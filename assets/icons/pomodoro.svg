@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1A1A2E"/>
+      <stop offset="100%" style="stop-color:#0F0F1A"/>
+    </linearGradient>
+    <linearGradient id="ring" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FF6B6B"/>
+      <stop offset="50%" style="stop-color:#7C3AED"/>
+      <stop offset="100%" style="stop-color:#4ECDC4"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <!-- Background circle -->
+  <circle cx="128" cy="128" r="120" fill="url(#bg)" stroke="rgba(255,255,255,0.1)" stroke-width="2"/>
+  <!-- Progress ring -->
+  <circle cx="128" cy="128" r="100" fill="none" stroke="url(#ring)" stroke-width="12" stroke-linecap="round"
+    stroke-dasharray="471" stroke-dashoffset="118" transform="rotate(-90 128 128)" filter="url(#glow)"/>
+  <!-- Track ring -->
+  <circle cx="128" cy="128" r="100" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="12"/>
+  <!-- Tomato body -->
+  <ellipse cx="128" cy="140" rx="42" ry="38" fill="#FF6B6B" filter="url(#glow)"/>
+  <!-- Tomato highlight -->
+  <ellipse cx="118" cy="130" rx="16" ry="12" fill="rgba(255,255,255,0.15)" transform="rotate(-15 118 130)"/>
+  <!-- Stem -->
+  <path d="M128 102 Q128 88 120 80" stroke="#4ECDC4" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <path d="M128 102 Q128 88 136 80" stroke="#4ECDC4" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <!-- Leaf -->
+  <path d="M120 85 Q112 78 118 72 Q124 78 120 85Z" fill="#4ECDC4"/>
+  <path d="M136 85 Q144 78 138 72 Q132 78 136 85Z" fill="#4ECDC4"/>
+  <!-- Tick marks -->
+  <g stroke="rgba(255,255,255,0.15)" stroke-width="1.5">
+    <line x1="128" y1="32" x2="128" y2="42"/>
+    <line x1="128" y1="214" x2="128" y2="224"/>
+    <line x1="32" y1="128" x2="42" y2="128"/>
+    <line x1="214" y1="128" x2="224" y2="128"/>
+  </g>
+</svg>

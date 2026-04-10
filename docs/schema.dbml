@@ -1,0 +1,82 @@
+// Pomodoro Linux — Database Schema
+// Paste this into https://dbdiagram.io to visualize
+// SQLite database at ~/.local/share/pomodoro/pomodoro.db
+
+Table users {
+  id            integer [pk, increment]
+  username      text    [not null, unique]
+  password_hash text    [not null, note: 'bcrypt hashed']
+  role          text    [not null, default: 'user', note: 'root | user']
+  created_at    text    [not null]
+
+  Note: 'First run seeds root/root. Root can manage all users and override ownership.'
+}
+
+Table tasks {
+  id               integer [pk, increment]
+  parent_id        integer [ref: > tasks.id, note: 'ON DELETE CASCADE — null = root project']
+  user             text    [not null, default: 'default', note: 'Owner — only owner/root can edit/delete']
+  title            text    [not null]
+  description      text
+  project          text    [note: 'Optional grouping label']
+  tags             text    [note: 'Comma-separated tags']
+  priority         integer [not null, default: 3, note: '1=lowest, 5=highest']
+  estimated        integer [not null, default: 1, note: 'Estimated pomodoros / story points']
+  actual           integer [not null, default: 0, note: 'Completed pomodoros (auto-incremented)']
+  estimated_hours  real    [not null, default: 0, note: 'Hour-based estimation']
+  remaining_points real    [not null, default: 0, note: 'Remaining story points (manual update)']
+  due_date         text    [note: 'ISO date string']
+  status           text    [not null, default: 'backlog', note: 'backlog | active | completed']
+  sort_order       integer [not null, default: 0, note: 'Scoped to siblings']
+  created_at       text    [not null]
+  updated_at       text    [not null]
+
+  Note: 'Hierarchical: parent_id=null → root project. Remaining % calculated from hours or points based on system estimation_mode.'
+}
+
+Table sessions {
+  id           integer [pk, increment]
+  task_id      integer [ref: > tasks.id, note: 'SET NULL on task delete']
+  user         text    [not null, default: 'default', note: 'Who ran this session']
+  session_type text    [not null, note: 'work | short_break | long_break']
+  status       text    [not null, note: 'running | completed | interrupted | skipped']
+  started_at   text    [not null]
+  ended_at     text    [note: 'null while running']
+  duration_s   integer [note: 'Computed on end']
+  notes        text
+
+  Note: 'Each pomodoro or break. Linked to task and stamped with user.'
+}
+
+Table comments {
+  id         integer [pk, increment]
+  task_id    integer [not null, ref: > tasks.id, note: 'Deleted with task']
+  session_id integer [ref: > sessions.id, note: 'Optional — links to specific pomodoro']
+  user       text    [not null, default: 'default', note: 'Author — only author/root can delete']
+  content    text    [not null]
+  created_at text    [not null]
+
+  Note: 'Anyone can comment on any task. Session-linked = notes during a pomodoro.'
+}
+
+Table time_reports {
+  id          integer [pk, increment]
+  task_id     integer [not null, ref: > tasks.id, note: 'Deleted with task']
+  user        text    [not null, note: 'Who logged the time']
+  hours       real    [not null, note: 'Hours worked']
+  description text    [note: 'What was done']
+  created_at  text    [not null]
+
+  Note: 'Manual time logging. Adding a report auto-assigns the user to the task.'
+}
+
+Table task_assignees {
+  task_id  integer [not null, ref: > tasks.id, note: 'ON DELETE CASCADE']
+  username text    [not null]
+
+  indexes {
+    (task_id, username) [pk]
+  }
+
+  Note: 'Many-to-many. Auto-populated when user logs time. Can also be manually assigned.'
+}

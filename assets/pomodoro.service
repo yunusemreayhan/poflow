@@ -1,0 +1,14 @@
+[Unit]
+Description=Pomodoro Timer Daemon
+Documentation=https://github.com/yunusemreayhan/pomodoroLinux
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/pomodoro-daemon
+Restart=on-failure
+RestartSec=3
+Environment=RUST_LOG=pomodoro_daemon=info
+
+[Install]
+WantedBy=default.target

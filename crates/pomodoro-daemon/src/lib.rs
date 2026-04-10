@@ -1,0 +1,137 @@
+pub mod auth;
+pub mod config;
+pub mod db;
+pub mod engine;
+pub mod notify;
+pub mod routes;
+
+use axum::Router;
+use std::sync::Arc;
+use tower_http::cors::{CorsLayer, Any};
+
+pub fn build_router(engine: Arc<engine::Engine>) -> Router {
+    use axum::routing::{delete, get, post, put};
+
+    let cors = CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods(Any)
+        .allow_headers(Any)
+        .expose_headers(Any);
+
+    Router::new()
+        .route("/api/auth/register", post(routes::register))
+        .route("/api/auth/login", post(routes::login))
+        .route("/api/timer", get(routes::get_state))
+        .route("/api/timer/start", post(routes::start))
+        .route("/api/timer/pause", post(routes::pause))
+        .route("/api/timer/resume", post(routes::resume))
+        .route("/api/timer/stop", post(routes::stop))
+        .route("/api/timer/skip", post(routes::skip))
+        .route("/api/tasks", get(routes::list_tasks).post(routes::create_task))
+        .route("/api/tasks/{id}", get(routes::get_task_detail).put(routes::update_task).delete(routes::delete_task))
+        .route("/api/tasks/{id}/comments", get(routes::list_comments).post(routes::add_comment))
+        .route("/api/comments/{id}", delete(routes::delete_comment))
+        .route("/api/tasks/{id}/time", get(routes::list_time_reports).post(routes::add_time_report))
+        .route("/api/tasks/{id}/assignees", get(routes::list_assignees).post(routes::add_assignee))
+        .route("/api/tasks/{id}/assignees/{username}", delete(routes::remove_assignee))
+        .route("/api/tasks/{id}/votes", get(routes::get_task_votes))
+        .route("/api/tasks/{id}/burn-total", get(routes::get_task_burn_total))
+        .route("/api/tasks/{id}/burn-users", get(routes::get_task_burn_users))
+        .route("/api/history", get(routes::get_history))
+        .route("/api/stats", get(routes::get_stats))
+        .route("/api/config", get(routes::get_config).put(routes::update_config))
+        .route("/api/profile", put(routes::update_profile))
+        .route("/api/admin/users", get(routes::list_users))
+        .route("/api/admin/users/{id}/role", put(routes::update_user_role))
+        .route("/api/admin/users/{id}", delete(routes::delete_user))
+        .route("/api/rooms", get(routes::list_rooms).post(routes::create_room))
+        .route("/api/rooms/{id}", get(routes::get_room_state).delete(routes::delete_room))
+        .route("/api/rooms/{id}/join", post(routes::join_room))
+        .route("/api/rooms/{id}/leave", post(routes::leave_room))
+        .route("/api/rooms/{id}/members/{username}", delete(routes::kick_member))
+        .route("/api/rooms/{id}/role", put(routes::set_room_role))
+        .route("/api/rooms/{id}/start-voting", post(routes::start_voting))
+        .route("/api/rooms/{id}/vote", post(routes::cast_vote))
+        .route("/api/rooms/{id}/reveal", post(routes::reveal_votes))
+        .route("/api/rooms/{id}/accept", post(routes::accept_estimate))
+        .route("/api/rooms/{id}/close", post(routes::close_room))
+        .route("/api/sprints", get(routes::list_sprints).post(routes::create_sprint))
+        .route("/api/sprints/{id}", get(routes::get_sprint_detail).put(routes::update_sprint).delete(routes::delete_sprint))
+        .route("/api/sprints/{id}/start", post(routes::start_sprint))
+        .route("/api/sprints/{id}/complete", post(routes::complete_sprint))
+        .route("/api/sprints/{id}/tasks", get(routes::get_sprint_tasks).post(routes::add_sprint_tasks))
+        .route("/api/sprints/{id}/tasks/{task_id}", delete(routes::remove_sprint_task))
+        .route("/api/sprints/{id}/burndown", get(routes::get_sprint_burndown))
+        .route("/api/sprints/burndown", get(routes::get_global_burndown))
+        .route("/api/epics", get(routes::list_epic_groups).post(routes::create_epic_group))
+        .route("/api/epics/{id}", get(routes::get_epic_group).delete(routes::delete_epic_group))
+        .route("/api/epics/{id}/tasks", post(routes::add_epic_group_tasks))
+        .route("/api/epics/{id}/tasks/{task_id}", delete(routes::remove_epic_group_task))
+        .route("/api/epics/{id}/snapshot", post(routes::snapshot_epic_group))
+        .route("/api/sprints/{id}/roots", get(routes::get_sprint_root_tasks).post(routes::add_sprint_root_tasks))
+        .route("/api/sprints/{id}/roots/{task_id}", delete(routes::remove_sprint_root_task))
+        .route("/api/sprints/{id}/scope", get(routes::get_sprint_scope))
+        .route("/api/teams", get(routes::list_teams).post(routes::create_team))
+        .route("/api/teams/{id}", get(routes::get_team).delete(routes::delete_team))
+        .route("/api/teams/{id}/members", post(routes::add_team_member))
+        .route("/api/teams/{id}/members/{user_id}", delete(routes::remove_team_member))
+        .route("/api/teams/{id}/roots", post(routes::add_team_root_tasks))
+        .route("/api/teams/{id}/roots/{task_id}", delete(routes::remove_team_root_task))
+        .route("/api/teams/{id}/scope", get(routes::get_team_scope))
+        .route("/api/me/teams", get(routes::get_my_teams))
+        .route("/api/sprints/{id}/snapshot", post(routes::snapshot_sprint))
+        .route("/api/sprints/{id}/board", get(routes::get_sprint_board))
+        .route("/api/sprints/{id}/burn", post(routes::log_burn))
+        .route("/api/sprints/{id}/burns", get(routes::list_burns))
+        .route("/api/sprints/{id}/burns/{burn_id}", delete(routes::cancel_burn))
+        .route("/api/sprints/{id}/burn-summary", get(routes::get_burn_summary))
+        .route("/api/task-sprints", get(routes::get_task_sprints))
+        .route("/api/users", get(routes::list_usernames))
+        .route("/api/burn-totals", get(routes::get_all_burn_totals))
+        .route("/api/assignees", get(routes::get_all_assignees))
+        .route("/api/tasks/full", get(routes::get_tasks_full))
+        .route("/api/timer/sse", get(routes::sse_timer))
+        .layer(cors)
+        .with_state(engine)
+}
+
+pub mod rate_limit {
+    use axum::extract::ConnectInfo;
+    use std::collections::HashMap;
+    use std::net::SocketAddr;
+    use std::sync::Arc;
+    use std::time::Instant;
+    use tokio::sync::Mutex;
+
+    #[derive(Clone)]
+    pub struct RateLimiter {
+        pub attempts: Arc<Mutex<HashMap<String, Vec<Instant>>>>,
+        pub max_requests: usize,
+        pub window_secs: u64,
+    }
+
+    impl RateLimiter {
+        pub fn new(max_requests: usize, window_secs: u64) -> Self {
+            Self { attempts: Arc::new(Mutex::new(HashMap::new())), max_requests, window_secs }
+        }
+    }
+
+    pub async fn check(
+        ConnectInfo(addr): ConnectInfo<SocketAddr>,
+        axum::extract::State(limiter): axum::extract::State<RateLimiter>,
+        req: axum::extract::Request,
+        next: axum::middleware::Next,
+    ) -> Result<axum::response::Response, axum::http::StatusCode> {
+        let key = addr.ip().to_string();
+        let now = Instant::now();
+        let mut map = limiter.attempts.lock().await;
+        let entries = map.entry(key).or_default();
+        entries.retain(|t| now.duration_since(*t).as_secs() < limiter.window_secs);
+        if entries.len() >= limiter.max_requests {
+            return Err(axum::http::StatusCode::TOO_MANY_REQUESTS);
+        }
+        entries.push(now);
+        drop(map);
+        Ok(next.run(req).await)
+    }
+}
