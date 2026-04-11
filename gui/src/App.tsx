@@ -243,6 +243,17 @@ export default function App() {
     }
   }, [activeTab, token]);
 
+  const [showShortcuts, setShowShortcuts] = useState(false);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.key === "?") setShowShortcuts(s => !s);
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
   if (!token) return <AuthScreen />;
 
   return (
@@ -333,6 +344,33 @@ export default function App() {
           )}
         </AnimatePresence>
       </main>
+      {/* Keyboard shortcuts panel */}
+      <AnimatePresence>
+        {showShortcuts && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowShortcuts(false)}>
+            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }}
+              className="glass p-6 rounded-2xl max-w-sm" onClick={e => e.stopPropagation()}>
+              <h2 className="text-sm font-semibold text-white mb-3">Keyboard Shortcuts</h2>
+              <div className="space-y-1.5 text-xs">
+                {[
+                  ["/", "Focus search"],
+                  ["?", "Toggle this panel"],
+                  ["Double-click", "Rename task"],
+                  ["Enter", "Save inline edit"],
+                  ["Escape", "Cancel inline edit"],
+                  ["Right-click", "Context menu"],
+                ].map(([key, desc]) => (
+                  <div key={key} className="flex items-center gap-3">
+                    <kbd className="px-1.5 py-0.5 rounded bg-white/10 text-white/70 font-mono text-[10px] min-w-[60px] text-center">{key}</kbd>
+                    <span className="text-white/50">{desc}</span>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

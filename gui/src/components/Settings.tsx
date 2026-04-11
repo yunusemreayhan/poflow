@@ -245,6 +245,7 @@ export default function Settings() {
           </select>
         </div>
         <LabelManager />
+        <TemplateManager />
       </div>
 
       {role === "root" && (
@@ -262,6 +263,59 @@ export default function Settings() {
         <Save size={18} />
         {saved ? "Saved!" : "Save Settings"}
       </motion.button>
+    </div>
+  );
+}
+
+interface Template { id: number; name: string; data: string; created_at: string }
+
+function TemplateManager() {
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [name, setName] = useState("");
+  const [data, setData] = useState('{"title":"","priority":3,"estimated":1}');
+
+  const load = () => apiCall<Template[]>("GET", "/api/templates").then(setTemplates).catch(() => {});
+  useEffect(load, []);
+
+  const create = async () => {
+    if (!name.trim()) return;
+    await apiCall("POST", "/api/templates", { name: name.trim(), data });
+    setName(""); load();
+  };
+
+  const del = async (id: number) => {
+    await apiCall("DELETE", `/api/templates/${id}`);
+    load();
+  };
+
+  const apply = async (t: Template) => {
+    try {
+      const parsed = JSON.parse(t.data);
+      await apiCall("POST", "/api/tasks", parsed);
+      useStore.getState().toast(`Created task from template "${t.name}"`);
+      useStore.getState().loadTasks();
+    } catch { useStore.getState().toast("Invalid template data", "error"); }
+  };
+
+  return (
+    <div className="mt-4">
+      <h3 className="text-sm font-medium text-[var(--color-text)] mb-2">Templates</h3>
+      <div className="flex gap-2 mb-2">
+        <input value={name} onChange={e => setName(e.target.value)} placeholder="Template name"
+          className="flex-1 bg-white/5 border border-white/10 rounded px-2 py-1 text-xs text-[var(--color-text)] outline-none" />
+        <button onClick={create} className="px-3 py-1 rounded text-xs bg-[var(--color-accent)] text-white">Add</button>
+      </div>
+      <textarea value={data} onChange={e => setData(e.target.value)} rows={2}
+        className="w-full bg-white/5 border border-white/10 rounded px-2 py-1 text-xs text-[var(--color-text)] outline-none font-mono mb-2"
+        placeholder='{"title":"Bug: ","priority":4}' />
+      {templates.map(t => (
+        <div key={t.id} className="flex items-center gap-2 text-xs py-1 group">
+          <span className="flex-1 text-[var(--color-text)]">{t.name}</span>
+          <button onClick={() => apply(t)} className="text-[var(--color-accent)] hover:underline">Use</button>
+          <button onClick={() => del(t.id)} className="text-white/20 hover:text-[var(--color-danger)] opacity-0 group-hover:opacity-100">✕</button>
+        </div>
+      ))}
+      {templates.length === 0 && <div className="text-xs text-[var(--color-dim)]">No templates yet</div>}
     </div>
   );
 }
