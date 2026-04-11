@@ -1,5 +1,78 @@
 # Changelog
 
+## v5 (in progress)
+
+### Security (10/10 — COMPLETE)
+- S1: Proper HMAC-SHA256 for webhook signatures (was SHA256(secret+body))
+- S2: Auth key derived from random per-installation salt (32 bytes)
+- S3: AES-256-GCM encryption for stored auth (was XOR cipher)
+- S4: Block executable file extensions in Tauri write_file
+- S5: Configurable CORS origins via POMODORO_CORS_ORIGINS env var
+- S6/B6: SSE ticket generation fails hard without /dev/urandom
+- S7: Bcrypt cost upgrade on login (rehash if cost < 12)
+- S8: Random storage key for attachments (was predictable timestamp)
+- S9: CSP + X-Content-Type-Options headers on attachment downloads
+- S10: Normalize IPv4-mapped IPv6 in rate limiter
+
+### Bugs (14/18)
+- B1/P1: User config cache with 60s TTL (tick() no longer does per-second DB queries)
+- B2: pause/resume/stop no longer acquire config lock unnecessarily
+- B3: get_state() lock ordering fixed (config → states)
+- B4: skip() increments session_count when skipping work phase
+- B7: WebSocket no longer auto-joins room on connect
+- B8: O(n) leaf detection in accept_estimate (was O(n²))
+- B9: Non-root users only export their own tasks
+- B10: Export sessions accepts from/to date range params
+- B11: Removed dead SSE ?token= fallback in frontend
+- B12: Module-level _tasksLoadedAt variable (was window cast)
+- B14: SSE connect guarded against unmounted component
+- B16: doReveal checks room status before calling reveal API
+- B17: BurnsView validates taskId > 0 before submit
+
+### Authorization (6/6 — COMPLETE)
+- Z1-Z6: Team/epic/sprint operations require admin or root
+
+### Validation (8/8 — COMPLETE)
+- V1-V7: Burn task, webhook URL, room type, team role/name, epic name, task existence
+
+### Features
+- F9: SSE reconnect with exponential backoff (1s→30s max)
+- F10: Bulk status change endpoint (PUT /api/tasks/bulk-status)
+- F12: WebSocket keepalive ping every 30s
+- F13: Export burns as CSV
+
+### Performance
+- P1: User config cache with 60s TTL
+- P2: get_state() only refreshes daily_completed on idle
+
+### Code Quality
+- Q1: TaskDetailView split (686→572 lines, extracted TaskDetailParts.tsx)
+- Q3: Settings split (519→410 lines, extracted SettingsParts.tsx)
+- Q4/Q5: Shared validate_username/validate_password in types.rs
+- Q7: Zero compiler warnings
+- Q9: CSV escape handles carriage returns
+- Q10: Date validation uses chrono::NaiveDate
+
+### UX
+- U5: Heatmap legend (Less → More gradient)
+- U6: Loading skeleton for sprint detail
+- U9: Empty state message for sprints list
+
+### Accessibility
+- A4: NumInput has aria-label
+- A5: Focus trap in confirmation dialog
+- A6: Error toasts use role="alert"
+- A9: MotionConfig reducedMotion="user"
+
+### Documentation
+- D1-D3: Rate limiting, webhook payload, production deployment docs
+- D4: Swagger UI endpoint documented
+- D5: Environment variables reference
+
+### i18n
+- I1: 6 empty state i18n keys (en + tr)
+- I4: Keyboard shortcuts panel i18n (7 keys)
+
 ## v4 (in progress)
 
 ### Security
