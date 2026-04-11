@@ -194,7 +194,7 @@ function DetailNode({ detail, depth, onRefresh, hoursMap }: { detail: TaskDetail
     Promise.all([
       apiCall<TimeReport[]>("GET", `/api/tasks/${t.id}/time`).catch(() => [] as TimeReport[]),
       apiCall<string[]>("GET", `/api/tasks/${t.id}/assignees`).catch(() => [] as string[]),
-      apiCall<string[]>("GET", "/api/users").catch(() => [] as string[]),
+      allUsers.length ? Promise.resolve(allUsers) : apiCall<string[]>("GET", "/api/users").catch(() => [] as string[]),
       apiCall<string[]>("GET", `/api/tasks/${t.id}/burn-users`).catch(() => [] as string[]),
     ]).then(([tr, a, u, bu]) => { setTimeReports(tr); setAssignees(a); setAllUsers(u); setBurnUsers(bu); });
   }, [t.id]);
