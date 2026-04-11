@@ -247,7 +247,8 @@ function TaskNode({ node, depth, onView, selectMode, onSelect, selectedTaskId, v
               className={`text-sm w-full bg-transparent border-b border-[var(--color-accent)] outline-none ${isProject ? "font-semibold" : ""} text-white`} />
           ) : (
             <div className={`text-sm truncate ${isProject ? "font-semibold" : ""} ${t.status === "completed" ? "line-through text-white/30" : "text-white/90"}`}
-              onDoubleClick={() => { if (isOwner) { setTitleDraft(t.title); setEditingTitle(true); } }}>
+              onDoubleClick={() => { if (isOwner) { setTitleDraft(t.title); setEditingTitle(true); } }}
+              className={isOwner ? "cursor-text" : "cursor-not-allowed"}>
               {searchQuery ? highlightMatch(t.title, searchQuery) : t.title}
             </div>
           )}
@@ -573,7 +574,7 @@ export default function TaskList({ selectMode, onSelect, selectedTaskId, votedTa
       <div className="flex gap-2 items-center">
         <div className="relative flex-1">
           <input id="task-search" value={search} onChange={e => setSearch(e.target.value)}
-            placeholder={selectMode ? "Search (regex)..." : "Search tasks (regex)... (press /)"}
+            placeholder={selectMode ? "Search..." : "Search tasks... (press /)"}
             className={`w-full bg-white/5 border border-white/10 text-xs text-white placeholder-white/30 outline-none focus:border-[var(--color-accent)] ${selectMode ? "rounded px-2 py-1" : "rounded-full px-4 py-2 pr-16"}`} />
           {search && (
             <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">

@@ -224,10 +224,10 @@ export default function App() {
       if (e.key === "Escape" && store.engine?.status === "Running") { store.stop(); }
       if (e.key === " " && store.engine?.status === "Running") { e.preventDefault(); store.pause(); }
       if (e.key === " " && store.engine?.status === "Paused") { e.preventDefault(); store.resume(); }
-      if (e.key === "r" && !e.ctrlKey && !e.metaKey) { store.loadTasks(); store.toast("Refreshed"); }
-      // Tab navigation: 1-6 for tabs (only when not in an input)
+      // Tab navigation and shortcuts: only when not in an input/select
       const tag = (e.target as HTMLElement)?.tagName;
-      if (tag !== "INPUT" && tag !== "TEXTAREA" && tag !== "SELECT" && !e.ctrlKey && !e.metaKey) {
+      if (tag !== "INPUT" && tag !== "TEXTAREA" && tag !== "SELECT" && !(e.target as HTMLElement)?.isContentEditable && !e.ctrlKey && !e.metaKey) {
+        if (e.key === "r") { store.loadTasks(); store.toast("Refreshed"); }
         const tabMap: Record<string, string> = { "0": "timer", "1": "tasks", "2": "sprints", "3": "rooms", "4": "history", "5": "settings", "6": "api" };
         if (tabMap[e.key]) { store.setTab(tabMap[e.key]); }
         if (e.key === "n" && store.activeTab === "tasks") {
