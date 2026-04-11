@@ -198,6 +198,7 @@ export default function EstimationRoomView({ roomId, onBack }: { roomId: number;
                   {cards.map(c => (
                     <motion.button key={c} whileHover={{ scale: 1.1, y: -8 }} whileTap={{ scale: 0.95 }}
                       onClick={() => vote(c)}
+                      aria-label={`Vote ${c} ${room.estimation_unit}`}
                       className={`w-14 h-20 rounded-xl flex items-center justify-center text-lg font-bold transition-all border-2 ${
                         selectedCard === c ? "border-[var(--color-accent)] bg-[var(--color-accent)]/20 text-[var(--color-accent)]"
                         : myVote?.voted ? "border-white/10 bg-white/5 text-white/30"

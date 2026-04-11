@@ -19,12 +19,14 @@ export default function Sprints() {
   const [createRoots, setCreateRoots] = useState<number[]>([]);
   const [createRootSearch, setCreateRootSearch] = useState("");
   const allTasks = useStore(s => s.tasks);
+  const [loading, setLoading] = useState(true);
   const rootTasks = allTasks.filter(t => t.parent_id === null);
 
   const load = useCallback(async () => {
     const params = filter !== "all" ? `?status=${filter}` : "";
     const data = await apiCall<Sprint[]>("GET", `/api/sprints${params}`);
     if (data) setSprints(data);
+    setLoading(false);
   }, [filter]);
 
   useEffect(() => {
@@ -139,7 +141,8 @@ export default function Sprints() {
           <button onClick={e => { e.stopPropagation(); useStore.getState().showConfirm(`Delete sprint "${s.name}"?`, () => del(s.id)); }} className="p-1 text-white/20 hover:text-red-400"><Trash2 size={14} /></button>
         </div>
       ))}
-      {sprints.length === 0 && <div className="text-center py-12"><div className="text-4xl mb-2">🏃</div><div className="text-white/30 text-sm">No sprints yet</div><div className="text-white/20 text-xs mt-1">Create one to start tracking progress</div></div>}
+      {loading && sprints.length === 0 && <div className="text-center py-12 text-white/20 text-sm">Loading sprints...</div>}
+      {!loading && sprints.length === 0 && <div className="text-center py-12"><div className="text-4xl mb-2">🏃</div><div className="text-white/30 text-sm">No sprints yet</div><div className="text-white/20 text-xs mt-1">Create one to start tracking progress</div></div>}
 
       {/* Velocity chart for completed sprints */}
       {sprints.filter(s => s.status === "completed").length >= 2 && (
