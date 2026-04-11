@@ -228,15 +228,12 @@ export default function App() {
       // Tab navigation: 1-6 for tabs (only when not in an input)
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag !== "INPUT" && tag !== "TEXTAREA" && tag !== "SELECT" && !e.ctrlKey && !e.metaKey) {
-        const tabMap: Record<string, string> = { "1": "tasks", "2": "sprints", "3": "rooms", "4": "history", "5": "settings", "6": "api" };
+        const tabMap: Record<string, string> = { "0": "timer", "1": "tasks", "2": "sprints", "3": "rooms", "4": "history", "5": "settings", "6": "api" };
         if (tabMap[e.key]) { store.setTab(tabMap[e.key]); }
         if (e.key === "n" && store.activeTab === "tasks") {
           e.preventDefault();
           // Focus the new task input if it exists
           document.querySelector<HTMLInputElement>('[data-new-task-input]')?.focus();
-        }
-        if (e.key === "?" && !e.shiftKey) {
-          store.toast("Keys: 1-6 tabs, Space pause/resume, Esc stop, r refresh, n new task, / search");
         }
         if (e.key === "/") {
           e.preventDefault();

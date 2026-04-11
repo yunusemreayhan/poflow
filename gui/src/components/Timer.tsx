@@ -30,7 +30,7 @@ const R = (SIZE - STROKE) / 2;
 const CIRC = 2 * Math.PI * R;
 
 export default function Timer() {
-  const { engine, tasks, start, pause, resume, stop, skip, startBreak } = useStore();
+  const { engine, tasks, start, pause, resume, stop, skip, startBreak, config } = useStore();
   const prevPhase = useRef<string | null>(null);
   const [showComment, setShowComment] = useState(false);
 
@@ -242,7 +242,7 @@ export default function Timer() {
             className="glass glass-hover flex items-center gap-2 px-5 py-2.5 rounded-full text-sm text-white/60 hover:text-white"
           >
             <Coffee size={15} />
-            Short Break
+            Short Break ({config?.short_break_min || 5}m)
           </motion.button>
           <motion.button
             whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
@@ -250,7 +250,7 @@ export default function Timer() {
             className="glass glass-hover flex items-center gap-2 px-5 py-2.5 rounded-full text-sm text-white/60 hover:text-white"
           >
             <Coffee size={15} />
-            Long Break
+            Long Break ({config?.long_break_min || 15}m)
           </motion.button>
         </div>
       )}
