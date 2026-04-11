@@ -122,8 +122,8 @@ export default function Sprints() {
       <EpicBurndown />
 
       {sprints.map(s => (
-        <div key={s.id} className="bg-[var(--color-surface)] p-3 rounded-lg flex items-center gap-3 cursor-pointer hover:bg-white/5 border border-white/5"
-          onClick={() => setSelected(s.id)}>
+        <div key={s.id} role="button" tabIndex={0} className="bg-[var(--color-surface)] p-3 rounded-lg flex items-center gap-3 cursor-pointer hover:bg-white/5 border border-white/5"
+          onClick={() => setSelected(s.id)} onKeyDown={e => e.key === "Enter" && setSelected(s.id)}>
           <div className="flex-1 min-w-0">
             <div className="text-sm text-white font-medium truncate">{s.name}</div>
             <div className="text-xs text-white/40 flex gap-2 mt-0.5">
@@ -172,8 +172,8 @@ function SprintView({ id, onBack }: { id: number; onBack: () => void }) {
     return () => { clearTimeout(sseTimer); window.removeEventListener("sse-sprints", onSse); };
   }, [load]);
 
-  const start = async () => { await apiCall("POST", `/api/sprints/${id}/start`); load(); };
-  const complete = async () => { await apiCall("POST", `/api/sprints/${id}/complete`); load(); };
+  const start = () => useStore.getState().showConfirm("Start this sprint?", async () => { await apiCall("POST", `/api/sprints/${id}/start`); load(); });
+  const complete = () => useStore.getState().showConfirm("Complete this sprint?", async () => { await apiCall("POST", `/api/sprints/${id}/complete`); load(); });
   const snapshot = async () => { await apiCall("POST", `/api/sprints/${id}/snapshot`); load(); };
 
   if (!detail) return <div className="p-4 text-white/30">Loading...</div>;

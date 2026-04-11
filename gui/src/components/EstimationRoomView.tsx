@@ -122,8 +122,14 @@ export default function EstimationRoomView({ roomId, onBack }: { roomId: number;
           ))}
         </div>
         {isAdmin && room.status !== "closed" && (
-          <button onClick={closeRoom} className="px-3 py-1.5 rounded-lg text-xs text-white/30 hover:text-[var(--color-danger)] bg-white/5">
+          <button onClick={closeRoom} className="px-3 py-1.5 rounded-lg text-xs text-white/30 hover:text-[var(--color-danger)] bg-white/5" title="Close room">
             <X size={14} />
+          </button>
+        )}
+        {!isAdmin && (
+          <button onClick={async () => { await apiCall("POST", `/api/rooms/${roomId}/leave`); onBack(); }}
+            className="px-3 py-1.5 rounded-lg text-xs text-white/30 hover:text-white/60 bg-white/5" title="Leave room">
+            Leave
           </button>
         )}
       </div>

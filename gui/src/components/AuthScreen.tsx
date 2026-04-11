@@ -13,6 +13,7 @@ export default function AuthScreen() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [editingServer, setEditingServer] = useState(false);
+  const [showPw, setShowPw] = useState(false);
   const [serverDraft, setServerDraft] = useState(serverUrl);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -80,14 +81,19 @@ export default function AuthScreen() {
             className="bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-sm text-white placeholder-white/30 outline-none focus:border-[var(--color-accent)]"
             autoFocus
           />
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Password (min 6 chars)"
-            aria-label="Password"
-            className="bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-sm text-white placeholder-white/30 outline-none focus:border-[var(--color-accent)]"
-          />
+          <div className="relative">
+            <input
+              type={showPw ? "text" : "password"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Password (min 6 chars)"
+              aria-label="Password"
+              className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 pr-10 text-sm text-white placeholder-white/30 outline-none focus:border-[var(--color-accent)]"
+            />
+            <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-3 top-3 text-white/30 hover:text-white/60 text-xs" aria-label={showPw ? "Hide password" : "Show password"}>
+              {showPw ? "🙈" : "👁"}
+            </button>
+          </div>
 
           {error && <div role="alert" className="text-xs text-[var(--color-danger)] bg-[var(--color-danger)]/10 rounded-lg px-3 py-2">{error}</div>}
 
