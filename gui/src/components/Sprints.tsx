@@ -236,7 +236,7 @@ function SprintView({ id, onBack }: { id: number; onBack: () => void }) {
 
       {tab === "board" && board && <BoardView board={board} reload={load} />}
       {tab === "backlog" && <BacklogView sprintId={id} taskIds={taskIds} reload={load} />}
-      {tab === "burns" && <BurnsView sprintId={id} tasks={detail.tasks} />}
+      {tab === "burns" && <BurnsView sprintId={id} sprintName={detail.sprint.name} tasks={detail.tasks} />}
       {tab === "burndown" && <BurndownView stats={detail.stats} />}
       {tab === "summary" && <SummaryView detail={detail} />}
     </div>

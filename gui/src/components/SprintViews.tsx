@@ -4,7 +4,7 @@ import type { Task, BurnEntry, BurnSummaryEntry, SprintDailyStat } from "../stor
 import Select from "./Select";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
-export function BurnsView({ sprintId, tasks }: { sprintId: number; tasks: Task[] }) {
+export function BurnsView({ sprintId, sprintName, tasks }: { sprintId: number; sprintName?: string; tasks: Task[] }) {
   const [burns, setBurns] = useState<BurnEntry[]>([]);
   const [summary, setSummary] = useState<BurnSummaryEntry[]>([]);
   const [taskId, setTaskId] = useState<number>(tasks[0]?.id || 0);
@@ -46,7 +46,7 @@ export function BurnsView({ sprintId, tasks }: { sprintId: number; tasks: Task[]
   return (
     <div className="space-y-3">
       <div className="bg-[var(--color-surface)] p-3 rounded-lg border border-white/5 space-y-2">
-        <div className="text-xs text-white/50 font-medium">Log Burn</div>
+        <div className="text-xs text-white/50 font-medium">Log Burn{sprintName ? ` — ${sprintName}` : ""}</div>
         <Select value={String(taskId)} onChange={v => setTaskId(Number(v))} className="w-full text-xs"
           options={tasks.map(t => ({value:String(t.id),label:t.title}))} />
         <div className="flex gap-2">
