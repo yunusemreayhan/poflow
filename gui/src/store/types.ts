@@ -21,6 +21,7 @@ export interface Task {
   created_at: string;
   updated_at: string;
   attachment_count: number;
+  deleted_at: string | null;
 }
 
 export interface Session {

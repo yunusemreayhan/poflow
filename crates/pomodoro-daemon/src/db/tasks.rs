@@ -1,7 +1,7 @@
 use super::*;
 
 
-pub const TASK_SELECT: &str = "SELECT t.id, t.parent_id, t.user_id, u.username as user, t.title, t.description, t.project, t.tags, t.priority, t.estimated, t.actual, t.estimated_hours, t.remaining_points, t.due_date, t.status, t.sort_order, t.created_at, t.updated_at, (SELECT COUNT(*) FROM task_attachments WHERE task_id = t.id) as attachment_count FROM tasks t JOIN users u ON t.user_id = u.id";
+pub const TASK_SELECT: &str = "SELECT t.id, t.parent_id, t.user_id, u.username as user, t.title, t.description, t.project, t.tags, t.priority, t.estimated, t.actual, t.estimated_hours, t.remaining_points, t.due_date, t.status, t.sort_order, t.created_at, t.updated_at, (SELECT COUNT(*) FROM task_attachments WHERE task_id = t.id) as attachment_count, t.deleted_at FROM tasks t JOIN users u ON t.user_id = u.id";
 
 pub async fn create_task(pool: &Pool, user_id: i64, parent_id: Option<i64>, title: &str, description: Option<&str>, project: Option<&str>, tags: Option<&str>, priority: i64, estimated: i64, estimated_hours: f64, remaining_points: f64, due_date: Option<&str>) -> Result<Task> {
     let now = now_str();
@@ -50,7 +50,7 @@ pub async fn list_tasks_paged(pool: &Pool, f: TaskFilter<'_>, limit: i64, offset
         Some(rows.into_iter().map(|r| r.0).collect())
     } else { None };
 
-    let mut q = format!("{} WHERE 1=1", TASK_SELECT);
+    let mut q = format!("{} WHERE t.deleted_at IS NULL", TASK_SELECT);
     if f.status.is_some() { q.push_str(" AND t.status = ?"); }
     if f.project.is_some() { q.push_str(" AND t.project = ?"); }
     if f.search.is_some() { q.push_str(" AND (t.title LIKE ? OR t.tags LIKE ?)"); }
@@ -105,32 +105,12 @@ pub async fn update_task(pool: &Pool, id: i64, title: Option<&str>, description:
 pub async fn delete_task(pool: &Pool, id: i64) -> Result<()> {
     let ids = get_descendant_ids(pool, &[id]).await?;
     let ph = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
-    let mut tx = pool.begin().await?;
-    sqlx::query("PRAGMA foreign_keys = ON").execute(&mut *tx).await?;
-
-    let sql = format!("UPDATE sessions SET task_id = NULL WHERE task_id IN ({})", ph);
-    let mut q = sqlx::query(&sql); for tid in &ids { q = q.bind(tid); } q.execute(&mut *tx).await?;
-
-    let sql = format!("DELETE FROM comments WHERE task_id IN ({})", ph);
-    let mut q = sqlx::query(&sql); for tid in &ids { q = q.bind(tid); } q.execute(&mut *tx).await?;
-
-    let sql = format!("DELETE FROM task_assignees WHERE task_id IN ({})", ph);
-    let mut q = sqlx::query(&sql); for tid in &ids { q = q.bind(tid); } q.execute(&mut *tx).await?;
-
-    let sql = format!("DELETE FROM burn_log WHERE task_id IN ({})", ph);
-    let mut q = sqlx::query(&sql); for tid in &ids { q = q.bind(tid); } q.execute(&mut *tx).await?;
-
-    let sql = format!("DELETE FROM sprint_tasks WHERE task_id IN ({})", ph);
-    let mut q = sqlx::query(&sql); for tid in &ids { q = q.bind(tid); } q.execute(&mut *tx).await?;
-
-    let sql = format!("DELETE FROM room_votes WHERE task_id IN ({})", ph);
-    let mut q = sqlx::query(&sql); for tid in &ids { q = q.bind(tid); } q.execute(&mut *tx).await?;
-
-    // Delete children first (reverse order to avoid FK violations on parent_id)
-    for tid in ids.iter().rev() {
-        sqlx::query("DELETE FROM tasks WHERE id = ?").bind(tid).execute(&mut *tx).await?;
-    }
-    tx.commit().await?;
+    let now = now_str();
+    // Soft delete: set deleted_at on task and all descendants
+    let sql = format!("UPDATE tasks SET deleted_at = ?, updated_at = ? WHERE id IN ({}) AND deleted_at IS NULL", ph);
+    let mut q = sqlx::query(&sql).bind(&now).bind(&now);
+    for tid in &ids { q = q.bind(tid); }
+    q.execute(pool).await?;
     Ok(())
 }
 
@@ -155,7 +135,7 @@ pub async fn count_tasks(pool: &Pool, f: TaskFilter<'_>) -> Result<i64> {
     } else { None };
     if let Some(ref ids) = assignee_task_ids { if ids.is_empty() { return Ok(0); } }
 
-    let mut q = "SELECT COUNT(*) FROM tasks t WHERE 1=1".to_string();
+    let mut q = "SELECT COUNT(*) FROM tasks t WHERE t.deleted_at IS NULL".to_string();
     if f.status.is_some() { q.push_str(" AND t.status = ?"); }
     if f.project.is_some() { q.push_str(" AND t.project = ?"); }
     if f.search.is_some() { q.push_str(" AND (t.title LIKE ? OR t.tags LIKE ?)"); }
@@ -183,6 +163,17 @@ pub async fn count_tasks(pool: &Pool, f: TaskFilter<'_>) -> Result<i64> {
     if let Some(ref ids) = team_scope { for id in ids { query = query.bind(id); } }
     let (count,) = query.fetch_one(pool).await?;
     Ok(count)
+}
+
+pub async fn restore_task(pool: &Pool, id: i64) -> Result<()> {
+    let ids = get_descendant_ids(pool, &[id]).await?;
+    let ph = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+    let now = now_str();
+    let sql = format!("UPDATE tasks SET deleted_at = NULL, updated_at = ? WHERE id IN ({})", ph);
+    let mut q = sqlx::query(&sql).bind(&now);
+    for tid in &ids { q = q.bind(tid); }
+    q.execute(pool).await?;
+    Ok(())
 }
 
 pub async fn reorder_tasks(pool: &Pool, orders: &[(i64, i64)]) -> Result<()> {

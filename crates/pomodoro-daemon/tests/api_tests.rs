@@ -893,13 +893,18 @@ async fn test_delete_task_cascades_burns_and_sprint_tasks() {
     app.clone().oneshot(auth_req("POST", &format!("/api/sprints/{}/tasks", sid), &tok, Some(json!({"task_ids":[tid]})))).await.unwrap();
     app.clone().oneshot(auth_req("POST", &format!("/api/sprints/{}/burn", sid), &tok, Some(json!({"task_id":tid,"points":5.0})))).await.unwrap();
 
-    // Delete task — should clean sprint_tasks and burn_log
+    // Delete task (soft delete) — sprint_tasks and burn_log remain since task still exists
     app.clone().oneshot(auth_req("DELETE", &format!("/api/tasks/{}", tid), &tok, None)).await.unwrap();
 
     let resp = app.clone().oneshot(auth_req("GET", &format!("/api/sprints/{}/tasks", sid), &tok, None)).await.unwrap();
-    assert_eq!(body_json(resp).await.as_array().unwrap().len(), 0);
+    assert_eq!(body_json(resp).await.as_array().unwrap().len(), 1); // task still linked
     let resp = app.clone().oneshot(auth_req("GET", &format!("/api/sprints/{}/burns", sid), &tok, None)).await.unwrap();
-    assert_eq!(body_json(resp).await.as_array().unwrap().len(), 0);
+    assert_eq!(body_json(resp).await.as_array().unwrap().len(), 1); // burn still exists
+
+    // But task should not appear in task list
+    let resp = app.clone().oneshot(auth_req("GET", "/api/tasks", &tok, None)).await.unwrap();
+    let tasks = body_json(resp).await;
+    assert!(!tasks.as_array().unwrap().iter().any(|t| t["id"] == tid));
 }
 
 #[tokio::test]

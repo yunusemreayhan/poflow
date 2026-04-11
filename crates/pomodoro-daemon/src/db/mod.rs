@@ -75,6 +75,8 @@ async fn migrate(pool: &Pool) -> Result<()> {
         created_at  TEXT NOT NULL,
         updated_at  TEXT NOT NULL
     )").execute(pool).await?;
+    // F1: Soft delete support
+    sqlx::query("ALTER TABLE tasks ADD COLUMN deleted_at TEXT").execute(pool).await.ok();
 
     sqlx::query("CREATE TABLE IF NOT EXISTS sessions (
         id           INTEGER PRIMARY KEY AUTOINCREMENT,

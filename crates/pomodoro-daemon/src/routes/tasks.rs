@@ -129,6 +129,16 @@ pub async fn delete_task(State(engine): State<AppState>, claims: Claims, Path(id
     Ok(StatusCode::NO_CONTENT)
 }
 
+#[utoipa::path(post, path = "/api/tasks/{id}/restore", responses((status = 204)), security(("bearer" = [])))]
+pub async fn restore_task(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>) -> Result<StatusCode, ApiError> {
+    let task: (i64,) = sqlx::query_as("SELECT user_id FROM tasks WHERE id = ?")
+        .bind(id).fetch_one(&engine.pool).await.map_err(|_| err(StatusCode::NOT_FOUND, "Task not found"))?;
+    if !is_owner_or_root(task.0, &claims) { return Err(err(StatusCode::FORBIDDEN, "Not owner")); }
+    db::restore_task(&engine.pool, id).await.map_err(internal)?;
+    engine.notify(ChangeEvent::Tasks);
+    Ok(StatusCode::NO_CONTENT)
+}
+
 #[derive(Deserialize, utoipa::ToSchema)]
 pub struct BulkStatusRequest { pub task_ids: Vec<i64>, pub status: String }
 

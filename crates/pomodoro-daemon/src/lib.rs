@@ -53,6 +53,7 @@ pub fn build_router(engine: Arc<engine::Engine>) -> Router {
         .route("/api/timer/skip", post(routes::skip))
         .route("/api/tasks", get(routes::list_tasks).post(routes::create_task))
         .route("/api/tasks/{id}", get(routes::get_task_detail).put(routes::update_task).delete(routes::delete_task))
+        .route("/api/tasks/{id}/restore", post(routes::restore_task))
         .route("/api/tasks/bulk-status", put(routes::bulk_update_status))
         .route("/api/tasks/{id}/comments", get(routes::list_comments).post(routes::add_comment))
         .route("/api/comments/{id}", delete(routes::delete_comment))
