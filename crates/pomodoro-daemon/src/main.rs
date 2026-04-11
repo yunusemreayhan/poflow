@@ -88,10 +88,14 @@ impl utoipa::Modify for SecurityAddon {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env()
-            .add_directive("pomodoro_daemon=info".parse()?))
-        .init();
+    let json_logs = std::env::var("POMODORO_LOG_JSON").map_or(false, |v| v == "1" || v.to_lowercase() == "true");
+    let filter = tracing_subscriber::EnvFilter::from_default_env()
+        .add_directive("pomodoro_daemon=info".parse()?);
+    if json_logs {
+        tracing_subscriber::fmt().with_env_filter(filter).json().init();
+    } else {
+        tracing_subscriber::fmt().with_env_filter(filter).init();
+    }
 
     tracing::info!("Pomodoro daemon starting...");
 

@@ -8,6 +8,7 @@
 | `POMODORO_SWAGGER` | `true` | Set to `0` or `false` to disable Swagger UI at `/swagger-ui/`. |
 | `ACCESS_TOKEN_EXPIRY_SECS` | `7200` (2 hours) | JWT access token lifetime in seconds. |
 | `REFRESH_TOKEN_EXPIRY_SECS` | `2592000` (30 days) | JWT refresh token lifetime in seconds. |
+| `POMODORO_LOG_JSON` | `false` | Set to `1` or `true` for structured JSON log output. |
 
 ## Config File
 
