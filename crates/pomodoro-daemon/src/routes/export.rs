@@ -115,13 +115,13 @@ pub async fn import_tasks_csv(State(engine): State<AppState>, claims: Claims, Js
     let mut created = 0i64;
     let mut errors = Vec::new();
     for (i, line) in req.csv.lines().enumerate() {
-        if i == 0 { continue; } // skip header
-        let cols: Vec<&str> = line.split(',').collect();
+        if i == 0 { continue; }
+        let cols = parse_csv_line(line);
         if cols.is_empty() || cols[0].trim().is_empty() { continue; }
-        let title = cols[0].trim().trim_matches('"').to_string();
+        let title = cols[0].trim().to_string();
         let priority = cols.get(1).and_then(|s| s.trim().parse::<i64>().ok()).unwrap_or(3).clamp(1, 5);
         let estimated = cols.get(2).and_then(|s| s.trim().parse::<i64>().ok()).unwrap_or(0);
-        let project = cols.get(3).map(|s| s.trim().trim_matches('"').to_string()).filter(|s| !s.is_empty());
+        let project = cols.get(3).map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
         match db::create_task(&engine.pool, claims.user_id, None, &title, None, project.as_deref(), None, priority, estimated, 0.0, 0.0, None).await {
             Ok(_) => created += 1,
             Err(e) => errors.push(format!("Line {}: {}", i + 1, e)),
@@ -129,4 +129,24 @@ pub async fn import_tasks_csv(State(engine): State<AppState>, claims: Claims, Js
     }
     engine.notify(ChangeEvent::Tasks);
     Ok(Json(serde_json::json!({ "created": created, "errors": errors })))
+}
+
+/// Parse a CSV line respecting quoted fields (handles commas and escaped quotes inside quotes)
+fn parse_csv_line(line: &str) -> Vec<String> {
+    let mut fields = Vec::new();
+    let mut current = String::new();
+    let mut in_quotes = false;
+    let mut chars = line.chars().peekable();
+    while let Some(c) = chars.next() {
+        if in_quotes {
+            if c == '"' {
+                if chars.peek() == Some(&'"') { chars.next(); current.push('"'); }
+                else { in_quotes = false; }
+            } else { current.push(c); }
+        } else if c == '"' { in_quotes = true; }
+        else if c == ',' { fields.push(std::mem::take(&mut current)); }
+        else { current.push(c); }
+    }
+    fields.push(current);
+    fields
 }

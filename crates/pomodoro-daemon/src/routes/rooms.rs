@@ -81,6 +81,11 @@ pub async fn start_voting(State(engine): State<AppState>, claims: Claims, Path(i
 pub async fn cast_vote(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>, Json(req): Json<CastVoteRequest>) -> Result<StatusCode, ApiError> {
     if req.value < 0.0 || req.value > 1000.0 { return Err(err(StatusCode::BAD_REQUEST, "Vote value must be 0-1000")); }
     let room = db::get_room(&engine.pool, id).await.map_err(internal)?;
+    // Verify user is a room member
+    let members = db::get_room_members(&engine.pool, id).await.map_err(internal)?;
+    if !members.iter().any(|m| m.user_id == claims.user_id) && claims.role != "root" {
+        return Err(err(StatusCode::FORBIDDEN, "Not a room member"));
+    }
     let task_id = room.current_task_id.ok_or_else(|| err(StatusCode::BAD_REQUEST, "No active vote"))?;
     db::cast_vote(&engine.pool, id, task_id, claims.user_id, req.value).await.map_err(internal)?;
     engine.notify(ChangeEvent::Rooms);

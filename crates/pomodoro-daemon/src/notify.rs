@@ -32,16 +32,20 @@ pub fn notify_session_complete(phase: TimerPhase, session_count: u32, play_sound
         ),
         TimerPhase::Idle => return,
     };
-    send_notification(&title, &body, phase, play_sound).ok();
+    tokio::task::spawn_blocking(move || { send_notification(&title, &body, phase, play_sound).ok(); });
 }
 
 pub fn notify_due_task(title: &str, urgency: &str) {
-    let _ = notify_rust::Notification::new()
-        .summary(&format!("📅 Task {}", urgency))
-        .body(title)
-        .icon("appointment-soon")
-        .appname("Pomodoro")
-        .urgency(notify_rust::Urgency::Normal)
-        .timeout(notify_rust::Timeout::Milliseconds(10000))
-        .show();
+    let summary = format!("📅 Task {}", urgency);
+    let body = title.to_string();
+    tokio::task::spawn_blocking(move || {
+        let _ = notify_rust::Notification::new()
+            .summary(&summary)
+            .body(&body)
+            .icon("appointment-soon")
+            .appname("Pomodoro")
+            .urgency(notify_rust::Urgency::Normal)
+            .timeout(notify_rust::Timeout::Milliseconds(10000))
+            .show();
+    });
 }

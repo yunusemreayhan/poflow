@@ -184,7 +184,14 @@ async fn main() -> Result<()> {
                             "monthly" => chrono::NaiveDate::parse_from_str(&rec.next_due, "%Y-%m-%d").ok().map(|d| {
                                 let m = d.month() % 12 + 1;
                                 let y = if m == 1 { d.year() + 1 } else { d.year() };
-                                chrono::NaiveDate::from_ymd_opt(y, m, d.day().min(28)).unwrap_or(d + chrono::Duration::days(30))
+                                // Preserve original day, clamping to month's last day
+                                let original_day = task.due_date.as_ref()
+                                    .and_then(|dd| chrono::NaiveDate::parse_from_str(dd, "%Y-%m-%d").ok())
+                                    .map(|dd| dd.day()).unwrap_or(d.day());
+                                let max_day = chrono::NaiveDate::from_ymd_opt(y, m + if m < 12 { 1 } else { 0 }, 1)
+                                    .unwrap_or_else(|| chrono::NaiveDate::from_ymd_opt(y + 1, 1, 1).unwrap())
+                                    .pred_opt().map(|d| d.day()).unwrap_or(28);
+                                chrono::NaiveDate::from_ymd_opt(y, m, original_day.min(max_day)).unwrap_or(d + chrono::Duration::days(30))
                             }),
                             _ => None,
                         };
@@ -203,11 +210,13 @@ async fn main() -> Result<()> {
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(std::time::Duration::from_secs(1800));
         let mut notified: std::collections::HashSet<i64> = std::collections::HashSet::new();
+        let mut last_date = String::new();
         loop {
             interval.tick().await;
             let today = chrono::Utc::now().naive_utc().format("%Y-%m-%d").to_string();
+            // Reset notified set on new day
+            if today != last_date { notified.clear(); last_date = today.clone(); }
             let tomorrow = (chrono::Utc::now().naive_utc() + chrono::Duration::days(1)).format("%Y-%m-%d").to_string();
-            // Find tasks due today or tomorrow that aren't completed
             let due_tasks = db::get_due_tasks(&engine_due.pool, &tomorrow).await.unwrap_or_default();
             for (id, title, due) in due_tasks {
                 if notified.contains(&id) { continue; }
@@ -215,8 +224,6 @@ async fn main() -> Result<()> {
                 notify::notify_due_task(&title, urgency);
                 notified.insert(id);
             }
-            // Reset notified set daily
-            if notified.len() > 1000 { notified.clear(); }
         }
     });
 

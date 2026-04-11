@@ -103,29 +103,34 @@ pub async fn update_task(pool: &Pool, id: i64, title: Option<&str>, description:
 }
 
 pub async fn delete_task(pool: &Pool, id: i64) -> Result<()> {
-    sqlx::query("PRAGMA foreign_keys = ON").execute(pool).await?;
     let ids = get_descendant_ids(pool, &[id]).await?;
     let ph = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+    let mut tx = pool.begin().await?;
+    sqlx::query("PRAGMA foreign_keys = ON").execute(&mut *tx).await?;
 
     let sql = format!("UPDATE sessions SET task_id = NULL WHERE task_id IN ({})", ph);
-    let mut q = sqlx::query(&sql); for tid in &ids { q = q.bind(tid); } q.execute(pool).await?;
+    let mut q = sqlx::query(&sql); for tid in &ids { q = q.bind(tid); } q.execute(&mut *tx).await?;
 
     let sql = format!("DELETE FROM comments WHERE task_id IN ({})", ph);
-    let mut q = sqlx::query(&sql); for tid in &ids { q = q.bind(tid); } q.execute(pool).await?;
+    let mut q = sqlx::query(&sql); for tid in &ids { q = q.bind(tid); } q.execute(&mut *tx).await?;
 
     let sql = format!("DELETE FROM task_assignees WHERE task_id IN ({})", ph);
-    let mut q = sqlx::query(&sql); for tid in &ids { q = q.bind(tid); } q.execute(pool).await?;
+    let mut q = sqlx::query(&sql); for tid in &ids { q = q.bind(tid); } q.execute(&mut *tx).await?;
 
     let sql = format!("DELETE FROM burn_log WHERE task_id IN ({})", ph);
-    let mut q = sqlx::query(&sql); for tid in &ids { q = q.bind(tid); } q.execute(pool).await?;
+    let mut q = sqlx::query(&sql); for tid in &ids { q = q.bind(tid); } q.execute(&mut *tx).await?;
 
     let sql = format!("DELETE FROM sprint_tasks WHERE task_id IN ({})", ph);
-    let mut q = sqlx::query(&sql); for tid in &ids { q = q.bind(tid); } q.execute(pool).await?;
+    let mut q = sqlx::query(&sql); for tid in &ids { q = q.bind(tid); } q.execute(&mut *tx).await?;
 
     let sql = format!("DELETE FROM room_votes WHERE task_id IN ({})", ph);
-    let mut q = sqlx::query(&sql); for tid in &ids { q = q.bind(tid); } q.execute(pool).await?;
+    let mut q = sqlx::query(&sql); for tid in &ids { q = q.bind(tid); } q.execute(&mut *tx).await?;
 
-    sqlx::query("DELETE FROM tasks WHERE id = ?").bind(id).execute(pool).await?;
+    // Delete children first (reverse order to avoid FK violations on parent_id)
+    for tid in ids.iter().rev() {
+        sqlx::query("DELETE FROM tasks WHERE id = ?").bind(tid).execute(&mut *tx).await?;
+    }
+    tx.commit().await?;
     Ok(())
 }
 

@@ -141,12 +141,16 @@ pub struct ReorderRequest { pub orders: Vec<(i64, i64)> }
 #[utoipa::path(post, path = "/api/tasks/reorder", responses((status = 204)), security(("bearer" = [])))]
 pub async fn reorder_tasks(State(engine): State<AppState>, claims: Claims, Json(req): Json<ReorderRequest>) -> Result<StatusCode, ApiError> {
     if req.orders.len() > 500 { return Err(err(StatusCode::BAD_REQUEST, "Too many items (max 500)")); }
-    // Verify user owns at least the first task (lightweight ownership check)
-    if let Some(&(task_id, _)) = req.orders.first() {
-        let task = db::get_task(&engine.pool, task_id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Task not found"))?;
-        if task.user_id != claims.user_id && claims.role != "root" {
-            return Err(err(StatusCode::FORBIDDEN, "Not task owner"));
-        }
+    // Verify user owns all tasks (root can reorder any)
+    if claims.role != "root" && !req.orders.is_empty() {
+        let ids: Vec<i64> = req.orders.iter().map(|&(id, _)| id).collect();
+        let ph = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        let q = format!("SELECT COUNT(*) as c FROM tasks WHERE id IN ({}) AND user_id != ?", ph);
+        let mut query = sqlx::query_as::<_, (i64,)>(&q);
+        for id in &ids { query = query.bind(id); }
+        query = query.bind(claims.user_id);
+        let (foreign,): (i64,) = query.fetch_one(&engine.pool).await.map_err(internal)?;
+        if foreign > 0 { return Err(err(StatusCode::FORBIDDEN, "Cannot reorder other users' tasks")); }
     }
     db::reorder_tasks(&engine.pool, &req.orders).await.map_err(internal)?;
     engine.notify(ChangeEvent::Tasks);

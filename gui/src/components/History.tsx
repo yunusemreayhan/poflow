@@ -169,14 +169,17 @@ export default function History() {
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-sm font-semibold text-white/60">Recent Sessions</h3>
           <button onClick={() => {
+            const esc = (s: string) => { const v = s.replace(/"/g, '""'); return /[,"\n\r]/.test(v) ? `"${v}"` : v; };
             const csv = ["date,type,status,user,task,duration_min",
-              ...filteredHistory.map(s => `${s.started_at?.slice(0,10)},${s.session_type},${s.status},${s.user},${(s.task_path || []).join(" > ").replace(/,/g, ";")},${s.duration_s ? Math.round(s.duration_s / 60) : 0}`)
+              ...filteredHistory.map(s => `${s.started_at?.slice(0,10)},${s.session_type},${s.status},${esc(s.user)},${esc((s.task_path || []).join(" > "))},${s.duration_s ? Math.round(s.duration_s / 60) : 0}`)
             ].join("\n");
             const blob = new Blob([csv], { type: "text/csv" });
+            const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
-            a.href = URL.createObjectURL(blob);
+            a.href = url;
             a.download = `sessions-${new Date().toISOString().slice(0,10)}.csv`;
             a.click();
+            URL.revokeObjectURL(url);
           }} className="text-xs text-[var(--color-accent)] hover:underline">↓ Export CSV</button>
         </div>
         <div className="space-y-3 max-h-48 overflow-y-auto">
