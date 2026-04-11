@@ -147,6 +147,13 @@ impl<S: Send + Sync> FromRequestParts<S> for Claims {
         _state: &S,
     ) -> impl std::future::Future<Output = Result<Self, Self::Rejection>> + Send {
         async move {
+            // CSRF: require x-requested-with header on state-changing requests
+            let method = &parts.method;
+            if method != axum::http::Method::GET && method != axum::http::Method::HEAD && method != axum::http::Method::OPTIONS {
+                if parts.headers.get("x-requested-with").is_none() {
+                    return Err(axum::http::StatusCode::FORBIDDEN);
+                }
+            }
             let header = parts.headers.get("authorization")
                 .and_then(|v| v.to_str().ok())
                 .ok_or(axum::http::StatusCode::UNAUTHORIZED)?;

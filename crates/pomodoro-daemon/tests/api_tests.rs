@@ -24,7 +24,8 @@ fn json_req(method: &str, uri: &str, body: Option<Value>) -> Request<Body> {
 fn auth_req(method: &str, uri: &str, token: &str, body: Option<Value>) -> Request<Body> {
     let b = Request::builder().method(method).uri(uri)
         .header("content-type", "application/json")
-        .header("authorization", format!("Bearer {}", token));
+        .header("authorization", format!("Bearer {}", token))
+        .header("x-requested-with", "test");
     if let Some(v) = body {
         b.body(Body::from(serde_json::to_vec(&v).unwrap())).unwrap()
     } else {
@@ -1827,6 +1828,7 @@ async fn test_attachments_crud() {
             .header("authorization", format!("Bearer {}", tok))
             .header("content-type", "text/plain")
             .header("x-filename", "test.txt")
+            .header("x-requested-with", "test")
             .body(axum::body::Body::from("hello world"))
             .unwrap()
     ).await.unwrap();
@@ -1872,6 +1874,7 @@ async fn test_attachment_empty_rejected() {
             .uri(format!("/api/tasks/{}/attachments", tid))
             .header("authorization", format!("Bearer {}", tok))
             .header("content-type", "text/plain")
+            .header("x-requested-with", "test")
             .body(axum::body::Body::empty())
             .unwrap()
     ).await.unwrap();
@@ -1893,6 +1896,7 @@ async fn test_attachment_filename_sanitized() {
             .header("authorization", format!("Bearer {}", tok))
             .header("content-type", "text/plain")
             .header("x-filename", "../../../etc/passwd")
+            .header("x-requested-with", "test")
             .body(axum::body::Body::from("test"))
             .unwrap()
     ).await.unwrap();
@@ -1902,4 +1906,26 @@ async fn test_attachment_filename_sanitized() {
     let filename = att["filename"].as_str().unwrap();
     assert!(!filename.contains('/'));
     assert!(!filename.contains(".."));
+}
+
+#[tokio::test]
+async fn test_csrf_header_required() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    // POST without x-requested-with should be rejected with 403
+    let req = Request::builder()
+        .method("POST").uri("/api/tasks")
+        .header("content-type", "application/json")
+        .header("authorization", format!("Bearer {}", tok))
+        .body(Body::from(serde_json::to_vec(&json!({"title":"T"})).unwrap())).unwrap();
+    let resp = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), 403);
+
+    // GET without x-requested-with should still work
+    let req = Request::builder()
+        .method("GET").uri("/api/timer")
+        .header("authorization", format!("Bearer {}", tok))
+        .body(Body::empty()).unwrap();
+    let resp = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), 200);
 }
