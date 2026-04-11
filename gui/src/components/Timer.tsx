@@ -31,7 +31,9 @@ const CIRC = 2 * Math.PI * R;
 
 export default function Timer() {
   const { engine, tasks, start, pause, resume, stop, skip, startBreak, config } = useStore();
+  const [selectedTaskId, setSelectedTaskId] = useState<number | undefined>(undefined);
   const [showComment, setShowComment] = useState(false);
+  const activeTasks = tasks.filter(t => t.status === "active" || t.status === "backlog");
 
   const phase = engine?.phase ?? "Idle";
   const status = engine?.status ?? "Idle";
@@ -168,16 +170,26 @@ export default function Timer() {
       {/* Controls */}
       <div className="flex items-center gap-5">
         {isIdle && (
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => start()}
-            className="flex items-center gap-3 px-10 py-4 rounded-full font-semibold text-white text-base transition-all"
-            style={{ background: `linear-gradient(135deg, ${color}, ${color}99)`, boxShadow: `0 4px 20px ${color}40` }}
-          >
-            <Play size={20} fill="white" />
-            Start Focus
-          </motion.button>
+          <div className="flex flex-col items-center gap-3">
+            {activeTasks.length > 0 && (
+              <select value={selectedTaskId ?? ""} onChange={e => setSelectedTaskId(e.target.value ? Number(e.target.value) : undefined)}
+                className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white/70 outline-none max-w-[240px] truncate"
+                aria-label="Select task to focus on">
+                <option value="">No task (free focus)</option>
+                {activeTasks.map(t => <option key={t.id} value={t.id}>{t.title}</option>)}
+              </select>
+            )}
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => start(selectedTaskId)}
+              className="flex items-center gap-3 px-10 py-4 rounded-full font-semibold text-white text-base transition-all"
+              style={{ background: `linear-gradient(135deg, ${color}, ${color}99)`, boxShadow: `0 4px 20px ${color}40` }}
+            >
+              <Play size={20} fill="white" />
+              Start Focus
+            </motion.button>
+          </div>
         )}
 
         {isRunning && (
