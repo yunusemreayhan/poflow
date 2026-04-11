@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Eye, Check, Crown, X, Edit3 } from "lucide-react";
 import { apiCall } from "../store/api";
@@ -18,6 +18,8 @@ export default function EstimationRoomView({ roomId, onBack }: { roomId: number;
   const [customAccept, setCustomAccept] = useState("");
   const [editingTask, setEditingTask] = useState(false);
   const [editTitle, setEditTitle] = useState("");
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
   const [editDesc, setEditDesc] = useState("");
 
   const load = useCallback(() => {
@@ -56,23 +58,15 @@ export default function EstimationRoomView({ roomId, onBack }: { roomId: number;
   };
 
   const doReveal = async () => {
-    if (!allVoted && notVoted.length > 0) {
-      // Countdown with warning
-      setCountdown(3);
-      for (let i = 3; i >= 1; i--) {
-        await new Promise(r => setTimeout(r, 1000));
-        setCountdown(i - 1);
-      }
-    } else {
-      setCountdown(3);
-      for (let i = 3; i >= 1; i--) {
-        await new Promise(r => setTimeout(r, 1000));
-        setCountdown(i - 1);
-      }
+    setCountdown(3);
+    for (let i = 3; i >= 1; i--) {
+      await new Promise(r => setTimeout(r, 1000));
+      if (!mountedRef.current) return;
+      setCountdown(i - 1);
     }
     setCountdown(null);
     await apiCall("POST", `/api/rooms/${roomId}/reveal`);
-    load();
+    if (mountedRef.current) load();
   };
 
   const acceptEstimate = async (value: number) => {

@@ -375,7 +375,10 @@ impl Engine {
     pub async fn get_state(&self, user_id: i64) -> EngineState {
         let states = self.states.lock().await;
         let config = self.config.lock().await.clone();
-        states.get(&user_id).cloned().unwrap_or_else(|| Self::idle_state(user_id, &config))
+        let mut state = states.get(&user_id).cloned().unwrap_or_else(|| Self::idle_state(user_id, &config));
+        // Always refresh daily_completed from DB for accuracy after restart
+        state.daily_completed = db::get_today_completed_for_user(&self.pool, Some(user_id)).await.unwrap_or(state.daily_completed);
+        state
     }
 
     pub async fn is_task_active(&self, task_id: i64) -> bool {
