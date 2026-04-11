@@ -7,6 +7,7 @@ export interface SavedServer {
   url: string;
   username: string;
   token: string;
+  refresh_token: string;
   role: string;
 }
 
@@ -121,7 +122,7 @@ export const useStore = create<Store>((set, get) => ({
     // Save to server list
     const url = get().serverUrl;
     const servers = loadServers().filter(s => !(s.url === url && s.username === resp.username));
-    servers.unshift({ url, username: resp.username, token: resp.token, role: resp.role });
+    servers.unshift({ url, username: resp.username, token: resp.token, refresh_token: resp.refresh_token, role: resp.role });
     saveServers(servers);
     set({ savedServers: servers });
   },
@@ -135,7 +136,7 @@ export const useStore = create<Store>((set, get) => ({
     set({ token: resp.token, username: resp.username, role: resp.role });
     const url = get().serverUrl;
     const servers = loadServers().filter(s => !(s.url === url && s.username === resp.username));
-    servers.unshift({ url, username: resp.username, token: resp.token, role: resp.role });
+    servers.unshift({ url, username: resp.username, token: resp.token, refresh_token: resp.refresh_token, role: resp.role });
     saveServers(servers);
     set({ savedServers: servers });
   },
@@ -179,8 +180,8 @@ export const useStore = create<Store>((set, get) => ({
     localStorage.setItem("serverUrl", server.url);
     await invoke("set_connection", { baseUrl: server.url });
     await setToken(server.token);
-    invoke("save_auth", { data: JSON.stringify({ token: server.token, username: server.username, role: server.role }) }).catch(() => {
-      localStorage.setItem("auth", JSON.stringify({ token: server.token, username: server.username, role: server.role }));
+    invoke("save_auth", { data: JSON.stringify({ token: server.token, refresh_token: server.refresh_token, username: server.username, role: server.role }) }).catch(() => {
+      localStorage.setItem("auth", JSON.stringify({ token: server.token, refresh_token: server.refresh_token, username: server.username, role: server.role }));
     });
     set({ serverUrl: server.url, token: server.token, username: server.username, role: server.role });
   },

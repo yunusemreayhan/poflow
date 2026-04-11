@@ -19,7 +19,8 @@ pub async fn register(headers: axum::http::HeaderMap, State(engine): State<AppSt
         .map_err(|_| err(StatusCode::CONFLICT, "Username already taken"))?;
     if let Err(e) = db::audit(&engine.pool, user.id, "register", "user", Some(user.id), None).await { tracing::warn!("Audit log failed: {}", e); }
     let token = auth::create_token(user.id, &user.username, &user.role).map_err(internal)?;
-    Ok(Json(AuthResponse { token, user_id: user.id, username: user.username, role: user.role }))
+    let refresh_token = auth::create_refresh_token(user.id, &user.username, &user.role).map_err(internal)?;
+    Ok(Json(AuthResponse { token, refresh_token, user_id: user.id, username: user.username, role: user.role }))
 }
 
 #[utoipa::path(post, path = "/api/auth/login", request_body = LoginRequest, responses((status = 200, body = AuthResponse)))]
@@ -35,7 +36,8 @@ pub async fn login(headers: axum::http::HeaderMap, State(engine): State<AppState
         return Err(err(StatusCode::UNAUTHORIZED, "Invalid credentials"));
     }
     let token = auth::create_token(user.id, &user.username, &user.role).map_err(internal)?;
-    Ok(Json(AuthResponse { token, user_id: user.id, username: user.username, role: user.role }))
+    let refresh_token = auth::create_refresh_token(user.id, &user.username, &user.role).map_err(internal)?;
+    Ok(Json(AuthResponse { token, refresh_token, user_id: user.id, username: user.username, role: user.role }))
 }
 
 #[utoipa::path(post, path = "/api/auth/logout", responses((status = 204)), security(("bearer" = [])))]
@@ -46,6 +48,22 @@ pub async fn logout(headers: axum::http::HeaderMap) -> Result<StatusCode, ApiErr
         .ok_or_else(|| err(StatusCode::UNAUTHORIZED, "Missing token"))?;
     auth::revoke_token(token).await;
     Ok(StatusCode::NO_CONTENT)
+}
+
+#[derive(Deserialize, utoipa::ToSchema)]
+pub struct RefreshRequest { pub refresh_token: String }
+
+#[utoipa::path(post, path = "/api/auth/refresh", responses((status = 200)), security(()))]
+pub async fn refresh_token(Json(req): Json<RefreshRequest>) -> ApiResult<AuthResponse> {
+    if auth::is_revoked(&req.refresh_token).await {
+        return Err(err(StatusCode::UNAUTHORIZED, "Token revoked"));
+    }
+    let claims = auth::verify_token(&req.refresh_token).map_err(|_| err(StatusCode::UNAUTHORIZED, "Invalid refresh token"))?;
+    let token = auth::create_token(claims.user_id, &claims.username, &claims.role).map_err(internal)?;
+    let refresh_token = auth::create_refresh_token(claims.user_id, &claims.username, &claims.role).map_err(internal)?;
+    // Revoke old refresh token (rotation)
+    auth::revoke_token(&req.refresh_token).await;
+    Ok(Json(AuthResponse { token, refresh_token, user_id: claims.user_id, username: claims.username, role: claims.role }))
 }
 
 // --- Timer ---

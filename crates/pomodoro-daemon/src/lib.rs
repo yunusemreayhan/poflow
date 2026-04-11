@@ -35,6 +35,7 @@ pub fn build_router(engine: Arc<engine::Engine>) -> Router {
         .route("/api/auth/register", post(routes::register))
         .route("/api/auth/login", post(routes::login))
         .route("/api/auth/logout", post(routes::logout))
+        .route("/api/auth/refresh", post(routes::refresh_token))
         .route("/api/timer", get(routes::get_state))
         .route("/api/timer/start", post(routes::start))
         .route("/api/timer/pause", post(routes::pause))

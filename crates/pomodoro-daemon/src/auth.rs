@@ -79,7 +79,14 @@ pub struct Claims {
 }
 
 pub fn create_token(user_id: i64, username: &str, role: &str) -> Result<String, jsonwebtoken::errors::Error> {
-    let exp = chrono::Utc::now().timestamp() as usize + 7 * 24 * 3600;
+    let exp = chrono::Utc::now().timestamp() as usize + 2 * 3600; // 2 hours
+    let claims = Claims { sub: user_id.to_string(), user_id, username: username.to_string(), role: role.to_string(), exp };
+    encode(&Header::default(), &claims, &EncodingKey::from_secret(secret()))
+}
+
+/// Create a long-lived refresh token (30 days)
+pub fn create_refresh_token(user_id: i64, username: &str, role: &str) -> Result<String, jsonwebtoken::errors::Error> {
+    let exp = chrono::Utc::now().timestamp() as usize + 30 * 24 * 3600;
     let claims = Claims { sub: user_id.to_string(), user_id, username: username.to_string(), role: role.to_string(), exp };
     encode(&Header::default(), &claims, &EncodingKey::from_secret(secret()))
 }

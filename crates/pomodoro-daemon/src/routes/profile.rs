@@ -18,7 +18,8 @@ pub async fn update_profile(State(engine): State<AppState>, claims: Claims, Json
     }
     let user = db::get_user(&engine.pool, claims.user_id).await.map_err(internal)?;
     let token = auth::create_token(user.id, &user.username, &user.role).map_err(internal)?;
-    Ok(Json(AuthResponse { token, user_id: user.id, username: user.username, role: user.role }))
+    let refresh_token = auth::create_refresh_token(user.id, &user.username, &user.role).map_err(internal)?;
+    Ok(Json(AuthResponse { token, refresh_token, user_id: user.id, username: user.username, role: user.role }))
 }
 
 // --- Admin ---

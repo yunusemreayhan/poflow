@@ -171,6 +171,7 @@ export interface BurnTotal {
 
 export interface AuthResponse {
   token: string;
+  refresh_token: string;
   user_id: number;
   username: string;
   role: string;

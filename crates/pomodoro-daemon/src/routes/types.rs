@@ -10,7 +10,7 @@ pub struct RegisterRequest { pub username: String, pub password: String }
 #[derive(Deserialize, utoipa::ToSchema)]
 pub struct LoginRequest { pub username: String, pub password: String }
 #[derive(Serialize, utoipa::ToSchema)]
-pub struct AuthResponse { pub token: String, pub user_id: i64, pub username: String, pub role: String }
+pub struct AuthResponse { pub token: String, pub refresh_token: String, pub user_id: i64, pub username: String, pub role: String }
 #[derive(Deserialize, utoipa::ToSchema)]
 pub struct CreateTaskRequest { pub title: String, pub parent_id: Option<i64>, pub description: Option<String>, pub project: Option<String>, pub tags: Option<String>, pub priority: Option<i64>, pub estimated: Option<i64>, pub estimated_hours: Option<f64>, pub remaining_points: Option<f64>, pub due_date: Option<String> }
 #[derive(Deserialize, utoipa::ToSchema)]
