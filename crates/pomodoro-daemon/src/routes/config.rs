@@ -8,6 +8,12 @@ pub async fn get_config(State(engine): State<AppState>, claims: Claims) -> ApiRe
 
 #[utoipa::path(put, path = "/api/config", request_body = crate::config::Config, responses((status = 200, body = crate::config::Config)), security(("bearer" = [])))]
 pub async fn update_config(State(engine): State<AppState>, claims: Claims, Json(cfg): Json<crate::config::Config>) -> ApiResult<crate::config::Config> {
+    // V1: Validate config bounds
+    if cfg.work_duration_min == 0 || cfg.work_duration_min > 240 { return Err(err(StatusCode::BAD_REQUEST, "work_duration_min must be 1-240")); }
+    if cfg.short_break_min == 0 || cfg.short_break_min > 60 { return Err(err(StatusCode::BAD_REQUEST, "short_break_min must be 1-60")); }
+    if cfg.long_break_min == 0 || cfg.long_break_min > 120 { return Err(err(StatusCode::BAD_REQUEST, "long_break_min must be 1-120")); }
+    if cfg.long_break_interval == 0 || cfg.long_break_interval > 20 { return Err(err(StatusCode::BAD_REQUEST, "long_break_interval must be 1-20")); }
+    if cfg.daily_goal > 50 { return Err(err(StatusCode::BAD_REQUEST, "daily_goal must be 0-50")); }
     // Save per-user overrides
     let uc = db::UserConfig {
         user_id: claims.user_id,

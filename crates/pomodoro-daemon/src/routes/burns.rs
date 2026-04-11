@@ -3,7 +3,10 @@ use super::*;
 
 #[utoipa::path(post, path = "/api/sprints/{id}/burn", request_body = LogBurnRequest, responses((status = 201, body = db::BurnEntry)), security(("bearer" = [])))]
 pub async fn log_burn(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>, Json(req): Json<LogBurnRequest>) -> Result<(StatusCode, Json<db::BurnEntry>), ApiError> {
-    let b = db::log_burn(&engine.pool, Some(id), req.task_id, None, claims.user_id, req.points.unwrap_or(0.0), req.hours.unwrap_or(0.0), "manual", req.note.as_deref())
+    let pts = req.points.unwrap_or(0.0);
+    let hrs = req.hours.unwrap_or(0.0);
+    if pts < 0.0 || hrs < 0.0 { return Err(err(StatusCode::BAD_REQUEST, "Points and hours must be non-negative")); }
+    let b = db::log_burn(&engine.pool, Some(id), req.task_id, None, claims.user_id, pts, hrs, "manual", req.note.as_deref())
         .await.map_err(internal)?;
     engine.notify(ChangeEvent::Sprints);
     Ok((StatusCode::CREATED, Json(b)))

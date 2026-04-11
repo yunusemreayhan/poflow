@@ -8,6 +8,7 @@ pub async fn list_comments(State(engine): State<AppState>, _claims: Claims, Path
 
 #[utoipa::path(post, path = "/api/tasks/{id}/comments", request_body = AddCommentRequest, responses((status = 201, body = db::Comment)), security(("bearer" = [])))]
 pub async fn add_comment(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>, Json(req): Json<AddCommentRequest>) -> Result<(StatusCode, Json<db::Comment>), ApiError> {
+    if req.content.trim().is_empty() { return Err(err(StatusCode::BAD_REQUEST, "Comment cannot be empty")); }
     db::add_comment(&engine.pool, claims.user_id, id, req.session_id, &req.content)
         .await.map(|c| { engine.notify(ChangeEvent::Tasks); (StatusCode::CREATED, Json(c)) }).map_err(internal)
 }
