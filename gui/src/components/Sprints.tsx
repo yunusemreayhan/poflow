@@ -120,12 +120,6 @@ export default function Sprints() {
 
       <EpicBurndown />
 
-      {!loading && sprints.length === 0 && (
-        <div className="text-center py-12 text-white/30 text-sm">
-          No sprints yet. Click <span className="text-[var(--color-accent)]">+</span> to create one.
-        </div>
-      )}
-
       {sprints.map(s => (
         <div key={s.id} role="button" tabIndex={0} className="bg-[var(--color-surface)] p-3 rounded-lg flex items-center gap-3 cursor-pointer hover:bg-white/5 border border-white/5"
           onClick={() => setSelected(s.id)} onKeyDown={e => e.key === "Enter" && setSelected(s.id)}>

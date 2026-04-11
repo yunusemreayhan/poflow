@@ -90,7 +90,7 @@ pub fn verify_token(token: &str) -> Result<Claims, jsonwebtoken::errors::Error> 
 
 /// Revoke a token (add to blocklist). Persists to DB.
 pub async fn revoke_token(token: &str) {
-    let hash = format!("{:x}", md5_hash(token.as_bytes()));
+    let hash = format!("{:032x}", token_hash(token.as_bytes()));
     blocklist().lock().await.insert(hash.clone());
     // Persist to DB
     if let Some(pool) = AUTH_POOL.get() {
@@ -109,11 +109,11 @@ pub async fn revoke_token(token: &str) {
 
 /// Check if a token has been revoked.
 pub async fn is_revoked(token: &str) -> bool {
-    let hash = format!("{:x}", md5_hash(token.as_bytes()));
+    let hash = format!("{:032x}", token_hash(token.as_bytes()));
     blocklist().lock().await.contains(&hash)
 }
 
-fn md5_hash(data: &[u8]) -> u128 {
+fn token_hash(data: &[u8]) -> u128 {
     use sha2::{Sha256, Digest};
     let hash = Sha256::digest(data);
     u128::from_be_bytes(hash[..16].try_into().unwrap())

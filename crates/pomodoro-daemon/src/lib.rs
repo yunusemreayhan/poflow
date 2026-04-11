@@ -142,55 +142,15 @@ pub fn build_router(engine: Arc<engine::Engine>) -> Router {
         .route("/api/timer/ticket", axum::routing::post(routes::create_sse_ticket))
         .layer(axum::extract::DefaultBodyLimit::max(2 * 1024 * 1024)) // 2MB max request body
         .layer(cors)
+        .layer(axum::middleware::from_fn(security_headers))
         .with_state(engine)
 }
 
-pub mod rate_limit {
-    use axum::extract::ConnectInfo;
-    use std::collections::HashMap;
-    use std::net::SocketAddr;
-    use std::sync::Arc;
-    use std::time::Instant;
-    use std::sync::Mutex;
-
-    #[derive(Clone)]
-    pub struct RateLimiter {
-        pub attempts: Arc<Mutex<HashMap<String, Vec<Instant>>>>,
-        pub max_requests: usize,
-        pub window_secs: u64,
-    }
-
-    impl RateLimiter {
-        pub fn new(max_requests: usize, window_secs: u64) -> Self {
-            Self { attempts: Arc::new(Mutex::new(HashMap::new())), max_requests, window_secs }
-        }
-    }
-
-    pub async fn check(
-        connect_info: Option<ConnectInfo<SocketAddr>>,
-        axum::extract::State(limiter): axum::extract::State<RateLimiter>,
-        req: axum::extract::Request,
-        next: axum::middleware::Next,
-    ) -> Result<axum::response::Response, axum::http::StatusCode> {
-        let key = match connect_info {
-            Some(ConnectInfo(addr)) => addr.ip().to_string(),
-            None => "unknown".to_string(),
-        };
-        let now = Instant::now();
-        let mut map = limiter.attempts.lock().unwrap();
-        // Periodic cleanup: remove stale IPs every 100 checks
-        if map.len() > 100 {
-            map.retain(|_, entries| {
-                entries.last().map_or(false, |t| now.duration_since(*t).as_secs() < limiter.window_secs * 2)
-            });
-        }
-        let entries = map.entry(key).or_default();
-        entries.retain(|t| now.duration_since(*t).as_secs() < limiter.window_secs);
-        if entries.len() >= limiter.max_requests {
-            return Err(axum::http::StatusCode::TOO_MANY_REQUESTS);
-        }
-        entries.push(now);
-        drop(map);
-        Ok(next.run(req).await)
-    }
+async fn security_headers(req: axum::extract::Request, next: axum::middleware::Next) -> axum::response::Response {
+    let mut resp = next.run(req).await;
+    let h = resp.headers_mut();
+    h.insert("x-content-type-options", "nosniff".parse().unwrap());
+    h.insert("x-frame-options", "DENY".parse().unwrap());
+    h.insert("referrer-policy", "strict-origin-when-cross-origin".parse().unwrap());
+    resp
 }

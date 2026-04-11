@@ -5,13 +5,9 @@ pub struct ExportQuery { pub format: Option<String>, pub from: Option<String>, p
 
 #[utoipa::path(get, path = "/api/export/tasks", responses((status = 200)), security(("bearer" = [])))]
 pub async fn export_tasks(State(engine): State<AppState>, claims: Claims, Query(q): Query<ExportQuery>) -> Result<axum::response::Response, ApiError> {
-    // Non-root users only export their own tasks
-    let tasks = if claims.role == "root" {
-        db::list_tasks(&engine.pool, None, None).await.map_err(internal)?
-    } else {
-        db::list_tasks(&engine.pool, None, None).await.map_err(internal)?
-            .into_iter().filter(|t| t.user_id == claims.user_id).collect()
-    };
+    let user_filter = if claims.role == "root" { None } else { Some(claims.user_id) };
+    let filter = db::TaskFilter { status: None, project: None, search: None, assignee: None, due_before: None, due_after: None, priority: None, team_id: None, user_id: user_filter };
+    let tasks = db::list_tasks_paged(&engine.pool, filter, 50000, 0).await.map_err(internal)?;
     let fmt = q.format.as_deref().unwrap_or("json");
     match fmt {
         "csv" => {
@@ -80,6 +76,12 @@ pub async fn export_sessions(State(engine): State<AppState>, claims: Claims, Que
 }
 
 fn escape_csv(s: &str) -> String {
+    // Prefix formula-triggering characters to prevent CSV injection in spreadsheet apps
+    let s = if s.starts_with('=') || s.starts_with('+') || s.starts_with('-') || s.starts_with('@') {
+        format!("'{}", s)
+    } else {
+        s.to_string()
+    };
     if s.contains(',') || s.contains('"') || s.contains('\n') || s.contains('\r') {
         format!("\"{}\"", s.replace('"', "\"\""))
     } else {

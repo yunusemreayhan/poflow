@@ -246,9 +246,8 @@ function TaskNode({ node, depth, onView, selectMode, onSelect, selectedTaskId, v
               onBlur={() => { if (titleDraft.trim()) { updateTask(t.id, { title: titleDraft.trim() }); } setEditingTitle(false); }}
               className={`text-sm w-full bg-transparent border-b border-[var(--color-accent)] outline-none ${isProject ? "font-semibold" : ""} text-white`} />
           ) : (
-            <div className={`text-sm truncate ${isProject ? "font-semibold" : ""} ${t.status === "completed" ? "line-through text-white/30" : "text-white/90"}`}
-              onDoubleClick={() => { if (isOwner) { setTitleDraft(t.title); setEditingTitle(true); } }}
-              className={isOwner ? "cursor-text" : "cursor-not-allowed"}>
+            <div className={`text-sm truncate ${isProject ? "font-semibold" : ""} ${t.status === "completed" ? "line-through text-white/30" : "text-white/90"} ${isOwner ? "cursor-text" : "cursor-not-allowed"}`}
+              onDoubleClick={() => { if (isOwner) { setTitleDraft(t.title); setEditingTitle(true); } }}>
               {searchQuery ? highlightMatch(t.title, searchQuery) : t.title}
             </div>
           )}

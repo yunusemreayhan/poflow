@@ -241,7 +241,7 @@ export default function App() {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag !== "INPUT" && tag !== "TEXTAREA" && tag !== "SELECT" && !(e.target as HTMLElement)?.isContentEditable && !e.ctrlKey && !e.metaKey) {
         if (e.key === "r") { store.loadTasks(); store.toast("Refreshed"); }
-        const tabMap: Record<string, string> = { "0": "timer", "1": "tasks", "2": "sprints", "3": "rooms", "4": "history", "5": "settings", "6": "api" };
+        const tabMap: Record<string, string> = { "0": "timer", "1": "tasks", "2": "sprints", "3": "rooms", "4": "history", "5": "api", "6": "settings" };
         if (tabMap[e.key]) { store.setTab(tabMap[e.key]); }
         if (e.key === "n" && store.activeTab === "tasks") {
           e.preventDefault();

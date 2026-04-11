@@ -8,10 +8,21 @@ use axum::Json;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-// Global rate limiter for auth endpoints: 10 attempts per 60 seconds per IP
-static AUTH_LIMITER: std::sync::OnceLock<crate::rate_limit::RateLimiter> = std::sync::OnceLock::new();
-fn auth_limiter() -> &'static crate::rate_limit::RateLimiter {
-    AUTH_LIMITER.get_or_init(|| crate::rate_limit::RateLimiter::new(10, 60))
+// Inline rate limiter (no external module dependency)
+struct RateLimiter {
+    attempts: std::sync::Mutex<std::collections::HashMap<String, Vec<std::time::Instant>>>,
+    max_requests: usize,
+    window_secs: u64,
+}
+impl RateLimiter {
+    fn new(max_requests: usize, window_secs: u64) -> Self {
+        Self { attempts: std::sync::Mutex::new(std::collections::HashMap::new()), max_requests, window_secs }
+    }
+}
+
+static AUTH_LIMITER: std::sync::OnceLock<RateLimiter> = std::sync::OnceLock::new();
+fn auth_limiter() -> &'static RateLimiter {
+    AUTH_LIMITER.get_or_init(|| RateLimiter::new(10, 60))
 }
 
 pub(crate) fn check_auth_rate_limit(headers: &axum::http::HeaderMap) -> Result<(), ApiError> {

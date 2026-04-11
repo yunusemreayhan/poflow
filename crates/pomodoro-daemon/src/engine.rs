@@ -247,7 +247,7 @@ impl Engine {
             state.session_count += 1;
         }
         let next_phase = match state.phase {
-            TimerPhase::Work => if state.session_count % config.long_break_interval == 0 { TimerPhase::LongBreak } else { TimerPhase::ShortBreak },
+            TimerPhase::Work => if state.session_count % config.long_break_interval.max(1) == 0 { TimerPhase::LongBreak } else { TimerPhase::ShortBreak },
             _ => TimerPhase::Work,
         };
         state.phase = next_phase;
@@ -320,7 +320,7 @@ impl Engine {
                 }
 
                 let next_phase = if was_work {
-                    if state.session_count % config.long_break_interval == 0 { TimerPhase::LongBreak } else { TimerPhase::ShortBreak }
+                    if state.session_count % config.long_break_interval.max(1) == 0 { TimerPhase::LongBreak } else { TimerPhase::ShortBreak }
                 } else {
                     TimerPhase::Work
                 };
