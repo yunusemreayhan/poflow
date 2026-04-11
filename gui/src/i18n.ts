@@ -157,6 +157,70 @@ export interface Locale {
   created: string;
   updated: string;
 
+  // Sprints (I2)
+  sprintName: string;
+  project: string;
+  sprintDuration: string;
+  todo: string;
+  inProgress: string;
+  done: string;
+  summary: string;
+  retroNotes: string;
+  addRetroNotes: string;
+  useTemplate: string;
+  searchRootTasks: string;
+  startThisSprint: string;
+  completeThisSprint: string;
+  noSprintTasks: string;
+
+  // Estimation rooms (I3)
+  pickEstimate: string;
+  revealCards: string;
+  consensus: string;
+  noConsensus: string;
+  average: string;
+  waitingForAdmin: string;
+  selectTask: string;
+  closeRoom: string;
+
+  // History (I5)
+  totalSessions: string;
+  focusHours: string;
+  currentStreak: string;
+  recentSessions: string;
+  exportCsv: string;
+  allUsers: string;
+  thisWeek: string;
+  activityHeatmap: string;
+
+  // Settings (I7)
+  timerDurations: string;
+  automation: string;
+  notifications: string;
+  goals: string;
+  account: string;
+  server: string;
+  estimationMode: string;
+  dailyGoalSessions: string;
+  backendUrl: string;
+  newPassword: string;
+  profileUpdated: string;
+  saveSettings: string;
+  userManagement: string;
+  promoteToRoot: string;
+  demoteToUser: string;
+  deleteUser: string;
+
+  // Auth (I8)
+  createAccount: string;
+  signIn: string;
+  firstUserAdmin: string;
+
+  // SprintViews (I6)
+  logBurn: string;
+  noBurnsLogged: string;
+  velocityTrend: string;
+
   // Empty states
   noSprintsYet: string;
   noTeamsYet: string;
@@ -164,6 +228,7 @@ export interface Locale {
   noWebhooksYet: string;
   noActivityRecorded: string;
   noRootTasks: string;
+  noMatchingTasks: string;
 }
 
 const en: Locale = {
@@ -314,6 +379,65 @@ const en: Locale = {
   noWebhooksYet: "No webhooks configured",
   noActivityRecorded: "No activity recorded",
   noRootTasks: "No root tasks — team sees nothing",
+  // Sprints (I2)
+  sprintName: "Sprint name",
+  project: "Project",
+  sprintDuration: "Sprint Duration",
+  todo: "Todo",
+  inProgress: "In Progress",
+  done: "Done",
+  summary: "Summary",
+  retroNotes: "Retro Notes",
+  addRetroNotes: "Add retrospective notes...",
+  useTemplate: "Use template",
+  searchRootTasks: "Search root tasks...",
+  startThisSprint: "Start this sprint?",
+  completeThisSprint: "Complete this sprint?",
+  noSprintTasks: "No tasks in sprint",
+  // Estimation rooms (I3)
+  pickEstimate: "Pick your estimate",
+  revealCards: "Reveal Cards",
+  consensus: "Consensus",
+  noConsensus: "No consensus",
+  average: "Average",
+  waitingForAdmin: "Waiting for admin to select a task...",
+  selectTask: "Select a task from the Tasks tab to start voting",
+  closeRoom: "Close room",
+  // History (I5)
+  totalSessions: "Total Sessions",
+  focusHours: "Focus Hours",
+  currentStreak: "Current Streak",
+  recentSessions: "Recent Sessions",
+  exportCsv: "↓ Export CSV",
+  allUsers: "All users",
+  thisWeek: "This Week",
+  activityHeatmap: "Activity heatmap",
+  // Settings (I7)
+  timerDurations: "Timer Durations",
+  automation: "Automation",
+  notifications: "Notifications",
+  goals: "Goals",
+  account: "Account",
+  server: "Server",
+  estimationMode: "Estimation Mode",
+  dailyGoalSessions: "Daily Goal (sessions)",
+  backendUrl: "Backend URL",
+  newPassword: "New Password",
+  profileUpdated: "Profile updated!",
+  saveSettings: "Save Settings",
+  userManagement: "User Management",
+  promoteToRoot: "Promote to root",
+  demoteToUser: "Demote to user",
+  deleteUser: "Delete user",
+  // Auth (I8)
+  createAccount: "Create your account",
+  signIn: "Sign in to continue",
+  firstUserAdmin: "First user becomes admin",
+  // SprintViews (I6)
+  logBurn: "Log Burn",
+  noBurnsLogged: "No burns logged",
+  velocityTrend: "Velocity Trend",
+  noMatchingTasks: "No matching tasks",
 };
 
 // Available locales — add new languages here
@@ -452,6 +576,59 @@ const tr: Locale = {
   noWebhooksYet: "Webhook yapılandırılmamış",
   noActivityRecorded: "Etkinlik kaydedilmemiş",
   noRootTasks: "Kök görev yok — takım hiçbir şey görmez",
+  sprintName: "Sprint adı",
+  project: "Proje",
+  sprintDuration: "Sprint Süresi",
+  todo: "Yapılacak",
+  inProgress: "Devam Eden",
+  done: "Tamamlandı",
+  summary: "Özet",
+  retroNotes: "Retro Notları",
+  addRetroNotes: "Retrospektif notları ekle...",
+  useTemplate: "Şablon kullan",
+  searchRootTasks: "Kök görev ara...",
+  startThisSprint: "Bu sprint başlatılsın mı?",
+  completeThisSprint: "Bu sprint tamamlansın mı?",
+  noSprintTasks: "Sprintte görev yok",
+  pickEstimate: "Tahmininizi seçin",
+  revealCards: "Kartları Göster",
+  consensus: "Uzlaşma",
+  noConsensus: "Uzlaşma yok",
+  average: "Ortalama",
+  waitingForAdmin: "Yöneticinin görev seçmesi bekleniyor...",
+  selectTask: "Oylama başlatmak için Görevler sekmesinden bir görev seçin",
+  closeRoom: "Odayı kapat",
+  totalSessions: "Toplam Oturum",
+  focusHours: "Odaklanma Saati",
+  currentStreak: "Mevcut Seri",
+  recentSessions: "Son Oturumlar",
+  exportCsv: "↓ CSV İndir",
+  allUsers: "Tüm kullanıcılar",
+  thisWeek: "Bu Hafta",
+  activityHeatmap: "Etkinlik haritası",
+  timerDurations: "Zamanlayıcı Süreleri",
+  automation: "Otomasyon",
+  notifications: "Bildirimler",
+  goals: "Hedefler",
+  account: "Hesap",
+  server: "Sunucu",
+  estimationMode: "Tahmin Modu",
+  dailyGoalSessions: "Günlük Hedef (oturum)",
+  backendUrl: "Sunucu URL",
+  newPassword: "Yeni Şifre",
+  profileUpdated: "Profil güncellendi!",
+  saveSettings: "Ayarları Kaydet",
+  userManagement: "Kullanıcı Yönetimi",
+  promoteToRoot: "Yönetici yap",
+  demoteToUser: "Kullanıcıya düşür",
+  deleteUser: "Kullanıcıyı sil",
+  createAccount: "Hesabınızı oluşturun",
+  signIn: "Devam etmek için giriş yapın",
+  firstUserAdmin: "İlk kullanıcı yönetici olur",
+  logBurn: "Burn Kaydet",
+  noBurnsLogged: "Burn kaydı yok",
+  velocityTrend: "Hız Trendi",
+  noMatchingTasks: "Eşleşen görev yok",
 };
 
 const locales: Record<string, Locale> = { en, tr };

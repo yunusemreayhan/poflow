@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { Users } from "lucide-react";
+import { useT } from "../i18n";
 import { formatDateTime } from "../utils";
 import Select from "./Select";
 
@@ -24,6 +25,7 @@ function HeatmapCell({ count, max, date }: { count: number; max: number; date: s
 }
 
 export default function History() {
+  const t = useT();
   const { stats, loadStats, history, loadHistory } = useStore();
   const [userFilter, setUserFilter] = useState<string>("all");
 
@@ -110,9 +112,9 @@ export default function History() {
       {/* Summary cards */}
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: "Total Sessions", value: totalSessions, icon: "🍅" },
-          { label: "Focus Hours", value: totalFocusHours, icon: "⏱️" },
-          { label: "Current Streak", value: `${streak}d`, icon: "🔥" },
+          { label: t.totalSessions, value: totalSessions, icon: "🍅" },
+          { label: t.focusHours, value: totalFocusHours, icon: "⏱️" },
+          { label: t.currentStreak, value: `${streak}d`, icon: "🔥" },
         ].map((card) => (
           <motion.div
             key={card.label}
@@ -167,7 +169,7 @@ export default function History() {
       {/* Recent sessions */}
       <div className="glass p-5">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-semibold text-white/60">Recent Sessions</h3>
+          <h3 className="text-sm font-semibold text-white/60">{t.recentSessions}</h3>
           <button onClick={() => {
             const esc = (s: string) => { const v = s.replace(/"/g, '""'); return /[,"\n\r]/.test(v) ? `"${v}"` : v; };
             const csv = ["date,type,status,user,task,duration_min",
@@ -180,7 +182,7 @@ export default function History() {
             a.download = `sessions-${new Date().toISOString().slice(0,10)}.csv`;
             a.click();
             URL.revokeObjectURL(url);
-          }} className="text-xs text-[var(--color-accent)] hover:underline">↓ Export CSV</button>
+          }} className="text-xs text-[var(--color-accent)] hover:underline">{t.exportCsv}</button>
         </div>
         <div className="space-y-3 max-h-48 overflow-y-auto">
           {filteredHistory.slice(0, 20).map((s) => (

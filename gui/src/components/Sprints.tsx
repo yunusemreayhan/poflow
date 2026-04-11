@@ -3,6 +3,7 @@ import { Plus, Trash2, Play, CheckCircle, ArrowLeft } from "lucide-react";
 import { apiCall } from "../store/api";
 import { useStore } from "../store/store";
 import { matchSearch } from "../utils";
+import { useT } from "../i18n";
 import { useSseDebounce } from "../hooks/useSseDebounce";
 import type { Sprint, SprintDetail, SprintBoard, SprintDailyStat, Task, BurnEntry, BurnSummaryEntry } from "../store/api";
 import TaskList from "./TaskList";
@@ -11,6 +12,7 @@ import EpicBurndown from "./EpicBurndown";
 import { BurnsView, BurndownView, VelocityChart } from "./SprintViews";
 
 export default function Sprints() {
+  const t = useT();
   const [sprints, setSprints] = useState<Sprint[]>([]);
   const [filter, setFilter] = useState<string>("all");
   const [selected, setSelected] = useState<number | null>(null);
@@ -142,7 +144,7 @@ export default function Sprints() {
         </div>
       ))}
       {loading && sprints.length === 0 && <div className="text-center py-12 text-white/20 text-sm">Loading sprints...</div>}
-      {!loading && sprints.length === 0 && <div className="text-center py-12"><div className="text-4xl mb-2">🏃</div><div className="text-white/30 text-sm">No sprints yet</div><div className="text-white/20 text-xs mt-1">Create one to start tracking progress</div></div>}
+      {!loading && sprints.length === 0 && <div className="text-center py-12"><div className="text-4xl mb-2">🏃</div><div className="text-white/30 text-sm">{t.noSprintsYet}</div><div className="text-white/20 text-xs mt-1">Create one to start tracking progress</div></div>}
 
       {/* Velocity chart for completed sprints */}
       {sprints.filter(s => s.status === "completed").length >= 2 && (
@@ -153,6 +155,7 @@ export default function Sprints() {
 }
 
 function SprintView({ id, onBack }: { id: number; onBack: () => void }) {
+  const t = useT();
   const [detail, setDetail] = useState<SprintDetail | null>(null);
   const [board, setBoard] = useState<SprintBoard | null>(null);
   const [loading, setLoading] = useState(true);
@@ -175,8 +178,8 @@ function SprintView({ id, onBack }: { id: number; onBack: () => void }) {
   useEffect(() => { load(); }, [load]);
   useSseDebounce("sse-sprints", load);
 
-  const start = () => useStore.getState().showConfirm("Start this sprint?", async () => { await apiCall("POST", `/api/sprints/${id}/start`); load(); });
-  const complete = () => useStore.getState().showConfirm("Complete this sprint?", async () => { await apiCall("POST", `/api/sprints/${id}/complete`); load(); });
+  const start = () => useStore.getState().showConfirm(t.startThisSprint, async () => { await apiCall("POST", `/api/sprints/${id}/start`); load(); }, t.start);
+  const complete = () => useStore.getState().showConfirm(t.completeThisSprint, async () => { await apiCall("POST", `/api/sprints/${id}/complete`); load(); }, t.completed);
   const snapshot = async () => { await apiCall("POST", `/api/sprints/${id}/snapshot`); load(); };
 
   if (loading || !detail) return (

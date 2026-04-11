@@ -3,6 +3,7 @@ import { ChevronRight } from "lucide-react";
 import { useStore } from "../store/store";
 import { apiCall } from "../store/api";
 import type { Task, TaskSprintInfo, Config } from "../store/api";
+import { useT } from "../i18n";
 import type { TreeNode } from "../tree";
 
 import { PRIORITY_COLORS } from "../constants";
@@ -34,6 +35,7 @@ interface CtxMenuProps {
 }
 
 export default function TaskContextMenu(p: CtxMenuProps) {
+  const tl = useT();
   const [ctxSub, setCtxSub] = useState<string | null>(null);
   const { task: t, pos, node, isOwner, assignees, ctxSprints, ctxUsers, ctxBurnUsers, taskSprints, config } = p;
   const close = p.onClose;
@@ -54,7 +56,7 @@ export default function TaskContextMenu(p: CtxMenuProps) {
           }
         }}>
 
-        <div className="px-3 py-1 text-white/20 text-[10px] uppercase tracking-wider" role="presentation">Status</div>
+        <div className="px-3 py-1 text-white/20 text-[10px] uppercase tracking-wider" role="presentation">{tl.status}</div>
         {([["backlog","Todo","○"],["active","WIP","▶"],["completed","Done","✓"],["archived","Archive","📦"]] as const).map(([s,label,icon]) => (
           <button key={s} role="menuitem" disabled={t.status === s} onClick={() => { p.updateTask(t.id, { status: s }); close(); }}
             className={`w-full text-left px-3 py-1.5 flex items-center gap-2 ${t.status === s ? "text-white/20" : "text-white/60 hover:bg-white/5"}`}>
@@ -64,7 +66,7 @@ export default function TaskContextMenu(p: CtxMenuProps) {
         ))}
 
         <div className="border-t border-white/5 my-1" />
-        <div className="px-3 py-1 text-white/20 text-[10px] uppercase tracking-wider">Priority</div>
+        <div className="px-3 py-1 text-white/20 text-[10px] uppercase tracking-wider">{tl.priority}</div>
         <div className="flex gap-1 px-3 py-1">
           {[1,2,3,4,5].map(pr => (
             <button key={pr} onClick={() => { p.updateTask(t.id, { priority: pr }); close(); }}

@@ -147,7 +147,7 @@ export default function Settings() {
   return (
     <div className="flex flex-col gap-5 p-8 h-full overflow-y-auto">
       <div className="glass p-5">
-        <h3 className="text-sm font-semibold text-white/60 mb-3">Timer Durations</h3>
+        <h3 className="text-sm font-semibold text-white/60 mb-3">{t.timerDurations}</h3>
         <Field label="Work (minutes)">
           <NumInput value={local.work_duration_min} onChange={(v) => set("work_duration_min", v)} label="Work duration (minutes)" />
         </Field>
@@ -163,7 +163,7 @@ export default function Settings() {
       </div>
 
       <div className="glass p-5">
-        <h3 className="text-sm font-semibold text-white/60 mb-3">Automation</h3>
+        <h3 className="text-sm font-semibold text-white/60 mb-3">{t.automation}</h3>
         <Field label="Auto-start Breaks">
           <Toggle value={local.auto_start_breaks} onChange={(v) => set("auto_start_breaks", v)} label="Auto-start Breaks" />
         </Field>
@@ -173,7 +173,7 @@ export default function Settings() {
       </div>
 
       <div className="glass p-5">
-        <h3 className="text-sm font-semibold text-white/60 mb-3">Notifications</h3>
+        <h3 className="text-sm font-semibold text-white/60 mb-3">{t.notifications}</h3>
         <Field label="Desktop Notifications">
           <Toggle value={local.notification_enabled} onChange={(v) => set("notification_enabled", v)} />
         </Field>
@@ -183,7 +183,7 @@ export default function Settings() {
       </div>
 
       <div className="glass p-5">
-        <h3 className="text-sm font-semibold text-white/60 mb-3">Goals</h3>
+        <h3 className="text-sm font-semibold text-white/60 mb-3">{t.goals}</h3>
         <Field label="Daily Goal (sessions)">
           <NumInput value={local.daily_goal} onChange={(v) => set("daily_goal", v)} min={1} max={20} label="Daily goal" />
         </Field>
@@ -271,7 +271,7 @@ export default function Settings() {
         style={{ background: saved ? "var(--color-success)" : "var(--color-accent)" }}
       >
         <Save size={18} />
-        {saved ? "Saved!" : isDirty ? "Save Settings •" : "Save Settings"}
+        {saved ? t.savedChanges : isDirty ? `${t.saveSettings} •` : t.saveSettings}
       </motion.button>
     </div>
   );
