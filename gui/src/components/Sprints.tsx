@@ -242,9 +242,9 @@ function SprintView({ id, onBack }: { id: number; onBack: () => void }) {
         </div>
       )}
 
-      <div className="flex gap-1 bg-[var(--color-surface)] rounded-lg p-0.5">
+      <div className="flex gap-1 bg-[var(--color-surface)] rounded-lg p-0.5" role="tablist">
         {(["board", "backlog", "burns", "burndown", "summary"] as const).map(t => (
-          <button key={t} onClick={() => setTab(t)}
+          <button key={t} onClick={() => setTab(t)} role="tab" aria-selected={tab === t}
             className={`flex-1 text-xs py-1.5 rounded ${tab === t ? "bg-[var(--color-accent)] text-white" : "text-white/50"}`}>
             {t[0].toUpperCase() + t.slice(1)}
           </button>
