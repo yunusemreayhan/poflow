@@ -10,6 +10,8 @@ pub async fn list_sprints(State(engine): State<AppState>, _claims: Claims, Query
 pub async fn create_sprint(State(engine): State<AppState>, claims: Claims, Json(req): Json<CreateSprintRequest>) -> Result<(StatusCode, Json<db::Sprint>), ApiError> {
     if req.name.trim().is_empty() { return Err(err(StatusCode::BAD_REQUEST, "Sprint name cannot be empty")); }
     if req.name.len() > 200 { return Err(err(StatusCode::BAD_REQUEST, "Sprint name too long (max 200 chars)")); }
+    if let Some(ref d) = req.start_date { if d.len() != 10 { return Err(err(StatusCode::BAD_REQUEST, "start_date must be YYYY-MM-DD")); } }
+    if let Some(ref d) = req.end_date { if d.len() != 10 { return Err(err(StatusCode::BAD_REQUEST, "end_date must be YYYY-MM-DD")); } }
     let s = db::create_sprint(&engine.pool, claims.user_id, &req.name, req.project.as_deref(), req.goal.as_deref(), req.start_date.as_deref(), req.end_date.as_deref())
         .await.map_err(internal)?;
     engine.notify(ChangeEvent::Sprints);
@@ -25,7 +27,7 @@ pub async fn get_sprint_detail(State(engine): State<AppState>, _claims: Claims, 
 pub async fn update_sprint(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>, Json(req): Json<UpdateSprintRequest>) -> ApiResult<db::Sprint> {
     let sprint = db::get_sprint(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Sprint not found"))?;
     if !is_owner_or_root(sprint.created_by_id, &claims) { return Err(err(StatusCode::FORBIDDEN, "Not owner")); }
-    if let Some(ref s) = req.status { validate_sprint_status(s)?; }
+    if req.status.is_some() { return Err(err(StatusCode::BAD_REQUEST, "Use /start or /complete endpoints to change sprint status")); }
     if let Some(ref expected) = req.expected_updated_at {
         if *expected != sprint.updated_at {
             return Err(err(StatusCode::CONFLICT, "Sprint was modified by another user. Please refresh and try again."));
@@ -85,6 +87,10 @@ pub async fn add_sprint_tasks(State(engine): State<AppState>, claims: Claims, Pa
     if !is_owner_or_root(sprint.created_by_id, &claims) { return Err(err(StatusCode::FORBIDDEN, "Not sprint owner")); }
     if req.task_ids.len() > 500 { return Err(err(StatusCode::BAD_REQUEST, "Too many task IDs (max 500)")); }
     if req.task_ids.is_empty() { return Err(err(StatusCode::BAD_REQUEST, "task_ids cannot be empty")); }
+    // Validate all tasks exist
+    for &tid in &req.task_ids {
+        db::get_task(&engine.pool, tid).await.map_err(|_| err(StatusCode::NOT_FOUND, &format!("Task {} not found", tid)))?;
+    }
     let result = db::add_sprint_tasks(&engine.pool, id, &req.task_ids, claims.user_id).await.map_err(internal)?;
     if db::get_sprint(&engine.pool, id).await.map(|s| s.status == "active").unwrap_or(false) {
         if let Err(e) = db::snapshot_sprint(&engine.pool, id).await { tracing::warn!("Snapshot failed: {}", e); }

@@ -1,6 +1,10 @@
 use super::*;
 
-
+fn valid_date(s: &str) -> bool {
+    // Accept YYYY-MM-DD format
+    s.len() == 10 && s.as_bytes().get(4) == Some(&b'-') && s.as_bytes().get(7) == Some(&b'-')
+        && s[..4].parse::<u16>().is_ok() && s[5..7].parse::<u8>().is_ok() && s[8..10].parse::<u8>().is_ok()
+}
 
 
 #[derive(Deserialize)]
@@ -55,6 +59,7 @@ pub async fn create_task(State(engine): State<AppState>, claims: Claims, Json(re
     let estimated = req.estimated.unwrap_or(1);
     if estimated < 0 { return Err(err(StatusCode::BAD_REQUEST, "Estimated cannot be negative")); }
     if req.estimated_hours.map_or(false, |h| h < 0.0) { return Err(err(StatusCode::BAD_REQUEST, "Estimated hours cannot be negative")); }
+    if let Some(ref d) = req.due_date { if !valid_date(d) { return Err(err(StatusCode::BAD_REQUEST, "due_date must be YYYY-MM-DD")); } }
     let t = db::create_task(&engine.pool, claims.user_id, req.parent_id, req.title.trim(), req.description.as_deref(), req.project.as_deref(), req.tags.as_deref(), priority, estimated, req.estimated_hours.unwrap_or(0.0), req.remaining_points.unwrap_or(0.0), req.due_date.as_deref())
         .await.map_err(internal)?;
     if let Err(e) = db::audit(&engine.pool, claims.user_id, "create", "task", Some(t.id), Some(&t.title)).await { tracing::warn!("Audit log failed: {}", e); }
@@ -76,6 +81,7 @@ pub async fn update_task(State(engine): State<AppState>, claims: Claims, Path(id
     if let Some(p) = req.priority { if p < 1 || p > 5 { return Err(err(StatusCode::BAD_REQUEST, "Priority must be 1-5")); } }
     if let Some(e) = req.estimated { if e < 0 { return Err(err(StatusCode::BAD_REQUEST, "Estimated cannot be negative")); } }
     if let Some(h) = req.estimated_hours { if h < 0.0 { return Err(err(StatusCode::BAD_REQUEST, "Estimated hours cannot be negative")); } }
+    if let Some(ref dd) = req.due_date { if let Some(ref d) = dd { if !valid_date(d) { return Err(err(StatusCode::BAD_REQUEST, "due_date must be YYYY-MM-DD")); } } }
     if let Some(ref expected) = req.expected_updated_at {
         if *expected != task.updated_at {
             return Err(err(StatusCode::CONFLICT, "Task was modified by another user. Please refresh and try again."));
