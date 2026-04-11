@@ -558,6 +558,7 @@ export default function TaskList({ selectMode, onSelect, selectedTaskId, votedTa
           onChange={(e) => setNewTitle(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleAddRoot()}
           placeholder="New project or top-level task..."
+          aria-label="New project or top-level task"
           className="flex-1 bg-transparent border-none outline-none text-white placeholder-white/30 text-sm py-1"
         />
         <motion.button
@@ -575,6 +576,7 @@ export default function TaskList({ selectMode, onSelect, selectedTaskId, votedTa
         <div className="relative flex-1">
           <input id="task-search" value={search} onChange={e => setSearch(e.target.value)}
             placeholder={selectMode ? "Search..." : "Search tasks... (press /)"}
+            aria-label="Search tasks"
             className={`w-full bg-white/5 border border-white/10 text-xs text-white placeholder-white/30 outline-none focus:border-[var(--color-accent)] ${selectMode ? "rounded px-2 py-1" : "rounded-full px-4 py-2 pr-16"}`} />
           {search && (
             <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
