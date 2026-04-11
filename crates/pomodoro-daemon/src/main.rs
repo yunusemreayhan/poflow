@@ -164,6 +164,8 @@ async fn main() -> Result<()> {
                 Err(e) => { tracing::error!("Recurrence check error: {}", e); continue; }
             };
             for rec in due {
+                // Skip if already created today (idempotency)
+                if rec.last_created.as_deref() == Some(&today) { continue; }
                 // Clone the template task
                 if let Ok(task) = db::get_task(&engine_recur.pool, rec.task_id).await {
                     let title = format!("{} ({})", task.title, today);

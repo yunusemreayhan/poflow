@@ -18,11 +18,9 @@ export async function apiCall<T = unknown>(method: string, path: string, body?: 
 }
 
 function showErrorToast(msg: string) {
-  // Lazy import to avoid circular dependency
-  try {
-    const { useStore } = require("./store");
+  import("./store").then(({ useStore }) => {
     useStore.getState().toast(msg, "error");
-  } catch {}
+  }).catch(() => {});
 }
 
 export async function setToken(token: string) {
@@ -248,6 +246,7 @@ export interface Sprint {
   status: string;
   start_date: string | null;
   end_date: string | null;
+  retro_notes: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;

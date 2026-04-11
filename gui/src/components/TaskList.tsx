@@ -102,12 +102,12 @@ function TaskNode({ node, depth, onView, selectMode, onSelect, selectedTaskId, v
           const dragId = Number(e.dataTransfer?.getData("text/plain"));
           if (!dragId || dragId === t.id) return;
           // Prevent dropping parent onto its own descendant
-          const isDescendant = (parentId: number | null, childId: number): boolean => {
-            let pid = parentId;
-            while (pid) { if (pid === childId) return true; const p = tasks.find(tk => tk.id === pid); pid = p?.parent_id ?? null; }
+          const isDescendantOf = (nodeId: number, ancestorId: number): boolean => {
+            let pid: number | null = nodeId;
+            while (pid) { if (pid === ancestorId) return true; const p = tasks.find(tk => tk.id === pid); pid = p?.parent_id ?? null; }
             return false;
           };
-          if (isDescendant(t.parent_id, dragId) || t.id === dragId) return;
+          if (isDescendantOf(t.id, dragId) || t.id === dragId) return;
           if (dropZone === "on") {
             await updateTask(dragId, { parent_id: t.id, sort_order: 0 });
           } else {
@@ -380,7 +380,7 @@ function TaskNode({ node, depth, onView, selectMode, onSelect, selectedTaskId, v
       {ctxMenu && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setCtxMenu(null)} />
-          <div className="fixed z-50 bg-[#1a1a2e] border border-white/10 rounded-lg shadow-xl py-1 min-w-52 text-xs"
+          <div className="fixed z-50 bg-[var(--color-surface)] border border-white/10 rounded-lg shadow-xl py-1 min-w-52 text-xs"
             style={{ left: Math.min(ctxMenu.x, window.innerWidth - 260), top: Math.min(ctxMenu.y, window.innerHeight - 400) }}>
 
             {/* --- Status --- */}
@@ -414,7 +414,7 @@ function TaskNode({ node, depth, onView, selectMode, onSelect, selectedTaskId, v
                 🏃 Sprints <ChevronRight size={12} className="text-white/30" />
               </div>
               {ctxSub === "sprints" && (
-                <div className="absolute top-0 bg-[#1a1a2e] border border-white/10 rounded-lg shadow-xl py-1 min-w-48 z-50"
+                <div className="absolute top-0 bg-[var(--color-surface)] border border-white/10 rounded-lg shadow-xl py-1 min-w-48 z-50"
                   style={ctxMenu && ctxMenu.x > window.innerWidth - 520 ? { right: "100%" } : { left: "100%" }}>
                   {taskSprints.filter(ts => ts.task_id === t.id).map(ts => (
                     <button key={`rm-${ts.sprint_id}`} onClick={async () => {
@@ -445,7 +445,7 @@ function TaskNode({ node, depth, onView, selectMode, onSelect, selectedTaskId, v
                 👤 Assignees <ChevronRight size={12} className="text-white/30" />
               </div>
               {ctxSub === "assign" && (
-                <div className="absolute top-0 bg-[#1a1a2e] border border-white/10 rounded-lg shadow-xl py-1 min-w-48 z-50 max-h-64 overflow-y-auto"
+                <div className="absolute top-0 bg-[var(--color-surface)] border border-white/10 rounded-lg shadow-xl py-1 min-w-48 z-50 max-h-64 overflow-y-auto"
                   style={ctxMenu && ctxMenu.x > window.innerWidth - 520 ? { right: "100%" } : { left: "100%" }}>
                   {assignees.length > 0 && (
                     <>

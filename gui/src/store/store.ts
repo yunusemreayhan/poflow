@@ -145,7 +145,7 @@ export const useStore = create<Store>((set, get) => ({
     invoke("clear_auth").catch(() => {});
     localStorage.removeItem("auth");
     set({ token: null, username: null, role: null });
-    setToken("");
+    invoke("set_token", { token: "" }).catch(() => {});
   },
 
   restoreAuth: async () => {

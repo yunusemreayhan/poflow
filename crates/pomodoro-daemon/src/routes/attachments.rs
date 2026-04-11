@@ -58,13 +58,17 @@ pub async fn download_attachment(State(engine): State<AppState>, _claims: Claims
     Ok(axum::response::Response::builder()
         .status(StatusCode::OK)
         .header("content-type", &att.mime_type)
-        .header("content-disposition", format!("attachment; filename=\"{}\"", att.filename))
+        .header("content-disposition", format!("attachment; filename=\"{}\"", att.filename.replace('"', "_")))
         .body(axum::body::Body::from(data))
         .map_err(|e| internal(e.to_string()))?)
 }
 
 #[utoipa::path(delete, path = "/api/attachments/{id}", responses((status = 204)), security(("bearer" = [])))]
-pub async fn delete_attachment(State(engine): State<AppState>, _claims: Claims, Path(id): Path<i64>) -> Result<StatusCode, ApiError> {
+pub async fn delete_attachment(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>) -> Result<StatusCode, ApiError> {
+    let att = db::get_attachment(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Attachment not found"))?;
+    if att.user_id != claims.user_id && claims.role != "root" {
+        return Err(err(StatusCode::FORBIDDEN, "Not owner"));
+    }
     let key = db::delete_attachment(&engine.pool, id).await.map_err(internal)?;
     let path = db::attachments_dir().join(&key);
     let _ = tokio::fs::remove_file(&path).await;

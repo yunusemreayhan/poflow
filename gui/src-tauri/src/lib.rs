@@ -59,7 +59,7 @@ async fn api_call(state: tauri::State<'_, Arc<AppState>>, method: String, path: 
 
 #[tauri::command]
 async fn set_token(state: tauri::State<'_, Arc<AppState>>, token: String) -> Result<(), String> {
-    state.config.lock().await.token = Some(token);
+    state.config.lock().await.token = if token.is_empty() { None } else { Some(token) };
     Ok(())
 }
 
