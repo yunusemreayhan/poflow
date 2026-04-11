@@ -7,6 +7,8 @@ pub async fn log_burn(State(engine): State<AppState>, claims: Claims, Path(id): 
     let hrs = req.hours.unwrap_or(0.0);
     if pts < 0.0 || hrs < 0.0 { return Err(err(StatusCode::BAD_REQUEST, "Points and hours must be non-negative")); }
     if pts > 1000.0 || hrs > 24.0 { return Err(err(StatusCode::BAD_REQUEST, "Points max 1000, hours max 24")); }
+    let sprint = db::get_sprint(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Sprint not found"))?;
+    if sprint.status == "completed" { return Err(err(StatusCode::BAD_REQUEST, "Cannot log burns on completed sprints")); }
     // Verify task belongs to this sprint
     let sprint_tasks = db::get_sprint_task_entries(&engine.pool, id).await.map_err(internal)?;
     if !sprint_tasks.iter().any(|st| st.task_id == req.task_id) {

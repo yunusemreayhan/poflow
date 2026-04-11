@@ -143,11 +143,12 @@ function TaskNode({ node, depth, onView, selectMode, onSelect, selectedTaskId, v
         onTouchStart={(e) => {
           const touch = e.touches[0];
           longPressRef.current = setTimeout(() => {
+            longPressRef.current = null;
             setCtxMenu({ x: touch.clientX, y: touch.clientY });
           }, 500);
         }}
-        onTouchEnd={() => { if (longPressRef.current) clearTimeout(longPressRef.current); longPressRef.current = null; }}
-        onTouchMove={() => { if (longPressRef.current) clearTimeout(longPressRef.current); longPressRef.current = null; }}
+        onTouchEnd={() => { if (longPressRef.current) { clearTimeout(longPressRef.current); longPressRef.current = null; } }}
+        onTouchMove={() => { if (longPressRef.current) { clearTimeout(longPressRef.current); longPressRef.current = null; } }}
         onContextMenu={async (e) => {
           e.preventDefault();
           setCtxBurnUsers(allAssignees.get(t.id) || []);

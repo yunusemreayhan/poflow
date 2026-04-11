@@ -23,6 +23,7 @@ pub async fn upload_attachment(
     if body.is_empty() {
         return Err(err(StatusCode::BAD_REQUEST, "Empty file"));
     }
+    db::get_task(&engine.pool, task_id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Task not found"))?;
 
     let filename = headers.get("x-filename")
         .and_then(|v| v.to_str().ok())

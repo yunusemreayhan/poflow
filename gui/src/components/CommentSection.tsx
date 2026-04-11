@@ -6,7 +6,7 @@ import { useStore } from "../store/store";
 interface Comment { id: number; user: string; content: string; created_at: string; session_id: number | null; }
 
 export default function CommentSection({ taskId, sessionId }: { taskId: number; sessionId?: number }) {
-  const { addComment } = useStore();
+  const { addComment, username: currentUser, role } = useStore();
   const [comments, setComments] = useState<Comment[]>([]);
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(true);
@@ -34,10 +34,10 @@ export default function CommentSection({ taskId, sessionId }: { taskId: number; 
             <span className="text-[var(--color-accent)]/60 mr-2">@{c.user}</span>
             {c.content}
           </div>
-          <button onClick={async () => { await apiCall("DELETE", `/api/comments/${c.id}`); load(); }}
+          {(c.user === currentUser || role === "root") && <button onClick={async () => { await apiCall("DELETE", `/api/comments/${c.id}`); load(); }}
             className="opacity-0 group-hover:opacity-100 text-white/20 hover:text-[var(--color-danger)] transition-all shrink-0">
             <Trash2 size={12} />
-          </button>
+          </button>}
         </div>
       ))}
       <div className="flex gap-2">

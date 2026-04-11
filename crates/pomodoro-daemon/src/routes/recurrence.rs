@@ -14,6 +14,9 @@ pub async fn set_recurrence(State(engine): State<AppState>, claims: Claims, Path
     if !VALID_PATTERNS.contains(&req.pattern.as_str()) {
         return Err(err(StatusCode::BAD_REQUEST, "Pattern must be: daily, weekly, biweekly, monthly"));
     }
+    if chrono::NaiveDate::parse_from_str(&req.next_due, "%Y-%m-%d").is_err() {
+        return Err(err(StatusCode::BAD_REQUEST, "next_due must be YYYY-MM-DD"));
+    }
     db::set_recurrence(&engine.pool, id, &req.pattern, &req.next_due).await.map(Json).map_err(internal)
 }
 

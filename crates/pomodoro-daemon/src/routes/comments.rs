@@ -10,6 +10,8 @@ pub async fn list_comments(State(engine): State<AppState>, _claims: Claims, Path
 pub async fn add_comment(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>, Json(req): Json<AddCommentRequest>) -> Result<(StatusCode, Json<db::Comment>), ApiError> {
     if req.content.trim().is_empty() { return Err(err(StatusCode::BAD_REQUEST, "Comment cannot be empty")); }
     if req.content.len() > 10000 { return Err(err(StatusCode::BAD_REQUEST, "Comment too long (max 10000 chars)")); }
+    // V7: Validate task exists
+    db::get_task(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Task not found"))?;
     db::add_comment(&engine.pool, claims.user_id, id, req.session_id, &req.content)
         .await.map(|c| { engine.notify(ChangeEvent::Tasks); (StatusCode::CREATED, Json(c)) }).map_err(internal)
 }

@@ -339,15 +339,19 @@ export const useStore = create<Store>((set, get) => ({
   loadStats: async () => {
     if (!get().token) return;
     set(s => ({ loading: { ...s.loading, stats: true } }));
-    const stats = await apiCall<DayStat[]>("GET", "/api/stats?days=365");
-    set(s => ({ stats, loading: { ...s.loading, stats: false } }));
+    try {
+      const stats = await apiCall<DayStat[]>("GET", "/api/stats?days=365");
+      set(s => ({ stats, loading: { ...s.loading, stats: false } }));
+    } catch { set(s => ({ loading: { ...s.loading, stats: false } })); }
   },
 
   loadHistory: async () => {
     if (!get().token) return;
     set(s => ({ loading: { ...s.loading, history: true } }));
-    const history = await apiCall<Session[]>("GET", "/api/history");
-    set(s => ({ history, loading: { ...s.loading, history: false } }));
+    try {
+      const history = await apiCall<Session[]>("GET", "/api/history");
+      set(s => ({ history, loading: { ...s.loading, history: false } }));
+    } catch { set(s => ({ loading: { ...s.loading, history: false } })); }
   },
 
   loadConfig: async () => {
