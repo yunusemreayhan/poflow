@@ -1929,3 +1929,89 @@ async fn test_csrf_header_required() {
     let resp = app.clone().oneshot(req).await.unwrap();
     assert_eq!(resp.status(), 200);
 }
+
+#[tokio::test]
+async fn test_templates_crud() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+
+    // Create template
+    let resp = app.clone().oneshot(auth_req("POST", "/api/templates", &tok, Some(json!({
+        "name": "Bug Report",
+        "data": "{\"title\":\"Bug: \",\"priority\":4,\"tags\":\"bug\"}"
+    })))).await.unwrap();
+    assert_eq!(resp.status(), 201);
+    let tmpl = body_json(resp).await;
+    let id = tmpl["id"].as_i64().unwrap();
+    assert_eq!(tmpl["name"], "Bug Report");
+
+    // List templates
+    let resp = app.clone().oneshot(auth_req("GET", "/api/templates", &tok, None)).await.unwrap();
+    let list = body_json(resp).await;
+    assert_eq!(list.as_array().unwrap().len(), 1);
+
+    // Delete template
+    let resp = app.clone().oneshot(auth_req("DELETE", &format!("/api/templates/{}", id), &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 204);
+
+    // List should be empty
+    let resp = app.clone().oneshot(auth_req("GET", "/api/templates", &tok, None)).await.unwrap();
+    let list = body_json(resp).await;
+    assert_eq!(list.as_array().unwrap().len(), 0);
+}
+
+#[tokio::test]
+async fn test_refresh_token() {
+    let app = app().await;
+    // Login to get tokens
+    let resp = app.clone().oneshot(json_req("POST", "/api/auth/login", Some(json!({"username":"root","password":"root"})))).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let body = body_json(resp).await;
+    let refresh = body["refresh_token"].as_str().expect(&format!("No refresh_token in: {}", body)).to_string();
+    assert!(!refresh.is_empty());
+
+    // Use refresh token to get new access token
+    let resp = app.clone().oneshot(json_req("POST", "/api/auth/refresh", Some(json!({"refresh_token": refresh})))).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let body = body_json(resp).await;
+    assert!(!body["token"].as_str().unwrap().is_empty());
+    assert!(!body["refresh_token"].as_str().unwrap().is_empty());
+
+    // Old refresh token should be revoked (rotation)
+    let resp = app.clone().oneshot(json_req("POST", "/api/auth/refresh", Some(json!({"refresh_token": refresh})))).await.unwrap();
+    assert_eq!(resp.status(), 401);
+}
+
+#[tokio::test]
+async fn test_attachment_delete_ownership() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+
+    // Create task and upload attachment as root
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"T"})))).await.unwrap();
+    let tid = body_json(resp).await["id"].as_i64().unwrap();
+    let resp = app.clone().oneshot(
+        axum::http::Request::builder()
+            .method("POST")
+            .uri(format!("/api/tasks/{}/attachments", tid))
+            .header("authorization", format!("Bearer {}", tok))
+            .header("content-type", "text/plain")
+            .header("x-filename", "test.txt")
+            .header("x-requested-with", "test")
+            .body(axum::body::Body::from("data"))
+            .unwrap()
+    ).await.unwrap();
+    let att_id = body_json(resp).await["id"].as_i64().unwrap();
+
+    // Register another user
+    let resp = app.clone().oneshot(json_req("POST", "/api/auth/register", Some(json!({"username":"other","password":"Other123"})))).await.unwrap();
+    let tok2 = body_json(resp).await["token"].as_str().unwrap().to_string();
+
+    // Other user should not be able to delete
+    let resp = app.clone().oneshot(auth_req("DELETE", &format!("/api/attachments/{}", att_id), &tok2, None)).await.unwrap();
+    assert_eq!(resp.status(), 403);
+
+    // Owner can delete
+    let resp = app.clone().oneshot(auth_req("DELETE", &format!("/api/attachments/{}", att_id), &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 204);
+}

@@ -12,9 +12,38 @@ pub struct LoginRequest { pub username: String, pub password: String }
 #[derive(Serialize, utoipa::ToSchema)]
 pub struct AuthResponse { pub token: String, pub refresh_token: String, pub user_id: i64, pub username: String, pub role: String }
 #[derive(Deserialize, utoipa::ToSchema)]
-pub struct CreateTaskRequest { pub title: String, pub parent_id: Option<i64>, pub description: Option<String>, pub project: Option<String>, pub tags: Option<String>, pub priority: Option<i64>, pub estimated: Option<i64>, pub estimated_hours: Option<f64>, pub remaining_points: Option<f64>, pub due_date: Option<String> }
+pub struct CreateTaskRequest {
+    pub title: String,
+    pub parent_id: Option<i64>,
+    pub description: Option<String>,
+    pub project: Option<String>,
+    pub tags: Option<String>,
+    pub priority: Option<i64>,
+    pub estimated: Option<i64>,
+    pub estimated_hours: Option<f64>,
+    pub remaining_points: Option<f64>,
+    pub due_date: Option<String>,
+}
 #[derive(Deserialize, utoipa::ToSchema)]
-pub struct UpdateTaskRequest { pub title: Option<String>, #[serde(default, deserialize_with = "deserialize_optional_nullable")] pub description: Option<Option<String>>, #[serde(default, deserialize_with = "deserialize_optional_nullable")] pub project: Option<Option<String>>, #[serde(default, deserialize_with = "deserialize_optional_nullable")] pub tags: Option<Option<String>>, pub priority: Option<i64>, pub estimated: Option<i64>, pub estimated_hours: Option<f64>, pub remaining_points: Option<f64>, #[serde(default, deserialize_with = "deserialize_optional_nullable")] pub due_date: Option<Option<String>>, pub status: Option<String>, pub sort_order: Option<i64>, pub parent_id: Option<Option<i64>>, pub expected_updated_at: Option<String> }
+pub struct UpdateTaskRequest {
+    pub title: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_optional_nullable")]
+    pub description: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_nullable")]
+    pub project: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_nullable")]
+    pub tags: Option<Option<String>>,
+    pub priority: Option<i64>,
+    pub estimated: Option<i64>,
+    pub estimated_hours: Option<f64>,
+    pub remaining_points: Option<f64>,
+    #[serde(default, deserialize_with = "deserialize_optional_nullable")]
+    pub due_date: Option<Option<String>>,
+    pub status: Option<String>,
+    pub sort_order: Option<i64>,
+    pub parent_id: Option<Option<i64>>,
+    pub expected_updated_at: Option<String>,
+}
 #[derive(Deserialize, utoipa::ToSchema)]
 pub struct StartRequest { pub task_id: Option<i64>, pub phase: Option<String> }
 #[derive(Deserialize, utoipa::ToSchema)]
@@ -44,7 +73,21 @@ pub struct AcceptEstimateRequest { pub value: f64 }
 #[derive(Deserialize, utoipa::ToSchema)]
 pub struct CreateSprintRequest { pub name: String, pub project: Option<String>, pub goal: Option<String>, pub start_date: Option<String>, pub end_date: Option<String> }
 #[derive(Deserialize, utoipa::ToSchema)]
-pub struct UpdateSprintRequest { pub name: Option<String>, #[serde(default, deserialize_with = "deserialize_optional_nullable")] pub project: Option<Option<String>>, #[serde(default, deserialize_with = "deserialize_optional_nullable")] pub goal: Option<Option<String>>, pub status: Option<String>, #[serde(default, deserialize_with = "deserialize_optional_nullable")] pub start_date: Option<Option<String>>, #[serde(default, deserialize_with = "deserialize_optional_nullable")] pub end_date: Option<Option<String>>, #[serde(default, deserialize_with = "deserialize_optional_nullable")] pub retro_notes: Option<Option<String>>, pub expected_updated_at: Option<String> }
+pub struct UpdateSprintRequest {
+    pub name: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_optional_nullable")]
+    pub project: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_nullable")]
+    pub goal: Option<Option<String>>,
+    pub status: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_optional_nullable")]
+    pub start_date: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_nullable")]
+    pub end_date: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_nullable")]
+    pub retro_notes: Option<Option<String>>,
+    pub expected_updated_at: Option<String>,
+}
 #[derive(Deserialize, utoipa::ToSchema)]
 pub struct AddSprintTasksRequest { pub task_ids: Vec<i64> }
 #[derive(Deserialize)]
