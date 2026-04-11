@@ -658,7 +658,7 @@ export default function TaskList({ selectMode, onSelect, selectedTaskId, votedTa
 
         {filtered.length === 0 && (
           <div className="text-center text-white/20 text-sm py-16">
-            No projects yet. Create one above!
+            {searchQuery ? "No matching tasks" : "No projects yet. Create one above!"}
           </div>
         )}
       </div>

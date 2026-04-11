@@ -157,11 +157,13 @@ function SprintView({ id, onBack }: { id: number; onBack: () => void }) {
   const allTasks = useStore(s => s.tasks);
 
   const load = useCallback(async () => {
-    const d = await apiCall<SprintDetail>("GET", `/api/sprints/${id}`);
+    const [d, b, r] = await Promise.all([
+      apiCall<SprintDetail>("GET", `/api/sprints/${id}`),
+      apiCall<SprintBoard>("GET", `/api/sprints/${id}/board`),
+      apiCall<number[]>("GET", `/api/sprints/${id}/roots`),
+    ]);
     if (d) setDetail(d);
-    const b = await apiCall<SprintBoard>("GET", `/api/sprints/${id}/board`);
     if (b) setBoard(b);
-    const r = await apiCall<number[]>("GET", `/api/sprints/${id}/roots`);
     if (r) setRootIds(r);
     setLoading(false);
   }, [id]);
