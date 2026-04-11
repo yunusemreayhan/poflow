@@ -280,7 +280,14 @@ function BoardView({ board, reload }: { board: SprintBoard; reload: () => void }
       <div className={`text-xs font-medium mb-2 ${color}`}>{title} ({tasks.length})</div>
       <div className="space-y-1.5 min-h-[40px] rounded p-1 transition-colors">
         {tasks.map(t => (
-          <div key={t.id} draggable onDragStart={e => { e.dataTransfer.setData("text/plain", String(t.id)); (e.target as HTMLElement).style.opacity = "0.4"; }}
+          <div key={t.id} draggable tabIndex={0}
+            onKeyDown={e => {
+              const statusOrder = ["backlog", "in_progress", "completed"];
+              const curIdx = statusOrder.indexOf(status);
+              if (e.key === "ArrowRight" && curIdx < 2) { e.preventDefault(); changeStatus(t.id, statusOrder[curIdx + 1]); }
+              else if (e.key === "ArrowLeft" && curIdx > 0) { e.preventDefault(); changeStatus(t.id, statusOrder[curIdx - 1]); }
+            }}
+            onDragStart={e => { e.dataTransfer.setData("text/plain", String(t.id)); (e.target as HTMLElement).style.opacity = "0.4"; }}
             onDragEnd={e => { (e.target as HTMLElement).style.opacity = "1"; }}
             className="bg-[var(--color-surface)] p-2 rounded border border-white/5 group cursor-grab active:cursor-grabbing">
             <div className="text-xs text-white/90 truncate">{t.title}</div>

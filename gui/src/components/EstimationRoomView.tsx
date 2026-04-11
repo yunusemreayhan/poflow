@@ -58,20 +58,24 @@ export default function EstimationRoomView({ roomId, onBack }: { roomId: number;
     finally { setSubmitting(false); }
   };
 
+  const cancelRevealRef = useRef(false);
+
   const doReveal = async () => {
+    cancelRevealRef.current = false;
     setCountdown(3);
     for (let i = 3; i >= 1; i--) {
       await new Promise(r => setTimeout(r, 1000));
-      if (!mountedRef.current) return;
+      if (!mountedRef.current || cancelRevealRef.current) { setCountdown(null); return; }
       setCountdown(i - 1);
     }
     setCountdown(null);
-    // Only reveal if room is still in voting state (use ref for fresh value)
     if (stateRef.current?.room.status === "voting") {
       await apiCall("POST", `/api/rooms/${roomId}/reveal`);
     }
     if (mountedRef.current) load();
   };
+
+  const cancelReveal = () => { cancelRevealRef.current = true; setCountdown(null); };
 
   const acceptEstimate = async (value: number) => {
     await apiCall("POST", `/api/rooms/${roomId}/accept`, { value });
@@ -184,7 +188,7 @@ export default function EstimationRoomView({ roomId, onBack }: { roomId: number;
                     className="text-8xl font-bold text-[var(--color-accent)]">
                     {countdown}
                   </motion.div>
-                  <button onClick={() => setCountdown(null)} className="mt-6 text-xs text-white/40 hover:text-white/70">Cancel</button>
+                  <button onClick={cancelReveal} className="mt-6 text-xs text-white/40 hover:text-white/70">Cancel</button>
                 </motion.div>
               )}
             </AnimatePresence>
