@@ -40,6 +40,7 @@ pub fn build_router(engine: Arc<engine::Engine>) -> Router {
             axum::http::HeaderName::from_static("x-per-page")]);
 
     Router::new()
+        .route("/api/health", get(|| async { axum::Json(serde_json::json!({"status": "ok"})) }))
         .route("/api/auth/register", post(routes::register))
         .route("/api/auth/login", post(routes::login))
         .route("/api/auth/logout", post(routes::logout))

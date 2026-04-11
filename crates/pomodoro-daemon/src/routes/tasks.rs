@@ -52,6 +52,10 @@ pub async fn list_tasks(State(engine): State<AppState>, _claims: Claims, Query(q
 #[utoipa::path(post, path = "/api/tasks", request_body = CreateTaskRequest, responses((status = 201, body = db::Task)), security(("bearer" = [])))]
 pub async fn create_task(State(engine): State<AppState>, claims: Claims, Json(req): Json<CreateTaskRequest>) -> Result<(StatusCode, Json<db::Task>), ApiError> {
     if req.title.trim().is_empty() { return Err(err(StatusCode::BAD_REQUEST, "Title cannot be empty")); }
+    if req.title.len() > 500 { return Err(err(StatusCode::BAD_REQUEST, "Title too long (max 500 chars)")); }
+    if req.description.as_ref().map_or(false, |d| d.len() > 10000) { return Err(err(StatusCode::BAD_REQUEST, "Description too long (max 10000 chars)")); }
+    if req.project.as_ref().map_or(false, |p| p.len() > 200) { return Err(err(StatusCode::BAD_REQUEST, "Project too long (max 200 chars)")); }
+    if req.tags.as_ref().map_or(false, |t| t.len() > 500) { return Err(err(StatusCode::BAD_REQUEST, "Tags too long (max 500 chars)")); }
     let priority = req.priority.unwrap_or(3);
     if priority < 1 || priority > 5 { return Err(err(StatusCode::BAD_REQUEST, "Priority must be 1-5")); }
     let estimated = req.estimated.unwrap_or(1);
@@ -75,6 +79,8 @@ pub async fn get_task_detail(State(engine): State<AppState>, _claims: Claims, Pa
 pub async fn update_task(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>, Json(req): Json<UpdateTaskRequest>) -> ApiResult<db::Task> {
     let task = db::get_task(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Task not found"))?;
     if !is_owner_or_root(task.user_id, &claims) { return Err(err(StatusCode::FORBIDDEN, "Not owner")); }
+    if let Some(ref t) = req.title { if t.len() > 500 { return Err(err(StatusCode::BAD_REQUEST, "Title too long (max 500)")); } }
+    if let Some(ref d) = req.description { if d.as_ref().map_or(false, |d| d.len() > 10000) { return Err(err(StatusCode::BAD_REQUEST, "Description too long")); } }
     if let Some(ref s) = req.status { validate_task_status(s)?; }
     if let Some(p) = req.priority { if p < 1 || p > 5 { return Err(err(StatusCode::BAD_REQUEST, "Priority must be 1-5")); } }
     if let Some(e) = req.estimated { if e < 0 { return Err(err(StatusCode::BAD_REQUEST, "Estimated cannot be negative")); } }
@@ -115,8 +121,7 @@ pub struct BulkStatusRequest { pub task_ids: Vec<i64>, pub status: String }
 
 #[utoipa::path(put, path = "/api/tasks/bulk-status", request_body = BulkStatusRequest, responses((status = 204)), security(("bearer" = [])))]
 pub async fn bulk_update_status(State(engine): State<AppState>, claims: Claims, Json(req): Json<BulkStatusRequest>) -> Result<StatusCode, ApiError> {
-    let valid = ["active", "backlog", "done", "archived"];
-    if !valid.contains(&req.status.as_str()) { return Err(err(StatusCode::BAD_REQUEST, "Invalid status")); }
+    validate_task_status(&req.status)?;
     for id in &req.task_ids {
         let task = db::get_task(&engine.pool, *id).await.map_err(|_| err(StatusCode::NOT_FOUND, &format!("Task {} not found", id)))?;
         if !is_owner_or_root(task.user_id, &claims) { return Err(err(StatusCode::FORBIDDEN, &format!("Not owner of task {}", id))); }

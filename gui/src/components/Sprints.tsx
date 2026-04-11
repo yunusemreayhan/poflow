@@ -7,7 +7,6 @@ import { useSseDebounce } from "../hooks/useSseDebounce";
 import type { Sprint, SprintDetail, SprintBoard, SprintDailyStat, Task, BurnEntry, BurnSummaryEntry } from "../store/api";
 import TaskList from "./TaskList";
 import Select from "./Select";
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import EpicBurndown from "./EpicBurndown";
 import { BurnsView, BurndownView, VelocityChart } from "./SprintViews";
 

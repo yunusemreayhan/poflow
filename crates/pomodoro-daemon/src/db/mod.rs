@@ -260,6 +260,9 @@ async fn migrate(pool: &Pool) -> Result<()> {
     sqlx::query("CREATE INDEX IF NOT EXISTS idx_burn_log_user_id ON burn_log(user_id)").execute(pool).await?;
     sqlx::query("CREATE INDEX IF NOT EXISTS idx_sprint_tasks_sprint_id ON sprint_tasks(sprint_id)").execute(pool).await?;
     sqlx::query("CREATE INDEX IF NOT EXISTS idx_sprint_tasks_task_id ON sprint_tasks(task_id)").execute(pool).await?;
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_tasks_user_id ON tasks(user_id)").execute(pool).await?;
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_comments_task_id ON comments(task_id)").execute(pool).await?;
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_rooms_creator_id ON rooms(creator_id)").execute(pool).await?;
 
     sqlx::query("CREATE TABLE IF NOT EXISTS audit_log (
         id          INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -10,8 +10,8 @@ pub async fn list_sprints(State(engine): State<AppState>, _claims: Claims, Query
 pub async fn create_sprint(State(engine): State<AppState>, claims: Claims, Json(req): Json<CreateSprintRequest>) -> Result<(StatusCode, Json<db::Sprint>), ApiError> {
     if req.name.trim().is_empty() { return Err(err(StatusCode::BAD_REQUEST, "Sprint name cannot be empty")); }
     if req.name.len() > 200 { return Err(err(StatusCode::BAD_REQUEST, "Sprint name too long (max 200 chars)")); }
-    if let Some(ref d) = req.start_date { if d.len() != 10 { return Err(err(StatusCode::BAD_REQUEST, "start_date must be YYYY-MM-DD")); } }
-    if let Some(ref d) = req.end_date { if d.len() != 10 { return Err(err(StatusCode::BAD_REQUEST, "end_date must be YYYY-MM-DD")); } }
+    if let Some(ref d) = req.start_date { if chrono::NaiveDate::parse_from_str(d, "%Y-%m-%d").is_err() { return Err(err(StatusCode::BAD_REQUEST, "start_date must be YYYY-MM-DD")); } }
+    if let Some(ref d) = req.end_date { if chrono::NaiveDate::parse_from_str(d, "%Y-%m-%d").is_err() { return Err(err(StatusCode::BAD_REQUEST, "end_date must be YYYY-MM-DD")); } }
     let s = db::create_sprint(&engine.pool, claims.user_id, &req.name, req.project.as_deref(), req.goal.as_deref(), req.start_date.as_deref(), req.end_date.as_deref())
         .await.map_err(internal)?;
     db::audit(&engine.pool, claims.user_id, "create", "sprint", Some(s.id), Some(&s.name)).await.ok();
