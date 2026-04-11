@@ -48,6 +48,7 @@ export interface Task {
   sort_order: number;
   created_at: string;
   updated_at: string;
+  attachment_count: number;
 }
 
 export interface Session {

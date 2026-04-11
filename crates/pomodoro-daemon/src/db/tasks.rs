@@ -1,7 +1,7 @@
 use super::*;
 
 
-pub const TASK_SELECT: &str = "SELECT t.id, t.parent_id, t.user_id, u.username as user, t.title, t.description, t.project, t.tags, t.priority, t.estimated, t.actual, t.estimated_hours, t.remaining_points, t.due_date, t.status, t.sort_order, t.created_at, t.updated_at FROM tasks t JOIN users u ON t.user_id = u.id";
+pub const TASK_SELECT: &str = "SELECT t.id, t.parent_id, t.user_id, u.username as user, t.title, t.description, t.project, t.tags, t.priority, t.estimated, t.actual, t.estimated_hours, t.remaining_points, t.due_date, t.status, t.sort_order, t.created_at, t.updated_at, (SELECT COUNT(*) FROM task_attachments WHERE task_id = t.id) as attachment_count FROM tasks t JOIN users u ON t.user_id = u.id";
 
 pub async fn create_task(pool: &Pool, user_id: i64, parent_id: Option<i64>, title: &str, description: Option<&str>, project: Option<&str>, tags: Option<&str>, priority: i64, estimated: i64, estimated_hours: f64, remaining_points: f64, due_date: Option<&str>) -> Result<Task> {
     let now = now_str();

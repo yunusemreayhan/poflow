@@ -268,6 +268,7 @@ function TaskNode({ node, depth, onView, selectMode, onSelect, selectedTaskId, v
                 📅 {t.due_date}{overdue ? ` (${-daysLeft}d overdue)` : soon ? ` (${daysLeft}d left)` : ""}
               </span>;
             })()}
+            {t.attachment_count > 0 && <span className="text-white/30" title={`${t.attachment_count} attachment${t.attachment_count > 1 ? "s" : ""}`}>📎{t.attachment_count}</span>}
             {remainingPct !== null && (
               <span className={`${remainingPct > 50 ? "text-[var(--color-success)]" : remainingPct > 20 ? "text-[var(--color-warning)]" : "text-[var(--color-danger)]"}`}>
                 {remainingPct}% left
