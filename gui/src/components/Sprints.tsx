@@ -257,7 +257,8 @@ function BoardView({ board, reload }: { board: SprintBoard; reload: () => void }
       <div className={`text-xs font-medium mb-2 ${color}`}>{title} ({tasks.length})</div>
       <div className="space-y-1.5 min-h-[40px] rounded p-1 transition-colors">
         {tasks.map(t => (
-          <div key={t.id} draggable onDragStart={e => e.dataTransfer.setData("text/plain", String(t.id))}
+          <div key={t.id} draggable onDragStart={e => { e.dataTransfer.setData("text/plain", String(t.id)); (e.target as HTMLElement).style.opacity = "0.4"; }}
+            onDragEnd={e => { (e.target as HTMLElement).style.opacity = "1"; }}
             className="bg-[var(--color-surface)] p-2 rounded border border-white/5 group cursor-grab active:cursor-grabbing">
             <div className="text-xs text-white/90 truncate">{t.title}</div>
             <div className="text-[10px] text-white/30 flex gap-1 mt-1">

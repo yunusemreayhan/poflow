@@ -120,7 +120,10 @@ pub async fn create_sse_ticket(claims: Claims) -> ApiResult<serde_json::Value> {
     };
     let mut tickets = sse_tickets().lock().await;
     let now = std::time::Instant::now();
-    tickets.retain(|_, (_, t)| now.duration_since(*t).as_secs() < 30);
+    // Only clean up when map grows large to avoid O(n) on every creation
+    if tickets.len() > 50 {
+        tickets.retain(|_, (_, t)| now.duration_since(*t).as_secs() < 30);
+    }
     tickets.insert(ticket.clone(), (claims.user_id, now));
     Ok(Json(serde_json::json!({ "ticket": ticket })))
 }

@@ -129,7 +129,7 @@ export default function History() {
       {/* Heatmap */}
       <div className="glass p-5">
         <h3 className="text-sm font-semibold text-white/60 mb-4">Activity (Last 365 Days)</h3>
-        <div className="flex flex-wrap gap-[3px] overflow-x-auto max-w-full">
+        <div className="flex flex-wrap gap-[3px] overflow-x-auto max-w-full" role="grid" aria-label="Activity heatmap">
           {heatmapData.map((d) => (
             <HeatmapCell key={d.date} count={d.count} max={maxCount} date={d.date} />
           ))}
