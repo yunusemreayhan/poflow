@@ -3458,3 +3458,39 @@ async fn test_csv_import_quoted_fields() {
     let titles: Vec<&str> = tasks.as_array().unwrap().iter().map(|t| t["title"].as_str().unwrap()).collect();
     assert!(titles.contains(&"Task with, comma"));
 }
+
+// T2: Circular parent_id detection
+#[tokio::test]
+async fn test_circular_parent_id_rejected() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    // Create two tasks
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"A"})))).await.unwrap();
+    let a_id = body_json(resp).await["id"].as_i64().unwrap();
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"B","parent_id":a_id})))).await.unwrap();
+    let b_id = body_json(resp).await["id"].as_i64().unwrap();
+    // Try to make A a child of B (creates cycle A→B→A)
+    let resp = app.clone().oneshot(auth_req("PUT", &format!("/api/tasks/{}", a_id), &tok,
+        Some(json!({"parent_id":b_id})))).await.unwrap();
+    assert_eq!(resp.status(), 400);
+}
+
+// T8: Token refresh flow
+#[tokio::test]
+async fn test_token_refresh_flow() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    // Get refresh token from login
+    let resp = app.clone().oneshot(json_req("POST", "/api/auth/login", Some(json!({"username":"root","password":"root"})))).await.unwrap();
+    let body = body_json(resp).await;
+    let refresh = body["refresh_token"].as_str().unwrap().to_string();
+    // Use refresh token to get new access token
+    let resp = app.clone().oneshot(json_req("POST", "/api/auth/refresh", Some(json!({"refresh_token": refresh})))).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let body = body_json(resp).await;
+    assert!(body["token"].as_str().is_some());
+    assert!(body["refresh_token"].as_str().is_some());
+    // Old refresh token should be revoked (rotation)
+    let resp = app.clone().oneshot(json_req("POST", "/api/auth/refresh", Some(json!({"refresh_token": refresh})))).await.unwrap();
+    assert_eq!(resp.status(), 401);
+}
