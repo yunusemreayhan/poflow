@@ -31,7 +31,7 @@ export default function Sprints() {
     load();
     let sseTimer: ReturnType<typeof setTimeout>; const onSse = () => { clearTimeout(sseTimer); sseTimer = setTimeout(load, 500); };
     window.addEventListener("sse-sprints", onSse);
-    return () => window.removeEventListener("sse-sprints", onSse);
+    return () => { clearTimeout(sseTimer); window.removeEventListener("sse-sprints", onSse); };
   }, [load]);
 
   const create = async () => {
@@ -136,7 +136,7 @@ export default function Sprints() {
               {s.start_date && <span>{s.start_date} → {s.end_date || "?"}</span>}
             </div>
           </div>
-          <button onClick={e => { e.stopPropagation(); del(s.id); }} className="p-1 text-white/20 hover:text-red-400"><Trash2 size={14} /></button>
+          <button onClick={e => { e.stopPropagation(); useStore.getState().showConfirm(`Delete sprint "${s.name}"?`, () => del(s.id)); }} className="p-1 text-white/20 hover:text-red-400"><Trash2 size={14} /></button>
         </div>
       ))}
       {sprints.length === 0 && <div className="text-center py-12"><div className="text-4xl mb-2">🏃</div><div className="text-white/30 text-sm">No sprints yet</div><div className="text-white/20 text-xs mt-1">Create one to start tracking progress</div></div>}
@@ -169,7 +169,7 @@ function SprintView({ id, onBack }: { id: number; onBack: () => void }) {
     load();
     let sseTimer: ReturnType<typeof setTimeout>; const onSse = () => { clearTimeout(sseTimer); sseTimer = setTimeout(load, 500); };
     window.addEventListener("sse-sprints", onSse);
-    return () => window.removeEventListener("sse-sprints", onSse);
+    return () => { clearTimeout(sseTimer); window.removeEventListener("sse-sprints", onSse); };
   }, [load]);
 
   const start = async () => { await apiCall("POST", `/api/sprints/${id}/start`); load(); };
@@ -204,6 +204,7 @@ function SprintView({ id, onBack }: { id: number; onBack: () => void }) {
         <div className="space-y-1">
           <div className="text-xs text-white/30">Retro Notes</div>
           <textarea
+            key={s.retro_notes || ""}
             defaultValue={s.retro_notes || ""}
             onBlur={e => {
               const val = e.target.value.trim() || null;

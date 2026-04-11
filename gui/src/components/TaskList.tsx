@@ -17,10 +17,10 @@ import type { TreeNode } from "../tree";
 import { apiCall } from "../store/api";
 import type { Task } from "../store/api";
 import TaskDetailView, { CommentSection } from "./TaskDetailView";
-import { InlineTimeReport, InlineComment, InlineAddSubtask } from "./TaskInlineEditors";
+import { InlineTimeReport, InlineComment } from "./TaskInlineEditors";
 import TaskContextMenu from "./TaskContextMenu";
 
-const PRIORITY_COLORS = ["", "#10B981", "#4ECDC4", "#F59E0B", "#FF6B6B", "#EF4444"];
+import { PRIORITY_COLORS } from "../constants";
 
 function TaskNode({ node, depth, onView, selectMode, onSelect, selectedTaskId, votedTaskIds, selectLabel, selectClassName, bulkSelected, setBulkSelected }: {
   node: TreeNode; depth: number; onView: (id: number) => void;

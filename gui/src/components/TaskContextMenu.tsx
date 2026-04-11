@@ -5,7 +5,7 @@ import { apiCall } from "../store/api";
 import type { Task, TaskSprintInfo, Config } from "../store/api";
 import type { TreeNode } from "../tree";
 
-const PRIORITY_COLORS = ["", "#10B981", "#4ECDC4", "#F59E0B", "#FF6B6B", "#EF4444"];
+import { PRIORITY_COLORS } from "../constants";
 
 interface CtxMenuProps {
   pos: { x: number; y: number };
