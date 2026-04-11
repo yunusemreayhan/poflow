@@ -49,6 +49,9 @@ use utoipa_swagger_ui::SwaggerUi;
         routes::create_sse_ticket,
         routes::logout,
         routes::export_sessions,
+        routes::list_attachments, routes::upload_attachment, routes::download_attachment, routes::delete_attachment,
+        routes::list_templates, routes::create_template, routes::delete_template,
+        routes::refresh_token,
     ),
     components(schemas(
         db::Task, db::Session, db::Comment, db::User, db::TaskDetail, db::SessionWithPath, db::DayStat, db::TaskAssignee,
@@ -66,6 +69,7 @@ use utoipa_swagger_ui::SwaggerUi;
         routes::CreateRoomRequest, routes::RoomRoleRequest, routes::StartVotingRequest, routes::CastVoteRequest, routes::AcceptEstimateRequest,
         routes::CreateSprintRequest, routes::UpdateSprintRequest, routes::AddSprintTasksRequest,
         routes::LogBurnRequest, routes::ApiErrorBody,
+        db::Attachment, db::TaskTemplate,
     )),
     modifiers(&SecurityAddon),
     info(title = "Pomodoro API", version = "1.0.0", description = "Multi-user Pomodoro timer with hierarchical task management")

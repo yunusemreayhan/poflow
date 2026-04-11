@@ -176,6 +176,8 @@ function TaskNode({ node, depth, onView, selectMode, onSelect, selectedTaskId, v
         <div
           className="w-2 h-2 rounded-full shrink-0"
           style={{ background: PRIORITY_COLORS[t.priority] ?? "#6C7A89" }}
+          title={`Priority ${t.priority}`}
+          aria-label={`Priority ${t.priority}`}
         />
 
         {/* Status badge */}

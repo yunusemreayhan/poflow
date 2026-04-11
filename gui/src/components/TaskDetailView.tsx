@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, MessageSquare, Download, Clock, Plus, Trash2, Users, Edit3, Save } from "lucide-react";
+import { ArrowLeft, MessageSquare, Download, Clock, Plus, Trash2, Users, Edit3, Save, Paperclip } from "lucide-react";
 import { useStore } from "../store/store";
 import { useState, useEffect, useCallback } from "react";
 import type { TaskDetail, Comment, TimeReport } from "../store/api";
@@ -368,6 +368,9 @@ function DetailNode({ detail, depth, onRefresh, hoursMap }: { detail: TaskDetail
           <TaskRecurrence taskId={t.id} />
         </div>
 
+        {/* Attachments */}
+        <TaskAttachments taskId={t.id} />
+
         {/* Assignees */}
         <div className="flex items-center gap-2 flex-wrap mb-3">
           <Users size={12} className="text-white/30" />
@@ -568,3 +571,68 @@ export default function TaskDetailView({ taskId, onBack, onNavigate }: { taskId:
 }
 
 export { CommentSection, ExportButton };
+
+interface Attachment {
+  id: number;
+  task_id: number;
+  filename: string;
+  mime_type: string;
+  size_bytes: number;
+  created_at: string;
+}
+
+function TaskAttachments({ taskId }: { taskId: number }) {
+  const [atts, setAtts] = useState<Attachment[]>([]);
+  const [uploading, setUploading] = useState(false);
+
+  const load = () => apiCall<Attachment[]>("GET", `/api/tasks/${taskId}/attachments`).then(setAtts).catch(() => {});
+  useEffect(load, [taskId]);
+
+  const upload = async (file: File) => {
+    setUploading(true);
+    try {
+      const buf = await file.arrayBuffer();
+      const resp = await fetch(`${(window as any).__serverUrl || "http://127.0.0.1:9090"}/api/tasks/${taskId}/attachments`, {
+        method: "POST",
+        headers: {
+          "content-type": file.type || "application/octet-stream",
+          "x-filename": file.name,
+          "x-requested-with": "PomodoroGUI",
+          "authorization": `Bearer ${(window as any).__token || ""}`,
+        },
+        body: buf,
+      });
+      if (resp.ok) load();
+    } catch {}
+    setUploading(false);
+  };
+
+  const del = async (id: number) => {
+    await apiCall("DELETE", `/api/attachments/${id}`);
+    setAtts(a => a.filter(x => x.id !== id));
+  };
+
+  const fmt = (bytes: number) => bytes < 1024 ? `${bytes}B` : bytes < 1048576 ? `${(bytes / 1024).toFixed(1)}KB` : `${(bytes / 1048576).toFixed(1)}MB`;
+
+  return (
+    <div className="mb-3">
+      <div className="flex items-center gap-2 mb-1">
+        <Paperclip size={12} className="text-white/30" />
+        <span className="text-xs text-[var(--color-dim)]">Attachments ({atts.length})</span>
+        <label className="text-xs text-[var(--color-accent)] cursor-pointer hover:underline">
+          {uploading ? "Uploading..." : "+ Add"}
+          <input type="file" className="hidden" onChange={e => { if (e.target.files?.[0]) upload(e.target.files[0]); e.target.value = ""; }} />
+        </label>
+      </div>
+      {atts.map(a => (
+        <div key={a.id} className="flex items-center gap-2 text-xs text-white/60 py-0.5 group">
+          <span className="truncate flex-1">{a.filename}</span>
+          <span className="text-white/20">{fmt(a.size_bytes)}</span>
+          <a href={`${(window as any).__serverUrl || "http://127.0.0.1:9090"}/api/attachments/${a.id}/download`}
+            className="text-[var(--color-accent)] hover:underline" target="_blank" rel="noopener">↓</a>
+          <button onClick={() => del(a.id)} className="text-white/20 hover:text-[var(--color-danger)] opacity-0 group-hover:opacity-100">✕</button>
+        </div>
+      ))}
+    </div>
+  );
+}

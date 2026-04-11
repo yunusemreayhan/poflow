@@ -189,6 +189,25 @@ function SprintView({ id, onBack }: { id: number; onBack: () => void }) {
 
       {s.start_date && <div className="text-xs text-white/30">{s.start_date} → {s.end_date || "?"}</div>}
 
+      {/* Retro notes */}
+      {(s.status === "completed" || s.retro_notes) && (
+        <div className="space-y-1">
+          <div className="text-xs text-white/30">Retro Notes</div>
+          <textarea
+            defaultValue={s.retro_notes || ""}
+            onBlur={e => {
+              const val = e.target.value.trim() || null;
+              if (val !== (s.retro_notes || null)) {
+                apiCall("PUT", `/api/sprints/${id}`, { retro_notes: val }).then(() => load());
+              }
+            }}
+            placeholder="Add retrospective notes..."
+            className="w-full bg-white/5 border border-white/10 text-xs text-white/70 rounded p-2 outline-none focus:border-[var(--color-accent)] resize-none"
+            rows={3}
+          />
+        </div>
+      )}
+
       {rootIds.length > 0 && (
         <div className="flex gap-1 flex-wrap">
           <span className="text-[10px] text-white/30">Scope:</span>

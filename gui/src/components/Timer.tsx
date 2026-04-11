@@ -84,7 +84,9 @@ export default function Timer() {
           />
         )}
 
-        <svg width={SIZE} height={SIZE} style={{ transform: "rotate(-90deg)" }}>
+        <svg width={SIZE} height={SIZE} style={{ transform: "rotate(-90deg)" }}
+          role="progressbar" aria-valuenow={elapsed} aria-valuemin={0} aria-valuemax={duration}
+          aria-label={`${PHASE_LABELS[phase] ?? phase}: ${formatTime(remaining)} remaining`}>
           <circle
             cx={SIZE / 2} cy={SIZE / 2} r={R}
             fill="none"
