@@ -189,10 +189,12 @@ function DetailNode({ detail, depth, onRefresh, hoursMap }: { detail: TaskDetail
   const rollup = computeRollup(detail, hoursMap);
 
   useEffect(() => {
-    apiCall<TimeReport[]>("GET", `/api/tasks/${t.id}/time`).then(setTimeReports).catch(() => {});
-    apiCall<string[]>("GET", `/api/tasks/${t.id}/assignees`).then(setAssignees).catch(() => {});
-    apiCall<string[]>("GET", "/api/users").then(setAllUsers).catch(() => {});
-    apiCall<string[]>("GET", `/api/tasks/${t.id}/burn-users`).then(setBurnUsers).catch(() => {});
+    Promise.all([
+      apiCall<TimeReport[]>("GET", `/api/tasks/${t.id}/time`).catch(() => [] as TimeReport[]),
+      apiCall<string[]>("GET", `/api/tasks/${t.id}/assignees`).catch(() => [] as string[]),
+      apiCall<string[]>("GET", "/api/users").catch(() => [] as string[]),
+      apiCall<string[]>("GET", `/api/tasks/${t.id}/burn-users`).catch(() => [] as string[]),
+    ]).then(([tr, a, u, bu]) => { setTimeReports(tr); setAssignees(a); setAllUsers(u); setBurnUsers(bu); });
   }, [t.id]);
 
   const saveField = (field: string, value: string) => {

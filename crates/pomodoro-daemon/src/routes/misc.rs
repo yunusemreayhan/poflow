@@ -41,16 +41,9 @@ pub struct TasksFullResponse {
 
 #[utoipa::path(get, path = "/api/tasks/full", responses((status = 200, body = Vec<db::Task>)), security(("bearer" = [])))]
 pub async fn get_tasks_full(State(engine): State<AppState>, _claims: Claims, headers: axum::http::HeaderMap) -> Result<axum::response::Response, ApiError> {
-    // ETag: hash of max updated_at across all relevant tables
-    let (max_updated,): (String,) = sqlx::query_as("SELECT COALESCE(MAX(updated_at), '') FROM tasks")
-        .fetch_one(&engine.pool).await.map_err(internal)?;
-    let (task_count,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM tasks")
-        .fetch_one(&engine.pool).await.map_err(internal)?;
-    let (sprint_task_count,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM sprint_tasks")
-        .fetch_one(&engine.pool).await.map_err(internal)?;
-    let (burn_count,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM burn_log WHERE cancelled = 0")
-        .fetch_one(&engine.pool).await.map_err(internal)?;
-    let (assignee_count,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM task_assignees")
+    // ETag: single query combining all change indicators
+    let (max_updated, task_count, sprint_task_count, burn_count, assignee_count): (String, i64, i64, i64, i64) =
+        sqlx::query_as("SELECT COALESCE((SELECT MAX(updated_at) FROM tasks), ''), (SELECT COUNT(*) FROM tasks), (SELECT COUNT(*) FROM sprint_tasks), (SELECT COUNT(*) FROM burn_log WHERE cancelled = 0), (SELECT COUNT(*) FROM task_assignees)")
         .fetch_one(&engine.pool).await.map_err(internal)?;
     let etag = format!("\"{}:{}:{}:{}:{}\"", max_updated, task_count, sprint_task_count, burn_count, assignee_count);
 

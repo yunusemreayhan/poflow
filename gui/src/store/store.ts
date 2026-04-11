@@ -256,7 +256,10 @@ export const useStore = create<Store>((set, get) => ({
         list.push(s);
         taskSprintsMap.set(s.task_id, list);
       }
-      set({ tasks: resp.tasks, taskSprints: ts, taskSprintsMap, burnTotals, allAssignees });
+      // Only update tasks if data actually changed (avoid unnecessary tree rebuilds)
+      const prev = get().tasks;
+      const tasksChanged = prev.length !== resp.tasks.length || resp.tasks.some((t, i) => t.id !== prev[i]?.id || t.updated_at !== prev[i]?.updated_at);
+      set({ tasks: tasksChanged ? resp.tasks : prev, taskSprints: ts, taskSprintsMap, burnTotals, allAssignees });
       (window as unknown as Record<string, number>).__tasksLoadedAt = Date.now();
     } catch { /* ignore */ }
     set(s => ({ loading: { ...s.loading, tasks: false } }));

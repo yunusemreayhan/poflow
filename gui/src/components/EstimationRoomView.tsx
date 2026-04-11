@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Eye, Check, Crown, X, Edit3 } from "lucide-react";
 import { apiCall } from "../store/api";
 import { useStore } from "../store/store";
+import { useSseDebounce } from "../hooks/useSseDebounce";
 import type { RoomState } from "../store/api";
 import TaskList from "./TaskList";
 
@@ -26,13 +27,9 @@ export default function EstimationRoomView({ roomId, onBack }: { roomId: number;
     apiCall<RoomState>("GET", `/api/rooms/${roomId}`).then(setState).catch(() => {});
   }, [roomId]);
 
-  // Reload on SSE push
-  useEffect(() => {
-    load();
-    const onSse = () => load();
-    window.addEventListener("sse-rooms", onSse);
-    return () => window.removeEventListener("sse-rooms", onSse);
-  }, [load]);
+  // Reload on SSE push (debounced)
+  useEffect(() => { load(); }, [load]);
+  useSseDebounce("sse-rooms", load, 300);
 
   // Reset card selection when task changes
   useEffect(() => { setSelectedCard(null); }, [state?.room.current_task_id]);

@@ -243,7 +243,8 @@ impl Engine {
 
     /// Tick all active user timers. Returns completed states for notification.
     pub async fn tick(&self) -> anyhow::Result<Vec<EngineState>> {
-        // Phase 1: Under lock, advance timers and collect DB work
+        // Two-phase tick: lock states briefly to advance timers, then release lock for DB I/O.
+        // Lock duration is O(active_running_users) which is acceptable for typical deployments.
         struct Completion {
             session_id: Option<i64>,
             was_work: bool,
