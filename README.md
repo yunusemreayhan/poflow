@@ -69,7 +69,7 @@ A full-featured multi-user Pomodoro timer for Linux with a Rust HTTP backend, Ta
 - **API**: OpenAPI/Swagger UI at `/swagger-ui/`
 - **State**: Zustand store with Tauri invoke → reqwest bridge
 
-## Database Schema (12 tables)
+## Database Schema (17 tables)
 
 All user references use `user_id INTEGER REFERENCES users(id)` — usernames are resolved via JOINs. This means usernames can be changed without breaking any foreign key relationships.
 
@@ -79,7 +79,6 @@ All user references use `user_id INTEGER REFERENCES users(id)` — usernames are
 | `tasks` | Hierarchical tasks with user_id FK, parent_id self-ref, status, estimates |
 | `sessions` | Pomodoro timer sessions with user_id FK |
 | `comments` | Comments on tasks with user_id FK |
-| `time_reports` | Hour tracking per task with user_id FK, auto-assigns user |
 | `task_assignees` | Many-to-many task↔user with user_id FK |
 | `rooms` | Estimation rooms with creator_id FK |
 | `room_members` | Room membership with user_id FK and role |
@@ -87,7 +86,15 @@ All user references use `user_id INTEGER REFERENCES users(id)` — usernames are
 | `sprints` | Sprint metadata with created_by_id FK |
 | `sprint_tasks` | Sprint↔task mapping with added_by_id FK |
 | `sprint_daily_stats` | Burndown snapshots per sprint per day |
-| `burn_log` | Unified burn tracking: manual entries, timer completions, time reports. Has source (manual/timer/time_report), optional sprint_id, optional session_id, soft-delete via cancelled_by_id |
+| `sprint_root_tasks` | Root task scoping for sprints |
+| `burn_log` | Unified burn tracking: manual entries, timer completions, time reports |
+| `user_configs` | Per-user timer configuration overrides |
+| `teams` | Team definitions with name |
+| `team_members` | Team↔user membership with roles |
+| `team_root_tasks` | Root task scoping for teams |
+| `epic_groups` | Epic group definitions for cross-sprint tracking |
+| `epic_group_tasks` | Epic group↔task mapping |
+| `epic_snapshots` | Daily burndown snapshots for epic groups |
 
 ## REST API
 
@@ -172,8 +179,91 @@ All user references use `user_id INTEGER REFERENCES users(id)` — usernames are
 | DELETE | `/api/admin/users/{id}` | Delete user (root only) |
 | PUT | `/api/profile` | Update own username/password |
 | GET/PUT | `/api/config` | Get/update timer config |
-| GET | `/api/history` | Session history (filter: ?from=&to=) |
+| GET | `/api/history` | Session history (filter: ?from=&to=&user_id=) |
 | GET | `/api/stats` | Day stats (filter: ?days=) |
+
+### Tasks (search/filter)
+| Parameter | Description |
+|---|---|
+| `?search=` | Search title and tags (LIKE match) |
+| `?assignee=` | Filter by assigned username |
+| `?due_before=` | Tasks due before date |
+| `?due_after=` | Tasks due after date |
+| `?priority=` | Filter by priority (1-5) |
+| `?page=&per_page=` | Pagination (default: page 1, 5000 per page) |
+| `?team_id=` | Filter by team scope |
+
+### Sprint Roots & Scope
+| Method | Endpoint | Description |
+|---|---|---|
+| GET/POST | `/api/sprints/{id}/roots` | List/add root tasks for sprint scoping |
+| DELETE | `/api/sprints/{id}/roots/{tid}` | Remove root task |
+| GET | `/api/sprints/{id}/scope` | Get all descendant task IDs from roots |
+| GET | `/api/sprints/burndown` | Global burndown (all active sprints) |
+
+### Teams
+| Method | Endpoint | Description |
+|---|---|---|
+| GET/POST | `/api/teams` | List/create teams |
+| GET/DELETE | `/api/teams/{id}` | Get detail / delete (root only) |
+| POST | `/api/teams/{id}/members` | Add member |
+| DELETE | `/api/teams/{id}/members/{uid}` | Remove member |
+| POST | `/api/teams/{id}/roots` | Add root tasks |
+| DELETE | `/api/teams/{id}/roots/{tid}` | Remove root task |
+| GET | `/api/teams/{id}/scope` | Get all descendant task IDs |
+| GET | `/api/me/teams` | Get current user's teams |
+
+### Epic Groups
+| Method | Endpoint | Description |
+|---|---|---|
+| GET/POST | `/api/epics` | List/create epic groups |
+| GET/DELETE | `/api/epics/{id}` | Get detail / delete |
+| POST | `/api/epics/{id}/tasks` | Add tasks to group |
+| DELETE | `/api/epics/{id}/tasks/{tid}` | Remove task |
+| POST | `/api/epics/{id}/snapshot` | Manual burndown snapshot |
+
+### Batch & Real-time
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/api/tasks/full` | Batch: tasks + sprints + burns + assignees (ETag support) |
+| GET | `/api/users` | List all usernames |
+| GET | `/api/burn-totals` | All task burn totals |
+| GET | `/api/assignees` | All task assignees |
+| GET | `/api/timer/sse?token=` | Server-Sent Events for timer + data changes |
+
+### Labels
+| Method | Endpoint | Description |
+|---|---|---|
+| GET/POST | `/api/labels` | List/create labels |
+| DELETE | `/api/labels/{id}` | Delete label |
+| GET | `/api/tasks/{id}/labels` | Get task's labels |
+| PUT | `/api/tasks/{id}/labels/{label_id}` | Add label to task |
+| DELETE | `/api/tasks/{id}/labels/{label_id}` | Remove label from task |
+
+### Dependencies
+| Method | Endpoint | Description |
+|---|---|---|
+| GET/POST | `/api/tasks/{id}/dependencies` | List/add dependencies |
+| DELETE | `/api/tasks/{id}/dependencies/{dep_id}` | Remove dependency |
+| GET | `/api/dependencies` | Get all task dependencies |
+
+### Recurrence
+| Method | Endpoint | Description |
+|---|---|---|
+| GET/PUT/DELETE | `/api/tasks/{id}/recurrence` | Get/set/remove recurrence pattern |
+
+### Webhooks
+| Method | Endpoint | Description |
+|---|---|---|
+| GET/POST | `/api/webhooks` | List/create webhooks |
+| DELETE | `/api/webhooks/{id}` | Delete webhook |
+
+### Audit & Export
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/api/audit` | Query audit log (?entity_type=&entity_id=&page=&per_page=) |
+| GET | `/api/export/tasks` | Export tasks (?format=csv or json) |
+| POST | `/api/auth/logout` | Revoke current JWT token |
 
 ## Installation
 

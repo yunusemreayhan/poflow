@@ -3,6 +3,9 @@ import { ArrowLeft, MessageSquare, Download, Clock, Plus, Trash2, Users, Edit3, 
 import { useStore } from "../store/store";
 import { useState, useEffect, useCallback } from "react";
 import type { TaskDetail, Comment, TimeReport } from "../store/api";
+import { TaskLabelPicker } from "./Labels";
+import { TaskDependencies } from "./Dependencies";
+import { TaskRecurrence } from "./Recurrence";
 import Select from "./Select";
 import { apiCall } from "../store/api";
 import { computeRollup } from "../rollup";
@@ -154,6 +157,14 @@ function EditField({ label, value, type, onSave }: { label: string; value: strin
   const [draft, setDraft] = useState(String(value));
 
   useEffect(() => { setDraft(String(value)); }, [value]);
+
+  // Warn on page unload if editing
+  useEffect(() => {
+    if (!editing) return;
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [editing]);
 
   if (!editing) {
     return (
@@ -342,6 +353,21 @@ function DetailNode({ detail, depth, onRefresh, hoursMap }: { detail: TaskDetail
           {!hasChildren && rollup.progressHours !== null && <span className={`${rollup.progressHours > 70 ? "text-[var(--color-success)]" : rollup.progressHours > 30 ? "text-[var(--color-warning)]" : "text-[var(--color-danger)]"}`}>{rollup.progressHours}% done</span>}
         </div>
 
+        {/* Labels */}
+        <div className="mb-3">
+          <TaskLabelPicker taskId={t.id} />
+        </div>
+
+        {/* Dependencies */}
+        <div className="mb-3">
+          <TaskDependencies taskId={t.id} allTasks={tasks} />
+        </div>
+
+        {/* Recurrence */}
+        <div className="mb-3">
+          <TaskRecurrence taskId={t.id} />
+        </div>
+
         {/* Assignees */}
         <div className="flex items-center gap-2 flex-wrap mb-3">
           <Users size={12} className="text-white/30" />
@@ -473,7 +499,7 @@ function DetailNode({ detail, depth, onRefresh, hoursMap }: { detail: TaskDetail
 // --- Main View ---
 
 export default function TaskDetailView({ taskId, onBack, onNavigate }: { taskId: number; onBack: () => void; onNavigate?: (id: number) => void }) {
-  const { getTaskDetail } = useStore();
+  const { getTaskDetail, tasks } = useStore();
   const [detail, setDetail] = useState<TaskDetail | null>(null);
   const [hoursMap, setHoursMap] = useState<Map<number, number>>(new Map());
 
@@ -497,8 +523,32 @@ export default function TaskDetailView({ taskId, onBack, onNavigate }: { taskId:
 
   if (!detail) return <div className="p-8 text-white/40 text-sm">Loading...</div>;
 
+  // Build breadcrumb chain from task ancestors
+  const tasks = useStore.getState().tasks;
+  const breadcrumbs: { id: number; title: string }[] = [];
+  let current = detail.task;
+  while (current.parent_id) {
+    const parent = tasks.find(t => t.id === current.parent_id);
+    if (!parent) break;
+    breadcrumbs.unshift({ id: parent.id, title: parent.title });
+    current = parent as typeof current;
+  }
+
   return (
     <div className="flex flex-col gap-4 p-8 h-full overflow-y-auto">
+      {/* Breadcrumbs */}
+      {breadcrumbs.length > 0 && onNavigate && (
+        <nav aria-label="Breadcrumb" className="flex items-center gap-1 text-xs text-white/30 overflow-x-auto">
+          {breadcrumbs.map((b, i) => (
+            <span key={b.id} className="flex items-center gap-1 shrink-0">
+              {i > 0 && <span>›</span>}
+              <button onClick={() => onNavigate(b.id)} className="hover:text-white/60 truncate max-w-[150px]">{b.title}</button>
+            </span>
+          ))}
+          <span>›</span>
+          <span className="text-white/50 truncate">{detail.task.title}</span>
+        </nav>
+      )}
       <div className="flex items-center gap-3">
         <button onClick={onBack} className="w-9 h-9 flex items-center justify-center rounded-lg glass text-white/60 hover:text-white transition-all">
           <ArrowLeft size={18} />

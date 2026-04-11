@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Timer as TimerIcon, ListTodo, BarChart3, Settings as SettingsIcon, Wifi, WifiOff, Code2, LogOut, Users, Zap, Sun, Moon, RefreshCw } from "lucide-react";
 import { useStore } from "./store/store";
+import { useT } from "./i18n";
 import type { EngineState } from "./store/api";
 import { apiCall } from "./store/api";
 import Timer from "./components/Timer";
@@ -64,6 +65,8 @@ function Sidebar() {
               active ? "text-white" : "text-white/30 hover:text-white/60"
             }`}
             title={tab.label}
+            aria-label={tab.label}
+            aria-current={active ? "page" : undefined}
           >
             {active && (
               <motion.div
@@ -97,14 +100,14 @@ function Sidebar() {
       <div className="flex flex-col items-center gap-1 mb-2">
         <span className="text-[10px] text-white/30 truncate max-w-[60px]">{username}</span>
         <button onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-          className="w-11 h-11 flex items-center justify-center rounded-xl text-white/30 hover:text-white/60 transition-all" title="Toggle theme">
+          className="w-11 h-11 flex items-center justify-center rounded-xl text-white/30 hover:text-white/60 transition-all" title="Toggle theme" aria-label="Toggle theme">
           {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
         </button>
         <button onClick={() => { useStore.getState().loadTasks(); useStore.getState().toast("Refreshed"); }}
-          className="w-11 h-11 flex items-center justify-center rounded-xl text-white/30 hover:text-white/60 transition-all" title="Refresh data">
+          className="w-11 h-11 flex items-center justify-center rounded-xl text-white/30 hover:text-white/60 transition-all" title="Refresh data" aria-label="Refresh data">
           <RefreshCw size={16} />
         </button>
-        <button onClick={logout} className="w-11 h-11 flex items-center justify-center rounded-xl text-white/30 hover:text-white/60 transition-all" title="Logout">
+        <button onClick={logout} className="w-11 h-11 flex items-center justify-center rounded-xl text-white/30 hover:text-white/60 transition-all" title="Logout" aria-label="Logout">
           <LogOut size={16} />
         </button>
       </div>
@@ -123,7 +126,7 @@ function Sidebar() {
 }
 
 export default function App() {
-  const { activeTab, poll, loadTasks, connected, token, toasts, dismissToast, confirmDialog, dismissConfirm } = useStore();
+  const { activeTab, poll, loadTasks, connected, token, toasts, dismissToast, confirmDialog, dismissConfirm, loading } = useStore();
 
   useEffect(() => {
     useStore.getState().restoreAuth();
@@ -135,15 +138,25 @@ export default function App() {
     loadTasks();
 
     // SSE for real-time timer + data change notifications
+    // Use ticket exchange to avoid JWT in URL (logged in server access logs)
     const url = useStore.getState().serverUrl;
-    const sse = new EventSource(`${url}/api/timer/sse?token=${encodeURIComponent(token)}`);
+    let sseInstance: EventSource | null = null;
 
-    sse.addEventListener("timer", (e) => {
+    const connectSse = async () => {
       try {
-        const engine = JSON.parse(e.data) as EngineState;
-        useStore.setState({ engine, connected: true, error: null });
-      } catch { /* ignore */ }
-    });
+        const resp = await apiCall<{ ticket: string }>("POST", "/api/timer/ticket");
+        sseInstance = new EventSource(`${url}/api/timer/sse?ticket=${encodeURIComponent(resp.ticket)}`);
+      } catch {
+        // Fallback to token if ticket exchange fails (e.g. older server)
+        sseInstance = new EventSource(`${url}/api/timer/sse?token=${encodeURIComponent(token)}`);
+      }
+
+      sseInstance.addEventListener("timer", (e) => {
+        try {
+          const engine = JSON.parse(e.data) as EngineState;
+          useStore.setState({ engine, connected: true, error: null });
+        } catch { /* ignore */ }
+      });
 
     // Debounce change events — rapid mutations coalesce into single reload
     const pending = new Set<string>();
@@ -160,26 +173,28 @@ export default function App() {
       pending.clear();
     };
 
-    sse.addEventListener("change", (e) => {
-      try {
-        const kind = JSON.parse(e.data) as string;
-        pending.add(kind);
-        if (debounceTimer) clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(flushChanges, 300);
-      } catch { /* ignore */ }
-    });
+      sseInstance.addEventListener("change", (e) => {
+        try {
+          const kind = JSON.parse(e.data) as string;
+          pending.add(kind);
+          if (debounceTimer) clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(flushChanges, 300);
+        } catch { /* ignore */ }
+      });
 
-    sse.onerror = () => useStore.setState({ connected: false });
-    sse.onopen = () => useStore.setState({ connected: true });
+      sseInstance.onerror = () => useStore.setState({ connected: false });
+      sseInstance.onopen = () => useStore.setState({ connected: true });
+    };
+    connectSse();
 
     // Fallback: poll timer if SSE drops
     const timerFallback = setInterval(() => {
-      if (sse.readyState !== EventSource.OPEN) poll();
+      if (!sseInstance || sseInstance.readyState !== EventSource.OPEN) poll();
     }, 2000);
     const taskSafety = setInterval(loadTasks, 30000);
 
     return () => {
-      sse.close();
+      sseInstance?.close();
       clearInterval(timerFallback);
       clearInterval(taskSafety);
     };
@@ -194,21 +209,54 @@ export default function App() {
       if (e.key === " " && store.engine?.status === "Running") { e.preventDefault(); store.pause(); }
       if (e.key === " " && store.engine?.status === "Paused") { e.preventDefault(); store.resume(); }
       if (e.key === "r" && !e.ctrlKey && !e.metaKey) { store.loadTasks(); store.toast("Refreshed"); }
+      // Tab navigation: 1-6 for tabs (only when not in an input)
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag !== "INPUT" && tag !== "TEXTAREA" && tag !== "SELECT" && !e.ctrlKey && !e.metaKey) {
+        const tabMap: Record<string, string> = { "1": "tasks", "2": "sprints", "3": "rooms", "4": "history", "5": "settings", "6": "api" };
+        if (tabMap[e.key]) { store.setTab(tabMap[e.key]); }
+        if (e.key === "n" && store.activeTab === "tasks") {
+          e.preventDefault();
+          // Focus the new task input if it exists
+          document.querySelector<HTMLInputElement>('[data-new-task-input]')?.focus();
+        }
+        if (e.key === "?" && !e.shiftKey) {
+          store.toast("Keys: 1-6 tabs, Space pause/resume, Esc stop, r refresh, n new task, / search");
+        }
+        if (e.key === "/") {
+          e.preventDefault();
+          document.getElementById("task-search")?.focus();
+        }
+      }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
   useEffect(() => {
-    if ((activeTab === "tasks" || activeTab === "sprints") && token) loadTasks();
+    // Only reload tasks on tab switch if data is stale (>10s since last load)
+    if ((activeTab === "tasks" || activeTab === "sprints") && token) {
+      const lastLoad = (window as unknown as Record<string, number>).__tasksLoadedAt ?? 0;
+      if (Date.now() - lastLoad > 10000) loadTasks();
+    }
   }, [activeTab, token]);
 
   if (!token) return <AuthScreen />;
 
   return (
     <div className="flex h-screen bg-[var(--color-bg)]">
-      <Sidebar />
-      <main className="flex-1 overflow-hidden relative">
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:top-2 focus:left-2 focus:px-4 focus:py-2 focus:bg-[var(--color-accent)] focus:text-white focus:rounded-lg focus:text-sm">
+        Skip to content
+      </a>
+      <nav aria-label="Main navigation">
+        <Sidebar />
+      </nav>
+      <main id="main-content" className="flex-1 overflow-hidden relative">
+        {/* Loading indicator */}
+        {(loading.tasks || loading.history || loading.stats || loading.config) && (
+          <div className="absolute top-0 left-0 right-0 h-0.5 z-40 bg-[var(--color-accent)]/20 overflow-hidden">
+            <div className="h-full w-1/3 bg-[var(--color-accent)] animate-[slide_1s_ease-in-out_infinite]" />
+          </div>
+        )}
         <AnimatePresence mode="wait">
           <motion.div
             key={activeTab}
@@ -243,15 +291,20 @@ export default function App() {
         </AnimatePresence>
 
         {/* Toast notifications */}
-        <div className="absolute top-4 right-4 flex flex-col gap-2 z-50 pointer-events-none">
+        <div className="absolute top-4 right-4 flex flex-col gap-2 z-50 pointer-events-none" role="status" aria-live="polite">
           <AnimatePresence>
             {toasts.map(t => (
               <motion.div key={t.id} initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 50 }}
-                onClick={() => dismissToast(t.id)}
-                className={`pointer-events-auto cursor-pointer px-4 py-2 rounded-lg text-xs font-medium shadow-lg ${
+                className={`pointer-events-auto flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium shadow-lg ${
                   t.type === "error" ? "bg-[var(--color-danger)] text-white" : "bg-[var(--color-success)]/90 text-white"
                 }`}>
-                {t.msg}
+                <span className="cursor-pointer" onClick={() => dismissToast(t.id)}>{t.msg}</span>
+                {t.onUndo && (
+                  <button onClick={() => { t.onUndo!(); dismissToast(t.id); }}
+                    className="ml-2 px-2 py-0.5 rounded bg-white/20 hover:bg-white/30 text-white text-xs font-bold">
+                    Undo
+                  </button>
+                )}
               </motion.div>
             ))}
           </AnimatePresence>
@@ -262,12 +315,12 @@ export default function App() {
           {confirmDialog && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="absolute inset-0 bg-black/50 flex items-center justify-center z-50"
-              onClick={dismissConfirm}>
+              onClick={dismissConfirm} role="dialog" aria-modal="true" aria-label="Confirmation dialog">
               <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }}
                 className="glass p-6 max-w-sm w-full mx-4" onClick={e => e.stopPropagation()}>
                 <p className="text-sm text-white/80 mb-4">{confirmDialog.msg}</p>
                 <div className="flex gap-2 justify-end">
-                  <button onClick={dismissConfirm}
+                  <button onClick={dismissConfirm} autoFocus
                     className="px-4 py-2 text-xs text-white/50 hover:text-white rounded-lg bg-white/5 hover:bg-white/10">Cancel</button>
                   <button onClick={() => { confirmDialog.onConfirm(); dismissConfirm(); }}
                     className="px-4 py-2 text-xs text-white rounded-lg bg-[var(--color-danger)]">Delete</button>

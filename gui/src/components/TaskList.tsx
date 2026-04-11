@@ -8,6 +8,7 @@ import type { TreeNode } from "../tree";
 import { apiCall } from "../store/api";
 import type { Task } from "../store/api";
 import TaskDetailView, { CommentSection } from "./TaskDetailView";
+import { InlineTimeReport, InlineComment, InlineAddSubtask } from "./TaskInlineEditors";
 
 const PRIORITY_COLORS = ["", "#10B981", "#4ECDC4", "#F59E0B", "#FF6B6B", "#EF4444"];
 
@@ -25,8 +26,6 @@ function TaskNode({ node, depth, onView, selectMode, onSelect, selectedTaskId, v
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState("");
   const [timeReporting, setTimeReporting] = useState(false);
-  const [reportHours, setReportHours] = useState("");
-  const [reportDesc, setReportDesc] = useState("");
   const [assignees, setAssignees] = useState<string[]>([]);
   const [totalHours, setTotalHours] = useState(0);
   const [newTitle, setNewTitle] = useState("");
@@ -59,16 +58,6 @@ function TaskNode({ node, depth, onView, selectMode, onSelect, selectedTaskId, v
     ? Math.max(0, Math.round((1 - totalHours / t.estimated_hours) * 100))
     : (t.remaining_points > 0 && t.estimated > 0 ? Math.round((t.remaining_points / t.estimated) * 100) : null);
 
-  const handleTimeReport = async () => {
-    const h = parseFloat(reportHours);
-    if (!h || h <= 0) return;
-    await apiCall("POST", `/api/tasks/${t.id}/time`, { hours: h, description: reportDesc || undefined });
-    setReportHours(""); setReportDesc(""); setTimeReporting(false);
-    setTotalHours(prev => prev + h);
-    // Refresh assignees
-    apiCall<string[]>("GET", `/api/tasks/${t.id}/assignees`).then(setAssignees).catch(() => {});
-  };
-
   const handleDelete = useCallback(async () => {
     try {
       await deleteTask(t.id);
@@ -93,7 +82,13 @@ function TaskNode({ node, depth, onView, selectMode, onSelect, selectedTaskId, v
         initial={{ opacity: 0, x: -10 }}
         animate={{ opacity: 1, x: 0 }}
         draggable={!selectMode}
-        onDragStart={(e: any) => { e.dataTransfer?.setData("text/plain", String(t.id)); }}
+        onDragStart={(e: any) => {
+          e.dataTransfer?.setData("text/plain", String(t.id));
+          e.dataTransfer.effectAllowed = "move";
+          // Reduce opacity of dragged element
+          setTimeout(() => { if (e.target) e.target.style.opacity = "0.4"; }, 0);
+        }}
+        onDragEnd={(e: any) => { if (e.target) e.target.style.opacity = "1"; }}
         onDragOver={(e: any) => {
           e.preventDefault();
           const rect = e.currentTarget.getBoundingClientRect();
@@ -559,35 +554,14 @@ function TaskNode({ node, depth, onView, selectMode, onSelect, selectedTaskId, v
       )}
 
       {/* Inline time report */}
-      <AnimatePresence>
-        {timeReporting && (
-          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
-            className="overflow-hidden" style={{ marginLeft: depth * 24 + 48 }}>
-            <div className="flex gap-2 items-center py-2 px-4">
-              <input type="number" step="0.25" min="0.25" value={reportHours} onChange={(e) => setReportHours(e.target.value)}
-                placeholder="Hours" className="w-20 bg-white/5 border border-white/10 rounded-lg text-xs text-white placeholder-white/30 px-3 py-2 outline-none focus:border-[var(--color-work)]" autoFocus />
-              <input value={reportDesc} onChange={(e) => setReportDesc(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleTimeReport()}
-                placeholder="What did you do?" className="flex-1 bg-white/5 border border-white/10 rounded-lg text-xs text-white placeholder-white/30 px-3 py-2 outline-none focus:border-[var(--color-work)]" />
-              <button onClick={handleTimeReport}
-                className="w-8 h-8 flex items-center justify-center rounded-lg bg-[var(--color-work)] text-white shrink-0">
-                <Plus size={14} />
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <InlineTimeReport taskId={t.id} depth={depth} show={timeReporting} onClose={() => setTimeReporting(false)}
+        onLogged={(h) => { setTotalHours(prev => prev + h); apiCall<string[]>("GET", `/api/tasks/${t.id}/assignees`).then(setAssignees).catch(() => {}); }} />
 
       {/* Inline comments */}
       <AnimatePresence>
         {commenting && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            className="overflow-hidden"
-            style={{ marginLeft: depth * 24 + 48 }}
-          >
+          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden" style={{ marginLeft: depth * 24 + 48 }}>
             <div className="py-2 px-4">
               <CommentSection taskId={t.id} />
             </div>
@@ -626,6 +600,7 @@ export default function TaskList({ selectMode, onSelect, selectedTaskId, votedTa
   const [filter, setFilter] = useState<"all" | "active">("all");
   const [viewingTask, setViewingTask] = useState<number | null>(null);
   const [search, setSearch] = useState("");
+  const [bulkSelected, setBulkSelected] = useState<Set<number>>(new Set());
 
   const tree = useMemo(() => {
     let t = tasks;
@@ -697,14 +672,45 @@ export default function TaskList({ selectMode, onSelect, selectedTaskId, votedTa
 
       {/* Search + Filter */}
       <div className="flex gap-2 items-center">
-        <input id="task-search" value={search} onChange={e => setSearch(e.target.value)}
-          placeholder={selectMode ? "Search (regex)..." : "Search tasks (regex)... (press /)"}
-          className={`flex-1 bg-white/5 border border-white/10 text-xs text-white placeholder-white/30 outline-none focus:border-[var(--color-accent)] ${selectMode ? "rounded px-2 py-1" : "rounded-full px-4 py-2"}`} />
+        <div className="relative flex-1">
+          <input id="task-search" value={search} onChange={e => setSearch(e.target.value)}
+            placeholder={selectMode ? "Search (regex)..." : "Search tasks (regex)... (press /)"}
+            className={`w-full bg-white/5 border border-white/10 text-xs text-white placeholder-white/30 outline-none focus:border-[var(--color-accent)] ${selectMode ? "rounded px-2 py-1" : "rounded-full px-4 py-2 pr-16"}`} />
+          {search && (
+            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+              <span className="text-[10px] text-white/30">{filtered.length} results</span>
+              <button onClick={() => setSearch("")} className="text-white/30 hover:text-white/60 text-xs" aria-label="Clear search">✕</button>
+            </div>
+          )}
+        </div>
         <button onClick={() => setFilter(filter === "all" ? "active" : "all")}
           className={`shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-all ${filter === "active" ? "bg-[var(--color-accent)] text-white" : "bg-white/5 text-white/40 hover:text-white/60"}`}>
           {filter === "active" ? "Active" : "All"} ({filtered.length})
         </button>
       </div>
+
+      {/* Bulk actions toolbar */}
+      {!selectMode && bulkSelected.size > 0 && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--color-accent)]/10 border border-[var(--color-accent)]/20" role="toolbar" aria-live="polite" aria-label="Bulk actions">
+          <span className="text-xs text-[var(--color-accent)] font-medium">{bulkSelected.size} selected</span>
+          <button onClick={async () => {
+            for (const id of bulkSelected) await useStore.getState().updateTask(id, { status: "completed" });
+            setBulkSelected(new Set());
+          }} className="px-2 py-0.5 rounded text-xs bg-[var(--color-success)]/20 text-[var(--color-success)]">✓ Done</button>
+          <button onClick={async () => {
+            for (const id of bulkSelected) await useStore.getState().updateTask(id, { status: "active" });
+            setBulkSelected(new Set());
+          }} className="px-2 py-0.5 rounded text-xs bg-[var(--color-accent)]/20 text-[var(--color-accent)]">▶ Active</button>
+          <button onClick={() => {
+            useStore.getState().showConfirm(`Delete ${bulkSelected.size} tasks?`, async () => {
+              for (const id of bulkSelected) await apiCall("DELETE", `/api/tasks/${id}`);
+              useStore.getState().loadTasks();
+              setBulkSelected(new Set());
+            });
+          }} className="px-2 py-0.5 rounded text-xs bg-[var(--color-danger)]/20 text-[var(--color-danger)]">🗑 Delete</button>
+          <button onClick={() => setBulkSelected(new Set())} className="ml-auto text-xs text-white/30 hover:text-white/50">Clear</button>
+        </div>
+      )}
 
       {/* Tree */}
       <div className="flex-1 overflow-y-auto space-y-2 pr-1"
@@ -715,9 +721,24 @@ export default function TaskList({ selectMode, onSelect, selectedTaskId, votedTa
         }}>
         <AnimatePresence>
           {filtered.map((node) => (
-            <TaskNode key={node.task.id} node={node} depth={0} onView={setViewingTask}
-              selectMode={selectMode} onSelect={onSelect} selectedTaskId={selectedTaskId} votedTaskIds={votedTaskIds}
-              selectLabel={selectLabel} selectClassName={selectClassName} />
+            <div key={node.task.id} className="flex items-start gap-1">
+              {!selectMode && (
+                <input type="checkbox" checked={bulkSelected.has(node.task.id)}
+                  onChange={e => {
+                    const next = new Set(bulkSelected);
+                    if (e.target.checked) next.add(node.task.id); else next.delete(node.task.id);
+                    setBulkSelected(next);
+                  }}
+                  className={`mt-3 shrink-0 accent-[var(--color-accent)] cursor-pointer ${bulkSelected.size > 0 ? "opacity-100" : "opacity-0 hover:opacity-100 focus:opacity-100"} peer`}
+                  style={bulkSelected.size > 0 ? { opacity: 1 } : {}}
+                />
+              )}
+              <div className="flex-1">
+                <TaskNode node={node} depth={0} onView={setViewingTask}
+                  selectMode={selectMode} onSelect={onSelect} selectedTaskId={selectedTaskId} votedTaskIds={votedTaskIds}
+                  selectLabel={selectLabel} selectClassName={selectClassName} />
+              </div>
+            </div>
           ))}
         </AnimatePresence>
 

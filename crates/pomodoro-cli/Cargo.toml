@@ -12,7 +12,5 @@ tokio = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 anyhow = { workspace = true }
-chrono = { workspace = true }
-dirs = { workspace = true }
-clap = { version = "4", features = ["derive"] }
-libc = "0.2"
+clap = { version = "4", features = ["derive", "env"] }
+reqwest = { version = "0.12", features = ["json"] }

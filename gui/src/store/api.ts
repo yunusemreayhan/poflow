@@ -3,7 +3,26 @@ import { invoke } from "@tauri-apps/api/core";
 // --- HTTP API helper ---
 
 export async function apiCall<T = unknown>(method: string, path: string, body?: unknown): Promise<T> {
-  return invoke<T>("api_call", { method, path, body: body ?? null });
+  try {
+    return await invoke<T>("api_call", { method, path, body: body ?? null });
+  } catch (e) {
+    // Show toast for mutation failures (POST/PUT/DELETE)
+    if (method !== "GET") {
+      const msg = typeof e === "string" ? e : (e as Error)?.message || "Request failed";
+      // Parse JSON error if possible
+      try { const parsed = JSON.parse(msg); if (parsed.error) { showErrorToast(parsed.error); throw e; } } catch {}
+      showErrorToast(msg);
+    }
+    throw e;
+  }
+}
+
+function showErrorToast(msg: string) {
+  // Lazy import to avoid circular dependency
+  try {
+    const { useStore } = require("./store");
+    useStore.getState().toast(msg, "error");
+  } catch {}
 }
 
 export async function setToken(token: string) {
@@ -205,7 +224,7 @@ export interface RoomVote {
 export interface VoteResult {
   task_id: number;
   task_title: string;
-  votes: { username: string; value: number | null }[];
+  votes: { id: number; room_id: number; task_id: number; user_id: number; username: string; value: number | null; created_at: string }[];
   average: number;
   consensus: boolean;
 }

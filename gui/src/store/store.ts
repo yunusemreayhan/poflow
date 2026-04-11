@@ -28,6 +28,7 @@ interface Store {
   history: Session[];
   config: Config | null;
   connected: boolean;
+  loading: { tasks: boolean; history: boolean; stats: boolean; config: boolean };
   activeTab: string;
   activeTeamId: number | null;
   teamScope: Set<number> | null; // descendant IDs for active team
@@ -63,13 +64,13 @@ interface Store {
   login: (username: string, password: string) => Promise<void>;
   register: (username: string, password: string) => Promise<void>;
   logout: () => void;
-  restoreAuth: () => void;
+  restoreAuth: () => Promise<void> | void;
   setServerUrl: (url: string) => Promise<void>;
   switchToServer: (server: SavedServer) => Promise<void>;
   removeServer: (url: string, username: string) => void;
   // Toast
-  toasts: { id: number; msg: string; type: "success" | "error" }[];
-  toast: (msg: string, type?: "success" | "error") => void;
+  toasts: { id: number; msg: string; type: "success" | "error"; onUndo?: () => void }[];
+  toast: (msg: string, type?: "success" | "error", onUndo?: () => void) => void;
   dismissToast: (id: number) => void;
   // Confirm dialog
   confirmDialog: { msg: string; onConfirm: () => void } | null;
@@ -87,6 +88,7 @@ export const useStore = create<Store>((set, get) => ({
   history: [],
   config: null,
   connected: false,
+  loading: { tasks: false, history: false, stats: false, config: false },
   activeTab: "timer",
   activeTeamId: JSON.parse(localStorage.getItem("activeTeamId") || "null"),
   teamScope: null,
@@ -97,10 +99,10 @@ export const useStore = create<Store>((set, get) => ({
   serverUrl: localStorage.getItem("serverUrl") || "http://127.0.0.1:9090",
   savedServers: loadServers(),
   toasts: [],
-  toast: (msg, type = "success") => {
-    const id = Date.now();
-    set(s => ({ toasts: [...s.toasts, { id, msg, type }] }));
-    setTimeout(() => set(s => ({ toasts: s.toasts.filter(t => t.id !== id) })), 3000);
+  toast: (msg, type = "success", onUndo) => {
+    const id = Date.now() * 1000 + Math.floor(Math.random() * 1000);
+    set(s => ({ toasts: [...s.toasts, { id, msg, type, onUndo }] }));
+    setTimeout(() => set(s => ({ toasts: s.toasts.filter(t => t.id !== id) })), onUndo ? 8000 : type === "error" ? 6000 : 3000);
   },
   dismissToast: (id) => set(s => ({ toasts: s.toasts.filter(t => t.id !== id) })),
   confirmDialog: null,
@@ -112,7 +114,9 @@ export const useStore = create<Store>((set, get) => ({
   login: async (username, password) => {
     const resp = await apiCall<AuthResponse>("POST", "/api/auth/login", { username, password });
     await setToken(resp.token);
-    localStorage.setItem("auth", JSON.stringify(resp));
+    invoke("save_auth", { data: JSON.stringify(resp) }).catch(() => {
+      localStorage.setItem("auth", JSON.stringify(resp)); // fallback
+    });
     set({ token: resp.token, username: resp.username, role: resp.role });
     // Save to server list
     const url = get().serverUrl;
@@ -125,7 +129,9 @@ export const useStore = create<Store>((set, get) => ({
   register: async (username, password) => {
     const resp = await apiCall<AuthResponse>("POST", "/api/auth/register", { username, password });
     await setToken(resp.token);
-    localStorage.setItem("auth", JSON.stringify(resp));
+    invoke("save_auth", { data: JSON.stringify(resp) }).catch(() => {
+      localStorage.setItem("auth", JSON.stringify(resp));
+    });
     set({ token: resp.token, username: resp.username, role: resp.role });
     const url = get().serverUrl;
     const servers = loadServers().filter(s => !(s.url === url && s.username === resp.username));
@@ -135,18 +141,23 @@ export const useStore = create<Store>((set, get) => ({
   },
 
   logout: () => {
+    apiCall("POST", "/api/auth/logout").catch(() => {});
+    invoke("clear_auth").catch(() => {});
     localStorage.removeItem("auth");
     set({ token: null, username: null, role: null });
     setToken("");
   },
 
-  restoreAuth: () => {
+  restoreAuth: async () => {
     const url = localStorage.getItem("serverUrl");
     if (url) {
       set({ serverUrl: url });
       invoke("set_connection", { baseUrl: url });
     }
-    const saved = localStorage.getItem("auth");
+    // Try Tauri secure store first, fall back to localStorage
+    let saved: string | null = null;
+    try { saved = await invoke<string>("load_auth"); } catch {}
+    if (!saved) saved = localStorage.getItem("auth");
     if (saved) {
       try {
         const auth = JSON.parse(saved) as AuthResponse;
@@ -168,7 +179,9 @@ export const useStore = create<Store>((set, get) => ({
     localStorage.setItem("serverUrl", server.url);
     await invoke("set_connection", { baseUrl: server.url });
     await setToken(server.token);
-    localStorage.setItem("auth", JSON.stringify({ token: server.token, username: server.username, role: server.role }));
+    invoke("save_auth", { data: JSON.stringify({ token: server.token, username: server.username, role: server.role }) }).catch(() => {
+      localStorage.setItem("auth", JSON.stringify({ token: server.token, username: server.username, role: server.role }));
+    });
     set({ serverUrl: server.url, token: server.token, username: server.username, role: server.role });
   },
 
@@ -222,6 +235,7 @@ export const useStore = create<Store>((set, get) => ({
 
   loadTasks: async () => {
     if (!get().token) return;
+    set(s => ({ loading: { ...s.loading, tasks: true } }));
     try {
       const resp = await apiCall<{ tasks: Task[]; task_sprints: TaskSprintInfo[]; burn_totals: BurnTotalEntry[]; assignees: TaskAssignee[] }>("GET", "/api/tasks/full");
       const burnTotals = new Map<number, BurnTotalEntry>();
@@ -233,7 +247,9 @@ export const useStore = create<Store>((set, get) => ({
         allAssignees.set(a.task_id, list);
       }
       set({ tasks: resp.tasks, taskSprints: resp.task_sprints || [], burnTotals, allAssignees });
+      (window as unknown as Record<string, number>).__tasksLoadedAt = Date.now();
     } catch { /* ignore */ }
+    set(s => ({ loading: { ...s.loading, tasks: false } }));
   },
 
   createTask: async (title, parentId, project, priority = 3, estimated = 1) => {
@@ -278,20 +294,23 @@ export const useStore = create<Store>((set, get) => ({
 
   loadStats: async () => {
     if (!get().token) return;
+    set(s => ({ loading: { ...s.loading, stats: true } }));
     const stats = await apiCall<DayStat[]>("GET", "/api/stats?days=365");
-    set({ stats });
+    set(s => ({ stats, loading: { ...s.loading, stats: false } }));
   },
 
   loadHistory: async () => {
     if (!get().token) return;
+    set(s => ({ loading: { ...s.loading, history: true } }));
     const history = await apiCall<Session[]>("GET", "/api/history");
-    set({ history });
+    set(s => ({ history, loading: { ...s.loading, history: false } }));
   },
 
   loadConfig: async () => {
     if (!get().token) return;
+    set(s => ({ loading: { ...s.loading, config: true } }));
     const config = await apiCall<Config>("GET", "/api/config");
-    set({ config });
+    set(s => ({ config, loading: { ...s.loading, config: false } }));
   },
 
   updateConfig: async (cfg) => {

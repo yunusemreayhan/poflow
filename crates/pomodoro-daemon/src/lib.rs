@@ -4,23 +4,36 @@ pub mod db;
 pub mod engine;
 pub mod notify;
 pub mod routes;
+pub mod webhook;
 
 use axum::Router;
 use std::sync::Arc;
-use tower_http::cors::{CorsLayer, Any};
+use tower_http::cors::{CorsLayer, AllowOrigin};
+use axum::http::{HeaderValue, Method, header};
 
 pub fn build_router(engine: Arc<engine::Engine>) -> Router {
     use axum::routing::{delete, get, post, put};
 
     let cors = CorsLayer::new()
-        .allow_origin(Any)
-        .allow_methods(Any)
-        .allow_headers(Any)
-        .expose_headers(Any);
+        .allow_origin(AllowOrigin::list([
+            "http://localhost:1420".parse::<HeaderValue>().unwrap(),
+            "http://127.0.0.1:1420".parse::<HeaderValue>().unwrap(),
+            "http://localhost:9090".parse::<HeaderValue>().unwrap(),
+            "http://127.0.0.1:9090".parse::<HeaderValue>().unwrap(),
+            "tauri://localhost".parse::<HeaderValue>().unwrap(),
+        ]))
+        .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE, Method::OPTIONS])
+        .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION, header::IF_NONE_MATCH,
+            axum::http::HeaderName::from_static("x-requested-with")])
+        .expose_headers([header::ETAG,
+            axum::http::HeaderName::from_static("x-total-count"),
+            axum::http::HeaderName::from_static("x-page"),
+            axum::http::HeaderName::from_static("x-per-page")]);
 
     Router::new()
         .route("/api/auth/register", post(routes::register))
         .route("/api/auth/login", post(routes::login))
+        .route("/api/auth/logout", post(routes::logout))
         .route("/api/timer", get(routes::get_state))
         .route("/api/timer/start", post(routes::start))
         .route("/api/timer/pause", post(routes::pause))
@@ -55,6 +68,7 @@ pub fn build_router(engine: Arc<engine::Engine>) -> Router {
         .route("/api/rooms/{id}/reveal", post(routes::reveal_votes))
         .route("/api/rooms/{id}/accept", post(routes::accept_estimate))
         .route("/api/rooms/{id}/close", post(routes::close_room))
+        .route("/api/rooms/{id}/ws", get(routes::room_ws))
         .route("/api/sprints", get(routes::list_sprints).post(routes::create_sprint))
         .route("/api/sprints/{id}", get(routes::get_sprint_detail).put(routes::update_sprint).delete(routes::delete_sprint))
         .route("/api/sprints/{id}/start", post(routes::start_sprint))
@@ -63,6 +77,7 @@ pub fn build_router(engine: Arc<engine::Engine>) -> Router {
         .route("/api/sprints/{id}/tasks/{task_id}", delete(routes::remove_sprint_task))
         .route("/api/sprints/{id}/burndown", get(routes::get_sprint_burndown))
         .route("/api/sprints/burndown", get(routes::get_global_burndown))
+        .route("/api/sprints/velocity", get(routes::get_velocity))
         .route("/api/epics", get(routes::list_epic_groups).post(routes::create_epic_group))
         .route("/api/epics/{id}", get(routes::get_epic_group).delete(routes::delete_epic_group))
         .route("/api/epics/{id}/tasks", post(routes::add_epic_group_tasks))
@@ -90,7 +105,25 @@ pub fn build_router(engine: Arc<engine::Engine>) -> Router {
         .route("/api/burn-totals", get(routes::get_all_burn_totals))
         .route("/api/assignees", get(routes::get_all_assignees))
         .route("/api/tasks/full", get(routes::get_tasks_full))
+        .route("/api/tasks/reorder", axum::routing::post(routes::reorder_tasks))
+        .route("/api/export/tasks", get(routes::export_tasks))
+        .route("/api/export/sessions", get(routes::export_sessions))
+        .route("/api/audit", get(routes::list_audit))
+        .route("/api/labels", get(routes::list_labels).post(routes::create_label))
+        .route("/api/labels/{id}", delete(routes::delete_label))
+        .route("/api/tasks/{id}/labels/{label_id}", axum::routing::put(routes::add_task_label).delete(routes::remove_task_label))
+        .route("/api/tasks/{id}/labels", get(routes::get_task_labels))
+        .route("/api/tasks/{id}/recurrence", get(routes::get_recurrence).put(routes::set_recurrence).delete(routes::remove_recurrence))
+        .route("/api/tasks/{id}/dependencies", get(routes::get_dependencies).post(routes::add_dependency))
+        .route("/api/tasks/{id}/dependencies/{dep_id}", delete(routes::remove_dependency))
+        .route("/api/dependencies", get(routes::get_all_dependencies))
+        .route("/api/webhooks", get(routes::list_webhooks).post(routes::create_webhook))
+        .route("/api/webhooks/{id}", delete(routes::delete_webhook))
+        .route("/api/templates", get(routes::list_templates).post(routes::create_template))
+        .route("/api/templates/{id}", delete(routes::delete_template))
         .route("/api/timer/sse", get(routes::sse_timer))
+        .route("/api/timer/ticket", axum::routing::post(routes::create_sse_ticket))
+        .layer(axum::extract::DefaultBodyLimit::max(2 * 1024 * 1024)) // 2MB max request body
         .layer(cors)
         .with_state(engine)
 }
@@ -117,12 +150,15 @@ pub mod rate_limit {
     }
 
     pub async fn check(
-        ConnectInfo(addr): ConnectInfo<SocketAddr>,
+        connect_info: Option<ConnectInfo<SocketAddr>>,
         axum::extract::State(limiter): axum::extract::State<RateLimiter>,
         req: axum::extract::Request,
         next: axum::middleware::Next,
     ) -> Result<axum::response::Response, axum::http::StatusCode> {
-        let key = addr.ip().to_string();
+        let key = match connect_info {
+            Some(ConnectInfo(addr)) => addr.ip().to_string(),
+            None => "unknown".to_string(),
+        };
         let now = Instant::now();
         let mut map = limiter.attempts.lock().await;
         let entries = map.entry(key).or_default();

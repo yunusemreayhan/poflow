@@ -23,7 +23,7 @@ pub struct Config {
     pub leaf_only_mode: bool,
 }
 
-fn default_bind_address() -> String { "0.0.0.0".to_string() }
+fn default_bind_address() -> String { "127.0.0.1".to_string() }
 fn default_bind_port() -> u16 { 9090 }
 fn default_estimation_mode() -> String { "hours".to_string() }
 
@@ -39,7 +39,7 @@ impl Default for Config {
             sound_enabled: true,
             notification_enabled: true,
             daily_goal: 8,
-            bind_address: "0.0.0.0".to_string(),
+            bind_address: "127.0.0.1".to_string(),
             bind_port: 9090,
             estimation_mode: "hours".to_string(),
             leaf_only_mode: false,

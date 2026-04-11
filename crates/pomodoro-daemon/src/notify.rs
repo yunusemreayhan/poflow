@@ -1,27 +1,22 @@
 use crate::engine::TimerPhase;
 use anyhow::Result;
 
-pub fn send_notification(title: &str, body: &str, phase: TimerPhase) -> Result<()> {
+pub fn send_notification(title: &str, body: &str, phase: TimerPhase, play_sound: bool) -> Result<()> {
     let icon = match phase {
         TimerPhase::Work => "dialog-warning",
-        TimerPhase::ShortBreak => "dialog-information",
-        TimerPhase::LongBreak => "dialog-information",
-        TimerPhase::Idle => "dialog-information",
+        _ => "dialog-information",
     };
 
-    notify_rust::Notification::new()
-        .summary(title)
-        .body(body)
-        .icon(icon)
-        .appname("Pomodoro")
+    let mut n = notify_rust::Notification::new();
+    n.summary(title).body(body).icon(icon).appname("Pomodoro")
         .urgency(notify_rust::Urgency::Normal)
-        .timeout(notify_rust::Timeout::Milliseconds(8000))
-        .show()?;
-
+        .timeout(notify_rust::Timeout::Milliseconds(8000));
+    if play_sound { n.sound_name("complete"); }
+    n.show()?;
     Ok(())
 }
 
-pub fn notify_session_complete(phase: TimerPhase, session_count: u32) {
+pub fn notify_session_complete(phase: TimerPhase, session_count: u32, play_sound: bool) {
     let (title, body) = match phase {
         TimerPhase::ShortBreak => (
             "🍅 Work session complete!".to_string(),
@@ -37,5 +32,16 @@ pub fn notify_session_complete(phase: TimerPhase, session_count: u32) {
         ),
         TimerPhase::Idle => return,
     };
-    send_notification(&title, &body, phase).ok();
+    send_notification(&title, &body, phase, play_sound).ok();
+}
+
+pub fn notify_due_task(title: &str, urgency: &str) {
+    let _ = notify_rust::Notification::new()
+        .summary(&format!("📅 Task {}", urgency))
+        .body(title)
+        .icon("appointment-soon")
+        .appname("Pomodoro")
+        .urgency(notify_rust::Urgency::Normal)
+        .timeout(notify_rust::Timeout::Milliseconds(10000))
+        .show();
 }

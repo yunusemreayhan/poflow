@@ -1,82 +1,296 @@
-// Pomodoro Linux — Database Schema
+// Pomodoro Linux — Database Schema (20 tables)
 // Paste this into https://dbdiagram.io to visualize
 // SQLite database at ~/.local/share/pomodoro/pomodoro.db
 
 Table users {
   id            integer [pk, increment]
-  username      text    [not null, unique]
-  password_hash text    [not null, note: 'bcrypt hashed']
+  username      text    [not null, unique, note: 'Alphanumeric + underscore/hyphen, max 32 chars']
+  password_hash text    [not null, note: 'bcrypt cost 12']
   role          text    [not null, default: 'user', note: 'root | user']
   created_at    text    [not null]
+}
 
-  Note: 'First run seeds root/root. Root can manage all users and override ownership.'
+Table user_configs {
+  user_id             integer [pk, ref: > users.id, note: 'ON DELETE CASCADE']
+  work_duration_min   integer
+  short_break_min     integer
+  long_break_min      integer
+  long_break_interval integer
+  auto_start_breaks   integer [note: '0 or 1']
+  auto_start_work     integer [note: '0 or 1']
+  daily_goal          integer
+
+  Note: 'Per-user timer config overrides. NULL = use global default.'
 }
 
 Table tasks {
   id               integer [pk, increment]
   parent_id        integer [ref: > tasks.id, note: 'ON DELETE CASCADE — null = root project']
-  user             text    [not null, default: 'default', note: 'Owner — only owner/root can edit/delete']
+  user_id          integer [not null, ref: > users.id]
   title            text    [not null]
   description      text
-  project          text    [note: 'Optional grouping label']
-  tags             text    [note: 'Comma-separated tags']
-  priority         integer [not null, default: 3, note: '1=lowest, 5=highest']
-  estimated        integer [not null, default: 1, note: 'Estimated pomodoros / story points']
-  actual           integer [not null, default: 0, note: 'Completed pomodoros (auto-incremented)']
-  estimated_hours  real    [not null, default: 0, note: 'Hour-based estimation']
-  remaining_points real    [not null, default: 0, note: 'Remaining story points (manual update)']
-  due_date         text    [note: 'ISO date string']
-  status           text    [not null, default: 'backlog', note: 'backlog | active | completed']
-  sort_order       integer [not null, default: 0, note: 'Scoped to siblings']
+  project          text
+  tags             text    [note: 'Comma-separated']
+  priority         integer [not null, default: 3, note: '1-5']
+  estimated        integer [not null, default: 1, note: 'Story points']
+  actual           integer [not null, default: 0, note: 'Completed pomodoros']
+  estimated_hours  real    [not null, default: 0]
+  remaining_points real    [not null, default: 0]
+  due_date         text
+  status           text    [not null, default: 'backlog', note: 'backlog|active|in_progress|completed|done|estimated']
+  sort_order       integer [not null, default: 0]
   created_at       text    [not null]
-  updated_at       text    [not null]
-
-  Note: 'Hierarchical: parent_id=null → root project. Remaining % calculated from hours or points based on system estimation_mode.'
+  updated_at       text    [not null, note: 'Millisecond precision for optimistic locking']
 }
 
 Table sessions {
   id           integer [pk, increment]
-  task_id      integer [ref: > tasks.id, note: 'SET NULL on task delete']
-  user         text    [not null, default: 'default', note: 'Who ran this session']
+  task_id      integer [ref: > tasks.id, note: 'SET NULL on delete']
+  user_id      integer [not null, ref: > users.id]
   session_type text    [not null, note: 'work | short_break | long_break']
   status       text    [not null, note: 'running | completed | interrupted | skipped']
   started_at   text    [not null]
-  ended_at     text    [note: 'null while running']
-  duration_s   integer [note: 'Computed on end']
+  ended_at     text
+  duration_s   integer
   notes        text
-
-  Note: 'Each pomodoro or break. Linked to task and stamped with user.'
 }
 
 Table comments {
   id         integer [pk, increment]
-  task_id    integer [not null, ref: > tasks.id, note: 'Deleted with task']
-  session_id integer [ref: > sessions.id, note: 'Optional — links to specific pomodoro']
-  user       text    [not null, default: 'default', note: 'Author — only author/root can delete']
+  task_id    integer [not null, ref: > tasks.id]
+  session_id integer [ref: > sessions.id]
+  user_id    integer [not null, ref: > users.id]
   content    text    [not null]
   created_at text    [not null]
-
-  Note: 'Anyone can comment on any task. Session-linked = notes during a pomodoro.'
-}
-
-Table time_reports {
-  id          integer [pk, increment]
-  task_id     integer [not null, ref: > tasks.id, note: 'Deleted with task']
-  user        text    [not null, note: 'Who logged the time']
-  hours       real    [not null, note: 'Hours worked']
-  description text    [note: 'What was done']
-  created_at  text    [not null]
-
-  Note: 'Manual time logging. Adding a report auto-assigns the user to the task.'
 }
 
 Table task_assignees {
   task_id  integer [not null, ref: > tasks.id, note: 'ON DELETE CASCADE']
-  username text    [not null]
+  user_id  integer [not null, ref: > users.id]
 
   indexes {
-    (task_id, username) [pk]
+    (task_id, user_id) [pk]
+  }
+}
+
+Table rooms {
+  id               integer [pk, increment]
+  name             text    [not null]
+  room_type        text    [not null, default: 'estimation']
+  estimation_unit  text    [not null, default: 'points', note: 'points | hours | mandays']
+  project          text
+  creator_id       integer [not null, ref: > users.id]
+  status           text    [not null, default: 'lobby', note: 'lobby | voting | revealed | closed']
+  current_task_id  integer [ref: > tasks.id]
+  created_at       text    [not null]
+}
+
+Table room_members {
+  room_id   integer [not null, ref: > rooms.id, note: 'ON DELETE CASCADE']
+  user_id   integer [not null, ref: > users.id]
+  role      text    [not null, default: 'voter', note: 'admin | voter']
+  joined_at text    [not null]
+
+  indexes {
+    (room_id, user_id) [pk]
+  }
+}
+
+Table room_votes {
+  id         integer [pk, increment]
+  room_id    integer [not null, ref: > rooms.id, note: 'ON DELETE CASCADE']
+  task_id    integer [not null, ref: > tasks.id]
+  user_id    integer [not null, ref: > users.id]
+  value      real
+  created_at text    [not null]
+
+  indexes {
+    (room_id, task_id, user_id) [unique]
+  }
+}
+
+Table sprints {
+  id            integer [pk, increment]
+  name          text    [not null]
+  project       text
+  goal          text
+  status        text    [not null, default: 'planning', note: 'planning | active | completed']
+  start_date    text
+  end_date      text
+  created_by_id integer [not null, ref: > users.id]
+  created_at    text    [not null]
+  updated_at    text    [not null]
+}
+
+Table sprint_tasks {
+  sprint_id   integer [not null, ref: > sprints.id, note: 'ON DELETE CASCADE']
+  task_id     integer [not null, ref: > tasks.id, note: 'ON DELETE CASCADE']
+  added_by_id integer [not null, ref: > users.id]
+  added_at    text    [not null]
+
+  indexes {
+    (sprint_id, task_id) [pk]
+  }
+}
+
+Table sprint_daily_stats {
+  id           integer [pk, increment]
+  sprint_id    integer [not null, ref: > sprints.id, note: 'ON DELETE CASCADE']
+  date         text    [not null]
+  total_points real    [not null, default: 0]
+  done_points  real    [not null, default: 0]
+  total_hours  real    [not null, default: 0]
+  done_hours   real    [not null, default: 0]
+  total_tasks  integer [not null, default: 0]
+  done_tasks   integer [not null, default: 0]
+
+  indexes {
+    (sprint_id, date) [unique]
+  }
+}
+
+Table sprint_root_tasks {
+  sprint_id integer [not null, ref: > sprints.id, note: 'ON DELETE CASCADE']
+  task_id   integer [not null, ref: > tasks.id, note: 'ON DELETE CASCADE']
+
+  indexes {
+    (sprint_id, task_id) [pk]
   }
 
-  Note: 'Many-to-many. Auto-populated when user logs time. Can also be manually assigned.'
+  Note: 'Defines which root tasks scope a sprint view.'
+}
+
+Table burn_log {
+  id              integer [pk, increment]
+  sprint_id       integer [ref: > sprints.id, note: 'ON DELETE CASCADE']
+  task_id         integer [not null, ref: > tasks.id, note: 'ON DELETE CASCADE']
+  session_id      integer [ref: > sessions.id]
+  user_id         integer [not null, ref: > users.id]
+  points          real    [not null, default: 0]
+  hours           real    [not null, default: 0]
+  source          text    [not null, default: 'manual', note: 'manual | timer | time_report']
+  note            text
+  cancelled       integer [not null, default: 0]
+  cancelled_by_id integer [ref: > users.id]
+  created_at      text    [not null]
+
+  Note: 'Unified burn tracking. Soft-delete via cancelled flag.'
+}
+
+Table teams {
+  id         integer [pk, increment]
+  name       text    [not null, unique]
+  created_at text    [not null]
+}
+
+Table team_members {
+  team_id integer [not null, ref: > teams.id, note: 'ON DELETE CASCADE']
+  user_id integer [not null, ref: > users.id, note: 'ON DELETE CASCADE']
+  role    text    [not null, default: 'member', note: 'admin | member']
+
+  indexes {
+    (team_id, user_id) [pk]
+  }
+}
+
+Table team_root_tasks {
+  team_id integer [not null, ref: > teams.id, note: 'ON DELETE CASCADE']
+  task_id integer [not null, ref: > tasks.id, note: 'ON DELETE CASCADE']
+
+  indexes {
+    (team_id, task_id) [pk]
+  }
+
+  Note: 'Defines which root tasks a team can see.'
+}
+
+Table epic_groups {
+  id         integer [pk, increment]
+  name       text    [not null]
+  created_by integer [not null, ref: > users.id]
+  created_at text    [not null]
+  updated_at text    [not null]
+}
+
+Table epic_group_tasks {
+  group_id integer [not null, ref: > epic_groups.id, note: 'ON DELETE CASCADE']
+  task_id  integer [not null, ref: > tasks.id, note: 'ON DELETE CASCADE']
+
+  indexes {
+    (group_id, task_id) [pk]
+  }
+}
+
+Table epic_snapshots {
+  id           integer [pk, increment]
+  group_id     integer [not null, ref: > epic_groups.id, note: 'ON DELETE CASCADE']
+  date         text    [not null]
+  total_tasks  integer [not null, default: 0]
+  done_tasks   integer [not null, default: 0]
+  total_points real    [not null, default: 0]
+  done_points  real    [not null, default: 0]
+  total_hours  real    [not null, default: 0]
+  done_hours   real    [not null, default: 0]
+
+  indexes {
+    (group_id, date) [unique]
+  }
+}
+
+
+Table audit_log {
+  id          integer [pk, increment]
+  user_id     integer [not null, ref: > users.id]
+  action      text    [not null, note: 'create | update | delete | register']
+  entity_type text    [not null, note: 'task | user | sprint | room']
+  entity_id   integer
+  detail      text
+  created_at  text    [not null]
+}
+
+Table labels {
+  id         integer [pk, increment]
+  name       text    [not null, unique]
+  color      text    [not null, default: '#6366f1']
+  created_at text    [not null]
+}
+
+Table task_labels {
+  task_id  integer [not null, ref: > tasks.id, note: 'ON DELETE CASCADE']
+  label_id integer [not null, ref: > labels.id, note: 'ON DELETE CASCADE']
+
+  indexes {
+    (task_id, label_id) [pk]
+  }
+}
+
+Table task_recurrence {
+  task_id      integer [pk, ref: > tasks.id, note: 'ON DELETE CASCADE']
+  pattern      text    [not null, note: 'daily | weekly | biweekly | monthly']
+  next_due     text    [not null]
+  last_created text
+}
+
+Table task_dependencies {
+  task_id    integer [not null, ref: > tasks.id, note: 'ON DELETE CASCADE']
+  depends_on integer [not null, ref: > tasks.id, note: 'ON DELETE CASCADE']
+
+  indexes {
+    (task_id, depends_on) [pk]
+  }
+}
+
+Table webhooks {
+  id         integer [pk, increment]
+  user_id    integer [not null, ref: > users.id, note: 'ON DELETE CASCADE']
+  url        text    [not null]
+  events     text    [not null, default: '*']
+  secret     text
+  active     integer [not null, default: 1]
+  created_at text    [not null]
+}
+
+Table token_blocklist {
+  token_hash text [pk, note: 'Hash of revoked JWT']
+  expires_at text [not null]
 }

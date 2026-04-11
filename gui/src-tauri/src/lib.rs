@@ -39,6 +39,7 @@ async fn api_call(state: tauri::State<'_, Arc<AppState>>, method: String, path: 
     if let Some(token) = &config.token {
         req = req.header("Authorization", format!("Bearer {}", token));
     }
+    req = req.header("X-Requested-With", "PomodoroGUI");
     if let Some(b) = body {
         req = req.json(&b);
     }
@@ -79,7 +80,38 @@ async fn set_connection(state: tauri::State<'_, Arc<AppState>>, base_url: String
 
 #[tauri::command]
 async fn write_file(path: String, content: String) -> Result<(), String> {
+    // Only allow writing to user's data/download directories
+    let p = std::path::Path::new(&path);
+    let allowed = dirs::download_dir()
+        .into_iter()
+        .chain(dirs::document_dir())
+        .chain(dirs::data_dir())
+        .chain(dirs::desktop_dir())
+        .any(|dir| p.starts_with(&dir));
+    if !allowed {
+        return Err("Write denied: path must be in Downloads, Documents, Desktop, or data directory".to_string());
+    }
     std::fs::write(&path, content).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn save_auth(state: tauri::State<'_, Arc<AppState>>, data: String) -> Result<(), String> {
+    let dir = dirs::data_dir().unwrap_or_else(|| std::path::PathBuf::from(".")).join("pomodoro-gui");
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    std::fs::write(dir.join(".auth"), data).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn load_auth(state: tauri::State<'_, Arc<AppState>>) -> Result<String, String> {
+    let path = dirs::data_dir().unwrap_or_else(|| std::path::PathBuf::from(".")).join("pomodoro-gui").join(".auth");
+    std::fs::read_to_string(&path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn clear_auth(state: tauri::State<'_, Arc<AppState>>) -> Result<(), String> {
+    let path = dirs::data_dir().unwrap_or_else(|| std::path::PathBuf::from(".")).join("pomodoro-gui").join(".auth");
+    let _ = std::fs::remove_file(&path);
+    Ok(())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -92,7 +124,7 @@ pub fn run() {
     tauri::Builder::default()
         .manage(app_state)
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![api_call, set_token, get_connection, set_connection, write_file])
+        .invoke_handler(tauri::generate_handler![api_call, set_token, get_connection, set_connection, write_file, save_auth, load_auth, clear_auth])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

@@ -187,3 +187,51 @@ describe("XML export sanitization", () => {
     expect(esc("normal text")).toBe("normal text");
   });
 });
+
+// --- matchSearch ---
+
+import { matchSearch } from "../utils";
+
+describe("matchSearch", () => {
+  it("matches text case-insensitively", () => {
+    expect(matchSearch("Fix Login Bug", "login")).toBe(true);
+    expect(matchSearch("Fix Login Bug", "LOGIN")).toBe(true);
+    expect(matchSearch("Fix Login Bug", "fix")).toBe(true);
+  });
+
+  it("matches with regex", () => {
+    expect(matchSearch("backend-api", "back.*api")).toBe(true);
+  });
+
+  it("returns false for no match", () => {
+    expect(matchSearch("Hello World", "xyz")).toBe(false);
+  });
+
+  it("returns true for empty query", () => {
+    expect(matchSearch("anything", "")).toBe(true);
+  });
+
+  it("handles invalid regex gracefully", () => {
+    expect(matchSearch("test [bracket", "[bracket")).toBe(true);
+  });
+});
+
+// --- countDescendants ---
+
+describe("countDescendants", () => {
+  it("returns 0 for leaf node", () => {
+    const tree = buildTree([makeTask({ id: 1 })]);
+    expect(countDescendants(tree[0])).toBe(0);
+  });
+
+  it("counts nested descendants", () => {
+    const tasks = [
+      makeTask({ id: 1 }),
+      makeTask({ id: 2, parent_id: 1 }),
+      makeTask({ id: 3, parent_id: 1 }),
+      makeTask({ id: 4, parent_id: 2 }),
+    ];
+    const tree = buildTree(tasks);
+    expect(countDescendants(tree[0])).toBe(3);
+  });
+});

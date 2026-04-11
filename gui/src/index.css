@@ -9,7 +9,7 @@
   --color-surface: #1A1A2E;
   --color-surface-2: #25253D;
   --color-text: #E8E8F0;
-  --color-text-dim: #8888AA;
+  --color-text-dim: #9999BB;
   --color-accent: #7C3AED;
   --color-success: #10B981;
   --color-warning: #F59E0B;
@@ -67,12 +67,12 @@ body {
 
 /* Light theme: fix hardcoded white text opacity classes */
 [data-theme="light"] .text-white { color: var(--color-text) !important; }
-[data-theme="light"] .text-white\/20 { color: rgba(26, 26, 46, 0.25) !important; }
-[data-theme="light"] .text-white\/30 { color: rgba(26, 26, 46, 0.35) !important; }
-[data-theme="light"] .text-white\/40 { color: rgba(26, 26, 46, 0.5) !important; }
-[data-theme="light"] .text-white\/50 { color: rgba(26, 26, 46, 0.6) !important; }
-[data-theme="light"] .text-white\/60 { color: rgba(26, 26, 46, 0.7) !important; }
-[data-theme="light"] .text-white\/70 { color: rgba(26, 26, 46, 0.8) !important; }
+[data-theme="light"] .text-white\/20 { color: rgba(26, 26, 46, 0.35) !important; }
+[data-theme="light"] .text-white\/30 { color: rgba(26, 26, 46, 0.45) !important; }
+[data-theme="light"] .text-white\/40 { color: rgba(26, 26, 46, 0.55) !important; }
+[data-theme="light"] .text-white\/50 { color: rgba(26, 26, 46, 0.65) !important; }
+[data-theme="light"] .text-white\/60 { color: rgba(26, 26, 46, 0.75) !important; }
+[data-theme="light"] .text-white\/70 { color: rgba(26, 26, 46, 0.85) !important; }
 [data-theme="light"] .text-white\/80 { color: rgba(26, 26, 46, 0.9) !important; }
 [data-theme="light"] .bg-white\/5 { background-color: rgba(0, 0, 0, 0.04) !important; }
 [data-theme="light"] .bg-white\/10 { background-color: rgba(0, 0, 0, 0.06) !important; }
@@ -91,3 +91,41 @@ body {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Visible focus indicators for keyboard navigation */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* Screen reader only utility */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+@keyframes slide {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
+}
