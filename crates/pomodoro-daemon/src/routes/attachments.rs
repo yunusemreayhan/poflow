@@ -39,14 +39,12 @@ pub async fn upload_attachment(
         .and_then(|v| v.to_str().ok())
         .unwrap_or("application/octet-stream");
 
-    // Generate unique storage key with random component
+    // Generate unique storage key (portable, no /dev/urandom dependency)
     let random_hex = {
-        let mut buf = [0u8; 8];
-        if let Ok(mut f) = std::fs::File::open("/dev/urandom") {
-            use std::io::Read;
-            let _ = f.read_exact(&mut buf);
-        }
-        buf.iter().map(|b| format!("{:02x}", b)).collect::<String>()
+        use sha2::{Sha256, Digest};
+        let seed = format!("{}{}{}{}", chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0), task_id, claims.user_id, body.len());
+        let hash = Sha256::digest(seed.as_bytes());
+        hash[..8].iter().map(|b| format!("{:02x}", b)).collect::<String>()
     };
     let key = format!("{}_{}", random_hex, &safe_name);
     let path = db::attachments_dir().join(&key);

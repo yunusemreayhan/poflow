@@ -73,14 +73,16 @@ fn default_token_type() -> String { "access".to_string() }
 
 pub fn create_token(user_id: i64, username: &str, role: &str) -> Result<String, jsonwebtoken::errors::Error> {
     let now = chrono::Utc::now().timestamp() as usize;
-    let claims = Claims { sub: user_id.to_string(), user_id, username: username.to_string(), role: role.to_string(), exp: now + 2 * 3600, iat: now, typ: "access".to_string() };
+    let access_exp: usize = std::env::var("ACCESS_TOKEN_EXPIRY_SECS").ok().and_then(|v| v.parse().ok()).unwrap_or(2 * 3600);
+    let claims = Claims { sub: user_id.to_string(), user_id, username: username.to_string(), role: role.to_string(), exp: now + access_exp, iat: now, typ: "access".to_string() };
     encode(&Header::default(), &claims, &EncodingKey::from_secret(secret()))
 }
 
 /// Create a long-lived refresh token (30 days)
 pub fn create_refresh_token(user_id: i64, username: &str, role: &str) -> Result<String, jsonwebtoken::errors::Error> {
     let now = chrono::Utc::now().timestamp() as usize;
-    let claims = Claims { sub: user_id.to_string(), user_id, username: username.to_string(), role: role.to_string(), exp: now + 30 * 24 * 3600, iat: now, typ: "refresh".to_string() };
+    let refresh_exp: usize = std::env::var("REFRESH_TOKEN_EXPIRY_SECS").ok().and_then(|v| v.parse().ok()).unwrap_or(30 * 24 * 3600);
+    let claims = Claims { sub: user_id.to_string(), user_id, username: username.to_string(), role: role.to_string(), exp: now + refresh_exp, iat: now, typ: "refresh".to_string() };
     encode(&Header::default(), &claims, &EncodingKey::from_secret(secret()))
 }
 
