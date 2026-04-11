@@ -86,6 +86,19 @@ pub async fn update_task(State(engine): State<AppState>, claims: Claims, Path(id
     if let Some(e) = req.estimated { if e < 0 { return Err(err(StatusCode::BAD_REQUEST, "Estimated cannot be negative")); } }
     if let Some(h) = req.estimated_hours { if h < 0.0 { return Err(err(StatusCode::BAD_REQUEST, "Estimated hours cannot be negative")); } }
     if let Some(ref dd) = req.due_date { if let Some(ref d) = dd { if !valid_date(d) { return Err(err(StatusCode::BAD_REQUEST, "due_date must be YYYY-MM-DD")); } } }
+    // V7: Prevent circular parent_id references
+    if let Some(Some(new_parent)) = req.parent_id {
+        if new_parent == id { return Err(err(StatusCode::BAD_REQUEST, "Task cannot be its own parent")); }
+        // Walk up the ancestor chain to detect cycles
+        let mut ancestor = Some(new_parent);
+        let mut depth = 0;
+        while let Some(aid) = ancestor {
+            depth += 1;
+            if depth > 50 { break; }
+            if aid == id { return Err(err(StatusCode::BAD_REQUEST, "Circular parent reference detected")); }
+            ancestor = db::get_task(&engine.pool, aid).await.ok().and_then(|t| t.parent_id);
+        }
+    }
     if let Some(ref expected) = req.expected_updated_at {
         if *expected != task.updated_at {
             return Err(err(StatusCode::CONFLICT, "Task was modified by another user. Please refresh and try again."));

@@ -26,7 +26,7 @@ function NumInput({ value, onChange, min = 1, max = 120, label }: { value: numbe
       value={value}
       min={min}
       max={max}
-      onChange={(e) => onChange(Number(e.target.value))}
+      onChange={(e) => { const v = Number(e.target.value); onChange(Math.max(min, Math.min(max, v))); }}
       aria-label={label}
       className="w-18 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white text-center outline-none focus:border-[var(--color-accent)]"
     />
