@@ -107,7 +107,7 @@ function Sidebar() {
           {teams.map(t => (
             <button key={t.id} onClick={() => setActiveTeam(t.id)}
               className={`w-11 h-7 flex items-center justify-center rounded text-[9px] font-medium truncate transition-all ${activeTeamId === t.id ? "bg-[var(--color-accent)] text-white" : "text-white/30 hover:text-white/50"}`}
-              title={t.name}>{t.name.slice(0, 4)}</button>
+              title={t.name} aria-label={t.name}>{t.name.slice(0, 4)}</button>
           ))}
         </div>
       )}
@@ -338,6 +338,7 @@ export default function App() {
                   t.type === "error" ? "bg-[var(--color-danger)] text-white" : "bg-[var(--color-success)]/90 text-white"
                 }`}>
                 <span className="cursor-pointer" onClick={() => dismissToast(t.id)}>{t.msg}</span>
+                <button onClick={() => dismissToast(t.id)} className="ml-1 text-white/60 hover:text-white" aria-label="Dismiss">×</button>
                 {t.onUndo && (
                   <button onClick={() => { t.onUndo!(); dismissToast(t.id); }}
                     className="ml-2 px-2 py-0.5 rounded bg-white/20 hover:bg-white/30 text-white text-xs font-bold">
@@ -390,11 +391,15 @@ export default function App() {
               <h2 className="text-sm font-semibold text-white mb-3">{t.keyboardShortcuts}</h2>
               <div className="space-y-1.5 text-xs">
                 {[
+                  ["0-6", "Switch tabs"],
+                  ["r", "Refresh"],
+                  ["n", "New task (on tasks tab)"],
+                  ["Space", "Pause/Resume timer"],
+                  ["Escape", "Stop timer"],
                   ["/", t.focusSearch],
                   ["?", t.toggleShortcuts],
                   ["Double-click", t.renameTask],
                   ["Enter", t.saveEdit],
-                  ["Escape", t.cancelEdit],
                   ["Right-click", t.contextMenu],
                 ].map(([key, desc]) => (
                   <div key={key} className="flex items-center gap-3">

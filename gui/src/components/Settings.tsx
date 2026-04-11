@@ -33,11 +33,12 @@ function NumInput({ value, onChange, min = 1, max = 120, label }: { value: numbe
   );
 }
 
-function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
+function Toggle({ value, onChange, label }: { value: boolean; onChange: (v: boolean) => void; label?: string }) {
   return (
     <button
       role="switch"
       aria-checked={value}
+      aria-label={label}
       onClick={() => onChange(!value)}
       className={`w-11 h-6 rounded-full transition-all relative ${value ? "bg-[var(--color-accent)]" : "bg-white/10"}`}
     >
@@ -160,10 +161,10 @@ export default function Settings() {
       <div className="glass p-5">
         <h3 className="text-sm font-semibold text-white/60 mb-3">Automation</h3>
         <Field label="Auto-start Breaks">
-          <Toggle value={local.auto_start_breaks} onChange={(v) => set("auto_start_breaks", v)} />
+          <Toggle value={local.auto_start_breaks} onChange={(v) => set("auto_start_breaks", v)} label="Auto-start Breaks" />
         </Field>
         <Field label="Auto-start Work">
-          <Toggle value={local.auto_start_work} onChange={(v) => set("auto_start_work", v)} />
+          <Toggle value={local.auto_start_work} onChange={(v) => set("auto_start_work", v)} label="Auto-start Work" />
         </Field>
       </div>
 

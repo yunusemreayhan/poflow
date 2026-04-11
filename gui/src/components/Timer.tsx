@@ -71,6 +71,7 @@ export default function Timer() {
   return (
     <div className="flex flex-col items-center justify-center gap-6 h-full px-8">
       {/* Phase label */}
+      <div aria-live="polite" aria-atomic="true">
       <AnimatePresence mode="wait">
         <motion.div
           key={phase}
@@ -83,6 +84,7 @@ export default function Timer() {
           {PHASE_LABELS[phase] ?? phase}
         </motion.div>
       </AnimatePresence>
+      </div>
 
       {/* Ring timer */}
       <div className="relative" style={{ width: SIZE, height: SIZE }}>

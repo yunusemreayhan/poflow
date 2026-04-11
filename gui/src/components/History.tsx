@@ -120,7 +120,7 @@ export default function History() {
             animate={{ opacity: 1, y: 0 }}
             className="glass p-5 text-center"
           >
-            <div className="text-2xl mb-1">{card.icon}</div>
+            <div className="text-2xl mb-1" role="img" aria-label={card.label}>{card.icon}</div>
             <div className="text-2xl font-bold text-white">{card.value}</div>
             <div className="text-xs text-white/40 mt-1">{card.label}</div>
           </motion.div>

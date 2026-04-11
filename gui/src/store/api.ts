@@ -165,12 +165,6 @@ export interface TeamDetail {
 }
 export type TimeReport = BurnEntry;
 
-export interface BurnTotal {
-  total_points: number;
-  total_hours: number;
-  count: number;
-}
-
 export interface AuthResponse {
   token: string;
   refresh_token: string;
