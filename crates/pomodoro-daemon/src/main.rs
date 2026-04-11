@@ -106,13 +106,20 @@ async fn main() -> Result<()> {
 
     let engine = Arc::new(engine::Engine::new(pool, config.clone()).await);
 
+    // Graceful shutdown signal (O1)
+    let (shutdown_tx, _) = tokio::sync::watch::channel(false);
+
     // Tick loop
     let engine_tick = engine.clone();
+    let mut shutdown_rx = shutdown_tx.subscribe();
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(std::time::Duration::from_secs(1));
         let mut last_date = chrono::Utc::now().naive_utc().format("%Y-%m-%d").to_string();
         loop {
-            interval.tick().await;
+            tokio::select! {
+                _ = interval.tick() => {},
+                _ = shutdown_rx.changed() => break,
+            }
             // Midnight reset: clear per-user daily counts
             let today = chrono::Utc::now().naive_utc().format("%Y-%m-%d").to_string();
             if today != last_date {
@@ -143,11 +150,15 @@ async fn main() -> Result<()> {
 
     // Sprint burndown snapshot (hourly)
     let engine_snap = engine.clone();
+    let mut shutdown_rx2 = shutdown_tx.subscribe();
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(std::time::Duration::from_secs(3600));
         interval.tick().await; // Skip immediate first tick
         loop {
-            interval.tick().await;
+            tokio::select! {
+                _ = interval.tick() => {},
+                _ = shutdown_rx2.changed() => break,
+            }
             if let Err(e) = db::snapshot_active_sprints(&engine_snap.pool).await {
                 tracing::error!("Sprint snapshot error: {}", e);
             }
@@ -159,10 +170,14 @@ async fn main() -> Result<()> {
 
     // Recurring task processing (every 5 minutes)
     let engine_recur = engine.clone();
+    let mut shutdown_rx3 = shutdown_tx.subscribe();
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(std::time::Duration::from_secs(300));
         loop {
-            interval.tick().await;
+            tokio::select! {
+                _ = interval.tick() => {},
+                _ = shutdown_rx3.changed() => break,
+            }
             let today = chrono::Utc::now().naive_utc().format("%Y-%m-%d").to_string();
             let due = match db::get_due_recurrences(&engine_recur.pool, &today).await {
                 Ok(d) => d,
@@ -208,12 +223,16 @@ async fn main() -> Result<()> {
 
     // Due date reminders (every 30 minutes)
     let engine_due = engine.clone();
+    let mut shutdown_rx4 = shutdown_tx.subscribe();
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(std::time::Duration::from_secs(1800));
         let mut notified: std::collections::HashSet<i64> = std::collections::HashSet::new();
         let mut last_date = String::new();
         loop {
-            interval.tick().await;
+            tokio::select! {
+                _ = interval.tick() => {},
+                _ = shutdown_rx4.changed() => break,
+            }
             let today = chrono::Utc::now().naive_utc().format("%Y-%m-%d").to_string();
             // Reset notified set on new day
             if today != last_date { notified.clear(); last_date = today.clone(); }
@@ -247,6 +266,8 @@ async fn main() -> Result<()> {
     let handle = server.with_graceful_shutdown(async move {
         let _ = tokio::signal::ctrl_c().await;
         tracing::info!("Shutting down gracefully...");
+        // Signal background tasks to stop
+        let _ = shutdown_tx.send(true);
         // Flush running sessions
         if let Err(e) = db::recover_interrupted(&engine_shutdown.pool).await {
             tracing::error!("Error flushing sessions on shutdown: {}", e);
