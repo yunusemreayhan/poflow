@@ -134,13 +134,21 @@ export function BurndownView({ stats }: { stats: SprintDailyStat[] }) {
     data.forEach((d, i) => { d.ideal = Math.max(0, start - step * i); });
   }
 
+  const exportCsv = () => {
+    const header = "date,remaining_" + metric + ",ideal\n";
+    const rows = data.map(d => `${d.date},${d.remaining.toFixed(2)},${d.ideal.toFixed(2)}`).join("\n");
+    const blob = new Blob([header + rows], { type: "text/csv" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `burndown_${metric}.csv`; a.click();
+  };
+
   return (
     <div className="space-y-2">
-      <div className="flex gap-1">
+      <div className="flex gap-1 items-center">
         {(["points", "hours", "tasks"] as const).map(m => (
           <button key={m} onClick={() => setMetric(m)}
             className={`text-xs px-2 py-1 rounded ${metric === m ? "bg-white/10 text-white" : "text-white/40"}`}>{m}</button>
         ))}
+        <button onClick={exportCsv} className="ml-auto text-xs text-white/30 hover:text-white/60" title="Export CSV">📥 CSV</button>
       </div>
       <ResponsiveContainer width="100%" height={200}>
         <AreaChart data={data}>
