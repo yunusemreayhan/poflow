@@ -104,3 +104,23 @@ describe("store actions", () => {
     expect(useStore.getState().connected).toBe(true);
   });
 });
+
+describe("store - taskSprintsMap", () => {
+  it("builds taskSprintsMap from task_sprints", () => {
+    useStore.setState({
+      taskSprints: [
+        { task_id: 1, sprint_id: 10, sprint_name: "S1" },
+        { task_id: 1, sprint_id: 20, sprint_name: "S2" },
+        { task_id: 2, sprint_id: 10, sprint_name: "S1" },
+      ],
+      taskSprintsMap: new Map([
+        [1, [{ task_id: 1, sprint_id: 10, sprint_name: "S1" }, { task_id: 1, sprint_id: 20, sprint_name: "S2" }]],
+        [2, [{ task_id: 2, sprint_id: 10, sprint_name: "S1" }]],
+      ]),
+    });
+    const map = useStore.getState().taskSprintsMap;
+    expect(map.get(1)?.length).toBe(2);
+    expect(map.get(2)?.length).toBe(1);
+    expect(map.get(999)).toBeUndefined();
+  });
+});
