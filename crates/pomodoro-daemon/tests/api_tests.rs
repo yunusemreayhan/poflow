@@ -3412,3 +3412,49 @@ async fn test_export_sessions_date_range() {
     assert!(body.is_array());
     assert_eq!(body.as_array().unwrap().len(), 0); // no sessions in that range
 }
+
+// T4: Config rejects long_break_interval=0
+#[tokio::test]
+async fn test_config_rejects_zero_interval() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("PUT", "/api/config", &tok,
+        Some(json!({"work_duration_min":25,"short_break_min":5,"long_break_min":15,"long_break_interval":0,"daily_goal":8,"auto_start_breaks":false,"auto_start_work":false,"estimation_mode":"points","theme":"dark"})))).await.unwrap();
+    assert!(resp.status().as_u16() >= 400);
+}
+
+// T5: Bulk status ownership isolation
+#[tokio::test]
+async fn test_bulk_status_ownership_isolation() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    // Create a task as root
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"RootTask"})))).await.unwrap();
+    let tid = body_json(resp).await["id"].as_i64().unwrap();
+    // Register user2
+    let resp = app.clone().oneshot(json_req("POST", "/api/auth/register", Some(json!({"username":"user2","password":"Pass1234!"})))).await.unwrap();
+    let tok2 = body_json(resp).await["token"].as_str().unwrap().to_string();
+    // user2 tries to bulk-update root's task
+    let resp = app.clone().oneshot(auth_req("PUT", "/api/tasks/bulk-status", &tok2,
+        Some(json!({"task_ids":[tid],"status":"completed"})))).await.unwrap();
+    assert_eq!(resp.status(), 403);
+}
+
+// T9: Frontend ErrorBoundary test is in gui/__tests__
+
+// T3: CSV import with quoted fields
+#[tokio::test]
+async fn test_csv_import_quoted_fields() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let csv = "title,priority,estimated,project\n\"Task with, comma\",3,2,\"Project A\"\n\"Normal task\",1,1,";
+    let resp = app.clone().oneshot(auth_req("POST", "/api/import/tasks", &tok, Some(json!({"csv": csv})))).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let body = body_json(resp).await;
+    assert_eq!(body["created"], 2);
+    // Verify the comma-containing title was imported correctly
+    let resp = app.clone().oneshot(auth_req("GET", "/api/tasks", &tok, None)).await.unwrap();
+    let tasks = body_json(resp).await;
+    let titles: Vec<&str> = tasks.as_array().unwrap().iter().map(|t| t["title"].as_str().unwrap()).collect();
+    assert!(titles.contains(&"Task with, comma"));
+}
