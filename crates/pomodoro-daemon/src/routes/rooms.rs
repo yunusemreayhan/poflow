@@ -8,7 +8,11 @@ pub async fn list_rooms(State(engine): State<AppState>, _claims: Claims) -> ApiR
 
 #[utoipa::path(post, path = "/api/rooms", request_body = CreateRoomRequest, responses((status = 201, body = db::Room)), security(("bearer" = [])))]
 pub async fn create_room(State(engine): State<AppState>, claims: Claims, Json(req): Json<CreateRoomRequest>) -> Result<(StatusCode, Json<db::Room>), ApiError> {
-    let r = db::create_room(&engine.pool, &req.name, req.room_type.as_deref().unwrap_or("estimation"), req.estimation_unit.as_deref().unwrap_or("points"), req.project.as_deref(), claims.user_id)
+    if req.name.trim().is_empty() { return Err(err(StatusCode::BAD_REQUEST, "Room name cannot be empty")); }
+    if req.name.len() > 200 { return Err(err(StatusCode::BAD_REQUEST, "Room name too long (max 200 chars)")); }
+    let unit = req.estimation_unit.as_deref().unwrap_or("points");
+    if !["points", "hours", "mandays"].contains(&unit) { return Err(err(StatusCode::BAD_REQUEST, "estimation_unit must be points, hours, or mandays")); }
+    let r = db::create_room(&engine.pool, &req.name, req.room_type.as_deref().unwrap_or("estimation"), unit, req.project.as_deref(), claims.user_id)
         .await.map_err(internal)?;
     engine.notify(ChangeEvent::Rooms);
     Ok((StatusCode::CREATED, Json(r)))
@@ -73,6 +77,7 @@ pub async fn start_voting(State(engine): State<AppState>, claims: Claims, Path(i
 
 #[utoipa::path(post, path = "/api/rooms/{id}/vote", request_body = CastVoteRequest, responses((status = 200)), security(("bearer" = [])))]
 pub async fn cast_vote(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>, Json(req): Json<CastVoteRequest>) -> Result<StatusCode, ApiError> {
+    if req.value < 0.0 || req.value > 1000.0 { return Err(err(StatusCode::BAD_REQUEST, "Vote value must be 0-1000")); }
     let room = db::get_room(&engine.pool, id).await.map_err(internal)?;
     let task_id = room.current_task_id.ok_or_else(|| err(StatusCode::BAD_REQUEST, "No active vote"))?;
     db::cast_vote(&engine.pool, id, task_id, claims.user_id, req.value).await.map_err(internal)?;
