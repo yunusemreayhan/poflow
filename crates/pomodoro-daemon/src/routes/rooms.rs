@@ -154,7 +154,7 @@ pub async fn room_ws(
     };
 
     let room_id = id;
-    let user_id = _user_id;
+    let _user_id = _user_id;
     let mut change_rx = engine.changes.subscribe();
     let pool = engine.pool.clone();
 

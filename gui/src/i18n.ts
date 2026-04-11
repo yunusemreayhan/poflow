@@ -156,6 +156,14 @@ export interface Locale {
   description: string;
   created: string;
   updated: string;
+
+  // Empty states
+  noSprintsYet: string;
+  noTeamsYet: string;
+  noTemplatesYet: string;
+  noWebhooksYet: string;
+  noActivityRecorded: string;
+  noRootTasks: string;
 }
 
 const en: Locale = {
@@ -300,6 +308,12 @@ const en: Locale = {
   description: "Description",
   created: "Created",
   updated: "Updated",
+  noSprintsYet: "No sprints yet",
+  noTeamsYet: "No teams yet",
+  noTemplatesYet: "No templates yet",
+  noWebhooksYet: "No webhooks configured",
+  noActivityRecorded: "No activity recorded",
+  noRootTasks: "No root tasks — team sees nothing",
 };
 
 // Available locales — add new languages here
@@ -432,6 +446,12 @@ const tr: Locale = {
   description: "Açıklama",
   created: "Oluşturulma",
   updated: "Güncellenme",
+  noSprintsYet: "Henüz sprint yok",
+  noTeamsYet: "Henüz takım yok",
+  noTemplatesYet: "Henüz şablon yok",
+  noWebhooksYet: "Webhook yapılandırılmamış",
+  noActivityRecorded: "Etkinlik kaydedilmemiş",
+  noRootTasks: "Kök görev yok — takım hiçbir şey görmez",
 };
 
 const locales: Record<string, Locale> = { en, tr };

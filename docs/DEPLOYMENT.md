@@ -252,3 +252,19 @@ WantedBy=multi-user.target
 ### Backup
 
 The SQLite database is at `~/.local/share/pomodoro/pomodoro.db`. Back up this file regularly. Attachments are stored in `~/.local/share/pomodoro/attachments/`.
+
+## API Documentation
+
+The backend serves interactive API documentation via Swagger UI at `/swagger-ui/`. All endpoints are annotated with request/response schemas, authentication requirements, and parameter descriptions.
+
+Access it at: `http://localhost:9090/swagger-ui/`
+
+## Environment Variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `POMODORO_CORS_ORIGINS` | (none) | Comma-separated additional CORS origins |
+| `POMODORO_DB_PATH` | `~/.local/share/pomodoro/pomodoro.db` | SQLite database path |
+| `JWT_SECRET` | (auto-generated) | JWT signing secret (set in production) |
+| `POMODORO_HOST` | `0.0.0.0` | Bind address |
+| `POMODORO_PORT` | `9090` | Bind port |

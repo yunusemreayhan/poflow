@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, MotionConfig } from "framer-motion";
 import { Timer as TimerIcon, ListTodo, BarChart3, Settings as SettingsIcon, Wifi, WifiOff, Code2, LogOut, Users, Zap, Sun, Moon, RefreshCw } from "lucide-react";
 import { useStore } from "./store/store";
 import { _tasksLoadedAt } from "./store/store";
@@ -271,6 +271,7 @@ export default function App() {
   if (!token) return <AuthScreen />;
 
   return (
+    <MotionConfig reducedMotion="user">
     <div className="flex h-screen bg-[var(--color-bg)]">
       <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:top-2 focus:left-2 focus:px-4 focus:py-2 focus:bg-[var(--color-accent)] focus:text-white focus:rounded-lg focus:text-sm">
         {t.skipToContent}
@@ -345,7 +346,16 @@ export default function App() {
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="absolute inset-0 bg-black/50 flex items-center justify-center z-50"
               onClick={dismissConfirm} role="dialog" aria-modal="true" aria-label="Confirmation dialog"
-              onKeyDown={e => { if (e.key === "Escape") dismissConfirm(); }}>
+              onKeyDown={e => {
+                if (e.key === "Escape") dismissConfirm();
+                if (e.key === "Tab") {
+                  const focusable = e.currentTarget.querySelectorAll<HTMLElement>("button, [tabindex]");
+                  if (focusable.length === 0) return;
+                  const first = focusable[0], last = focusable[focusable.length - 1];
+                  if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+                  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+                }
+              }}>
               <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }}
                 className="glass p-6 max-w-sm w-full mx-4" onClick={e => e.stopPropagation()}>
                 <p className="text-sm text-white/80 mb-4">{confirmDialog.msg}</p>
@@ -389,5 +399,6 @@ export default function App() {
         )}
       </AnimatePresence>
     </div>
+    </MotionConfig>
   );
 }
