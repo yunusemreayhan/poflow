@@ -3181,3 +3181,150 @@ async fn test_config_all_bounds() {
     let resp = app.clone().oneshot(auth_req("PUT", "/api/config", &tok, Some(bad))).await.unwrap();
     assert_eq!(resp.status(), 400);
 }
+
+// ---- Export tasks JSON format ----
+
+#[tokio::test]
+async fn test_export_tasks_json() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"Export Me"})))).await.unwrap();
+    let resp = app.clone().oneshot(auth_req("GET", "/api/export/tasks?format=json", &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let ct = resp.headers().get("content-type").unwrap().to_str().unwrap();
+    assert!(ct.contains("application/json"));
+    let tasks = body_json(resp).await;
+    assert!(tasks.as_array().unwrap().len() >= 1);
+}
+
+// ---- Sprint burndown with data ----
+
+#[tokio::test]
+async fn test_sprint_burndown_with_snapshot() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let sprint = body_json(app.clone().oneshot(auth_req("POST", "/api/sprints", &tok, Some(json!({"name":"BurnSprint"})))).await.unwrap()).await;
+    let sid = sprint["id"].as_i64().unwrap();
+    let task = body_json(app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"T","remaining_points":5.0})))).await.unwrap()).await;
+    app.clone().oneshot(auth_req("POST", &format!("/api/sprints/{}/tasks", sid), &tok, Some(json!({"task_ids":[task["id"]]})))).await.unwrap();
+    // Start sprint (triggers snapshot)
+    app.clone().oneshot(auth_req("POST", &format!("/api/sprints/{}/start", sid), &tok, None)).await.unwrap();
+    // Get burndown
+    let resp = app.clone().oneshot(auth_req("GET", &format!("/api/sprints/{}/burndown", sid), &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let stats = body_json(resp).await;
+    assert!(stats.as_array().unwrap().len() >= 1);
+}
+
+// ---- Room reveal without votes ----
+
+#[tokio::test]
+async fn test_room_reveal_without_votes() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let room = body_json(app.clone().oneshot(auth_req("POST", "/api/rooms", &tok, Some(json!({"name":"RevealRoom"})))).await.unwrap()).await;
+    let rid = room["id"].as_i64().unwrap();
+    let task = body_json(app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"T"})))).await.unwrap()).await;
+    app.clone().oneshot(auth_req("POST", &format!("/api/rooms/{}/start-voting", rid), &tok, Some(json!({"task_id":task["id"]})))).await.unwrap();
+    // Reveal without any votes
+    let resp = app.clone().oneshot(auth_req("POST", &format!("/api/rooms/{}/reveal", rid), &tok, None)).await.unwrap();
+    assert!(resp.status().is_success());
+}
+
+// ---- Task status transitions ----
+
+#[tokio::test]
+async fn test_task_status_transitions() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let task = body_json(app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"StatusTask"})))).await.unwrap()).await;
+    let tid = task["id"].as_i64().unwrap();
+    assert_eq!(task["status"], "backlog");
+    // backlog → active
+    let resp = app.clone().oneshot(auth_req("PUT", &format!("/api/tasks/{}", tid), &tok, Some(json!({"status":"active"})))).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    assert_eq!(body_json(resp).await["status"], "active");
+    // active → completed
+    let resp = app.clone().oneshot(auth_req("PUT", &format!("/api/tasks/{}", tid), &tok, Some(json!({"status":"completed"})))).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    assert_eq!(body_json(resp).await["status"], "completed");
+    // Invalid status
+    let resp = app.clone().oneshot(auth_req("PUT", &format!("/api/tasks/{}", tid), &tok, Some(json!({"status":"invalid"})))).await.unwrap();
+    assert_eq!(resp.status(), 400);
+}
+
+// ---- Register duplicate username ----
+
+#[tokio::test]
+async fn test_register_duplicate_username() {
+    let app = app().await;
+    register_user(&app, "dupUser").await;
+    let resp = app.clone().oneshot(json_req("POST", "/api/auth/register", Some(json!({"username":"dupUser","password":"Pass1234"})))).await.unwrap();
+    assert_eq!(resp.status(), 409);
+}
+
+// ---- Task empty title rejected ----
+
+#[tokio::test]
+async fn test_task_empty_title_rejected() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":""})))).await.unwrap();
+    assert_eq!(resp.status(), 400);
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"   "})))).await.unwrap();
+    assert_eq!(resp.status(), 400);
+}
+
+// ---- Sprint update retro notes ----
+
+#[tokio::test]
+async fn test_sprint_retro_notes() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let sprint = body_json(app.clone().oneshot(auth_req("POST", "/api/sprints", &tok, Some(json!({"name":"RetroSprint"})))).await.unwrap()).await;
+    let sid = sprint["id"].as_i64().unwrap();
+    let resp = app.clone().oneshot(auth_req("PUT", &format!("/api/sprints/{}", sid), &tok, Some(json!({"retro_notes":"Good sprint!"})))).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let updated = body_json(resp).await;
+    assert_eq!(updated["retro_notes"], "Good sprint!");
+}
+
+// ---- Room with mandays estimation ----
+
+#[tokio::test]
+async fn test_room_mandays_estimation() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("POST", "/api/rooms", &tok, Some(json!({"name":"MandayRoom","estimation_unit":"mandays"})))).await.unwrap();
+    assert_eq!(resp.status(), 201);
+    let room = body_json(resp).await;
+    assert_eq!(room["estimation_unit"], "mandays");
+}
+
+// ---- Task with all optional fields ----
+
+#[tokio::test]
+async fn test_task_all_fields() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({
+        "title": "Full Task",
+        "description": "A detailed description",
+        "project": "myproject",
+        "tags": "rust,backend",
+        "priority": 1,
+        "estimated": 5,
+        "estimated_hours": 10.5,
+        "remaining_points": 3.0,
+        "due_date": "2026-12-31"
+    })))).await.unwrap();
+    assert_eq!(resp.status(), 201);
+    let task = body_json(resp).await;
+    assert_eq!(task["title"], "Full Task");
+    assert_eq!(task["description"], "A detailed description");
+    assert_eq!(task["project"], "myproject");
+    assert_eq!(task["tags"], "rust,backend");
+    assert_eq!(task["priority"], 1);
+    assert_eq!(task["estimated"], 5);
+    assert_eq!(task["due_date"], "2026-12-31");
+}
