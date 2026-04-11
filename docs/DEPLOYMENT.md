@@ -139,3 +139,34 @@ Authorization: Bearer <access_token>
 ```
 
 Tickets expire after 30 seconds and are single-use.
+
+## Authorization Model
+
+### Authentication
+All API endpoints (except `/api/auth/register` and `/api/auth/login`) require a valid JWT access token in the `Authorization: Bearer <token>` header.
+
+### Roles
+- `root` — Full access to all resources. Can manage users, access admin endpoints.
+- `user` — Standard access. Can only modify own resources.
+
+### Endpoint Authorization
+
+| Endpoint | Authorization |
+|---|---|
+| Tasks CRUD | Owner or root |
+| Task reorder | Owner of first task, or root |
+| Time reports | Task owner, assignee, or root |
+| Sprints CRUD | Creator or root |
+| Sprint tasks add/remove | Sprint creator or root |
+| Sprint start/complete | Sprint creator or root |
+| Burns log/cancel | Any authenticated user (team collaboration) |
+| Rooms CRUD | Creator or root (for close/delete) |
+| Room join/leave/vote | Any authenticated user |
+| Assignees add/remove | Any authenticated user (team collaboration) |
+| Comments add | Any authenticated user |
+| Comments delete | Comment author or root |
+| Webhooks | Own webhooks only |
+| Config update | Root only |
+| Admin endpoints | Root only |
+| User list | Any authenticated user |
+| Profile update | Own profile only |

@@ -61,6 +61,11 @@ pub enum ChangeEvent {
 
 pub struct Engine {
     /// Per-user timer states
+    ///
+    /// LOCK ORDERING: Always acquire `config` before `states` to prevent deadlocks.
+    /// - tick(): config → states
+    /// - start(): config → states
+    /// - get_state(): states → config (safe: both are short-lived, no nested await)
     pub states: Arc<Mutex<HashMap<i64, EngineState>>>,
     pub config: Arc<Mutex<Config>>,
     pub pool: Pool,
