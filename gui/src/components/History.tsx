@@ -11,15 +11,12 @@ function HeatmapCell({ count, max, date }: { count: number; max: number; date: s
     ? "rgba(255,255,255,0.03)"
     : `rgba(124, 58, 237, ${0.2 + intensity * 0.8})`;
   return (
-    <motion.div
-      initial={{ scale: 0 }}
-      animate={{ scale: 1 }}
-      whileHover={{ scale: 1.5 }}
+    <div
       tabIndex={0}
       role="gridcell"
       aria-label={`${date}: ${count} sessions`}
       title={`${date}: ${count} sessions`}
-      className="w-3 h-3 rounded-sm cursor-pointer"
+      className="w-3 h-3 rounded-sm cursor-pointer transition-transform hover:scale-150"
       style={{ background: bg }}
     />
   );
@@ -132,7 +129,7 @@ export default function History() {
       {/* Heatmap */}
       <div className="glass p-5">
         <h3 className="text-sm font-semibold text-white/60 mb-4">Activity (Last 365 Days)</h3>
-        <div className="flex flex-wrap gap-[3px]">
+        <div className="flex flex-wrap gap-[3px] overflow-x-auto max-w-full">
           {heatmapData.map((d) => (
             <HeatmapCell key={d.date} count={d.count} max={maxCount} date={d.date} />
           ))}

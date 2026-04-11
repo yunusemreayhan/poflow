@@ -275,15 +275,18 @@ interface Template { id: number; name: string; data: string; created_at: string 
 function TemplateManager() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [name, setName] = useState("");
-  const [data, setData] = useState('{"title":"","priority":3,"estimated":1}');
+  const [title, setTitle] = useState("");
+  const [priority, setPriority] = useState(3);
+  const [estimated, setEstimated] = useState(1);
 
   const load = () => apiCall<Template[]>("GET", "/api/templates").then(setTemplates).catch(() => {});
   useEffect(load, []);
 
   const create = async () => {
     if (!name.trim()) return;
+    const data = JSON.stringify({ title, priority, estimated });
     await apiCall("POST", "/api/templates", { name: name.trim(), data });
-    setName(""); load();
+    setName(""); setTitle(""); load();
   };
 
   const del = async (id: number) => {
@@ -303,14 +306,25 @@ function TemplateManager() {
   return (
     <div className="mt-4">
       <h3 className="text-sm font-medium text-[var(--color-text)] mb-2">Templates</h3>
-      <div className="flex gap-2 mb-2">
+      <div className="space-y-2 mb-2">
         <input value={name} onChange={e => setName(e.target.value)} placeholder="Template name"
-          className="flex-1 bg-white/5 border border-white/10 rounded px-2 py-1 text-xs text-[var(--color-text)] outline-none" />
-        <button onClick={create} className="px-3 py-1 rounded text-xs bg-[var(--color-accent)] text-white">Add</button>
+          className="w-full bg-white/5 border border-white/10 rounded px-2 py-1 text-xs text-[var(--color-text)] outline-none" />
+        <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Task title prefix (e.g. 'Bug: ')"
+          className="w-full bg-white/5 border border-white/10 rounded px-2 py-1 text-xs text-[var(--color-text)] outline-none" />
+        <div className="flex gap-2">
+          <label className="text-xs text-[var(--color-dim)] flex items-center gap-1">Priority
+            <select value={priority} onChange={e => setPriority(Number(e.target.value))}
+              className="bg-white/5 border border-white/10 rounded px-1 py-0.5 text-xs text-[var(--color-text)]">
+              {[1,2,3,4,5].map(p => <option key={p} value={p}>{p}</option>)}
+            </select>
+          </label>
+          <label className="text-xs text-[var(--color-dim)] flex items-center gap-1">Est.
+            <input type="number" min={0} value={estimated} onChange={e => setEstimated(Number(e.target.value))}
+              className="w-12 bg-white/5 border border-white/10 rounded px-1 py-0.5 text-xs text-[var(--color-text)]" />
+          </label>
+          <button onClick={create} className="px-3 py-1 rounded text-xs bg-[var(--color-accent)] text-white ml-auto">Add</button>
+        </div>
       </div>
-      <textarea value={data} onChange={e => setData(e.target.value)} rows={2}
-        className="w-full bg-white/5 border border-white/10 rounded px-2 py-1 text-xs text-[var(--color-text)] outline-none font-mono mb-2"
-        placeholder='{"title":"Bug: ","priority":4}' />
       {templates.map(t => (
         <div key={t.id} className="flex items-center gap-2 text-xs py-1 group">
           <span className="flex-1 text-[var(--color-text)]">{t.name}</span>
