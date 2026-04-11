@@ -57,7 +57,8 @@ impl Default for Config {
 impl Config {
     pub fn config_path() -> PathBuf {
         let dir = dirs::config_dir()
-            .unwrap_or_else(|| PathBuf::from("~/.config"))
+            .or_else(|| std::env::var("HOME").ok().map(|h| PathBuf::from(h).join(".config")))
+            .unwrap_or_else(|| PathBuf::from("/tmp"))
             .join("pomodoro");
         std::fs::create_dir_all(&dir).ok();
         dir.join("config.toml")
@@ -79,11 +80,11 @@ impl Config {
         let path = Self::config_path();
         let tmp = path.with_extension("toml.tmp");
         std::fs::write(&tmp, toml::to_string_pretty(self)?)?;
-        std::fs::rename(&tmp, &path)?;
         #[cfg(unix)] {
             use std::os::unix::fs::PermissionsExt;
-            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).ok();
+            std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o600)).ok();
         }
+        std::fs::rename(&tmp, &path)?;
         Ok(())
     }
 }

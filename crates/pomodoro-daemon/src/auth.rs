@@ -2,24 +2,23 @@ use axum::{extract::FromRequestParts, http::request::Parts};
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
 use std::sync::OnceLock;
-use tokio::sync::Mutex;
+use tokio::sync::RwLock;
 use std::collections::HashSet;
 
 static SECRET: OnceLock<Vec<u8>> = OnceLock::new();
-static BLOCKLIST: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
+static BLOCKLIST: OnceLock<RwLock<HashSet<String>>> = OnceLock::new();
 static AUTH_POOL: OnceLock<crate::db::Pool> = OnceLock::new();
 
-fn blocklist() -> &'static Mutex<HashSet<String>> {
-    BLOCKLIST.get_or_init(|| Mutex::new(HashSet::new()))
+fn blocklist() -> &'static RwLock<HashSet<String>> {
+    BLOCKLIST.get_or_init(|| RwLock::new(HashSet::new()))
 }
 
 /// Initialize auth with a DB pool for persistent token blocklist
 pub async fn init_pool(pool: crate::db::Pool) {
     AUTH_POOL.set(pool.clone()).ok();
-    // Load existing blocklist from DB
     let rows: Vec<(String,)> = sqlx::query_as("SELECT token_hash FROM token_blocklist WHERE expires_at > datetime('now')")
         .fetch_all(&pool).await.unwrap_or_default();
-    let mut bl = blocklist().lock().await;
+    let mut bl = blocklist().write().await;
     for (hash,) in rows { bl.insert(hash); }
 }
 
@@ -65,6 +64,7 @@ pub struct Claims {
     pub username: String,
     pub role: String,
     pub exp: usize,
+    pub iat: usize,
     #[serde(default = "default_token_type")]
     pub typ: String,      // "access" or "refresh"
 }
@@ -72,15 +72,15 @@ pub struct Claims {
 fn default_token_type() -> String { "access".to_string() }
 
 pub fn create_token(user_id: i64, username: &str, role: &str) -> Result<String, jsonwebtoken::errors::Error> {
-    let exp = chrono::Utc::now().timestamp() as usize + 2 * 3600; // 2 hours
-    let claims = Claims { sub: user_id.to_string(), user_id, username: username.to_string(), role: role.to_string(), exp, typ: "access".to_string() };
+    let now = chrono::Utc::now().timestamp() as usize;
+    let claims = Claims { sub: user_id.to_string(), user_id, username: username.to_string(), role: role.to_string(), exp: now + 2 * 3600, iat: now, typ: "access".to_string() };
     encode(&Header::default(), &claims, &EncodingKey::from_secret(secret()))
 }
 
 /// Create a long-lived refresh token (30 days)
 pub fn create_refresh_token(user_id: i64, username: &str, role: &str) -> Result<String, jsonwebtoken::errors::Error> {
-    let exp = chrono::Utc::now().timestamp() as usize + 30 * 24 * 3600;
-    let claims = Claims { sub: user_id.to_string(), user_id, username: username.to_string(), role: role.to_string(), exp, typ: "refresh".to_string() };
+    let now = chrono::Utc::now().timestamp() as usize;
+    let claims = Claims { sub: user_id.to_string(), user_id, username: username.to_string(), role: role.to_string(), exp: now + 30 * 24 * 3600, iat: now, typ: "refresh".to_string() };
     encode(&Header::default(), &claims, &EncodingKey::from_secret(secret()))
 }
 
@@ -91,7 +91,7 @@ pub fn verify_token(token: &str) -> Result<Claims, jsonwebtoken::errors::Error> 
 /// Revoke a token (add to blocklist). Persists to DB.
 pub async fn revoke_token(token: &str) {
     let hash = format!("{:032x}", token_hash(token.as_bytes()));
-    blocklist().lock().await.insert(hash.clone());
+    blocklist().write().await.insert(hash.clone());
     // Persist to DB
     if let Some(pool) = AUTH_POOL.get() {
         let exp = decode::<Claims>(token, &DecodingKey::from_secret(secret()), &{
@@ -110,7 +110,7 @@ pub async fn revoke_token(token: &str) {
 /// Check if a token has been revoked.
 pub async fn is_revoked(token: &str) -> bool {
     let hash = format!("{:032x}", token_hash(token.as_bytes()));
-    blocklist().lock().await.contains(&hash)
+    blocklist().read().await.contains(&hash)
 }
 
 fn token_hash(data: &[u8]) -> u128 {

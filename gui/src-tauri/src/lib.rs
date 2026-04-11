@@ -99,12 +99,25 @@ async fn write_file(path: String, content: String) -> Result<(), String> {
     if !allowed {
         return Err("Write denied: path must be in Downloads, Documents, or Desktop directory".to_string());
     }
-    // Prevent path traversal
+    // Prevent path traversal — canonicalize to resolve symlinks
+    let canonical = p.parent()
+        .and_then(|parent| std::fs::canonicalize(parent).ok())
+        .map(|parent| parent.join(p.file_name().unwrap_or_default()));
+    let check_path = canonical.as_deref().unwrap_or(p);
+    let allowed = dirs::download_dir()
+        .into_iter()
+        .chain(dirs::document_dir())
+        .chain(dirs::desktop_dir())
+        .any(|dir| check_path.starts_with(&dir));
+    if !allowed {
+        return Err("Write denied: path must be in Downloads, Documents, or Desktop directory".to_string());
+    }
     if path.contains("..") {
         return Err("Write denied: path traversal not allowed".to_string());
     }
     // Block executable file extensions
-    let blocked_ext = [".desktop", ".sh", ".bash", ".bat", ".cmd", ".exe", ".ps1", ".app", ".run"];
+    let blocked_ext = [".desktop", ".sh", ".bash", ".bat", ".cmd", ".exe", ".ps1", ".app", ".run",
+        ".py", ".pl", ".rb", ".jar", ".deb", ".rpm", ".appimage", ".msi", ".com", ".csh", ".ksh", ".zsh"];
     if let Some(ext) = p.extension().and_then(|e| e.to_str()) {
         let dot_ext = format!(".{}", ext.to_lowercase());
         if blocked_ext.contains(&dot_ext.as_str()) {

@@ -220,13 +220,16 @@ async fn main() -> Result<()> {
         }
     });
 
-    let app = build_router(engine.clone())
-        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
-        .layer(tower_http::trace::TraceLayer::new_for_http());
+    let mut app = build_router(engine.clone());
+    let swagger_enabled = std::env::var("POMODORO_SWAGGER").map_or(true, |v| v != "0" && v.to_lowercase() != "false");
+    if swagger_enabled {
+        app = app.merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()));
+    }
+    let app = app.layer(tower_http::trace::TraceLayer::new_for_http());
 
     let addr = format!("{}:{}", config.bind_address, config.bind_port);
     tracing::info!("HTTP server listening on {}", addr);
-    tracing::info!("Swagger UI: http://{}/swagger-ui/", addr);
+    if swagger_enabled { tracing::info!("Swagger UI: http://{}/swagger-ui/", addr); }
 
     let listener = tokio::net::TcpListener::bind(&addr).await?;
     let server = axum::serve(listener, app.into_make_service_with_connect_info::<std::net::SocketAddr>());

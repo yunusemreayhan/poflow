@@ -4,9 +4,14 @@ use super::*;
 pub(crate) async fn seed_root_user(pool: &Pool) -> Result<()> {
     let count = user_count(pool).await?;
     if count == 0 {
-        let hash = bcrypt::hash("root", 12).map_err(|e| anyhow::anyhow!(e))?;
+        let password = std::env::var("POMODORO_ROOT_PASSWORD").unwrap_or_else(|_| {
+            let pw = "root";
+            tracing::warn!("⚠ Default root/root credentials. Set POMODORO_ROOT_PASSWORD env var in production!");
+            pw.to_string()
+        });
+        let hash = bcrypt::hash(&password, 12).map_err(|e| anyhow::anyhow!(e))?;
         create_user(pool, "root", &hash, "root").await?;
-        tracing::info!("Seeded default root user (root/root)");
+        tracing::info!("Seeded default root user");
     }
     Ok(())
 }

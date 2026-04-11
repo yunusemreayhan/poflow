@@ -26,11 +26,12 @@ fn auth_limiter() -> &'static RateLimiter {
 }
 
 pub(crate) fn check_auth_rate_limit(headers: &axum::http::HeaderMap) -> Result<(), ApiError> {
-    let ip = headers.get("x-forwarded-for")
-        .or_else(|| headers.get("x-real-ip"))
+    // Prefer x-real-ip (typically set by trusted reverse proxy) over x-forwarded-for (spoofable).
+    // In production, deploy behind nginx/caddy that sets x-real-ip from actual peer address.
+    let ip = headers.get("x-real-ip")
+        .or_else(|| headers.get("x-forwarded-for"))
         .and_then(|v| v.to_str().ok())
         .map(|s| s.split(',').next().unwrap_or(s).trim().to_string())
-        // Normalize IPv4-mapped IPv6 (::ffff:127.0.0.1 → 127.0.0.1)
         .map(|s| s.strip_prefix("::ffff:").unwrap_or(&s).to_string())
         .unwrap_or_else(|| "unknown".to_string());
     let limiter = auth_limiter();

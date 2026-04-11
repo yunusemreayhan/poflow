@@ -56,18 +56,19 @@ pub async fn logout(headers: axum::http::HeaderMap) -> Result<StatusCode, ApiErr
 pub struct RefreshRequest { pub refresh_token: String }
 
 #[utoipa::path(post, path = "/api/auth/refresh", responses((status = 200)), security(()))]
-pub async fn refresh_token(headers: axum::http::HeaderMap, Json(req): Json<RefreshRequest>) -> ApiResult<AuthResponse> {
+pub async fn refresh_token(State(engine): State<AppState>, headers: axum::http::HeaderMap, Json(req): Json<RefreshRequest>) -> ApiResult<AuthResponse> {
     check_auth_rate_limit(&headers)?;
     if auth::is_revoked(&req.refresh_token).await {
         return Err(err(StatusCode::UNAUTHORIZED, "Token revoked"));
     }
     let claims = auth::verify_token(&req.refresh_token).map_err(|_| err(StatusCode::UNAUTHORIZED, "Invalid refresh token"))?;
     if claims.typ != "refresh" { return Err(err(StatusCode::UNAUTHORIZED, "Not a refresh token")); }
-    let token = auth::create_token(claims.user_id, &claims.username, &claims.role).map_err(internal)?;
-    let refresh_token = auth::create_refresh_token(claims.user_id, &claims.username, &claims.role).map_err(internal)?;
-    // Revoke old refresh token (rotation)
+    // Re-fetch user from DB to get current role/username (not stale claims)
+    let user = db::get_user(&engine.pool, claims.user_id).await.map_err(|_| err(StatusCode::UNAUTHORIZED, "User not found"))?;
+    let token = auth::create_token(user.id, &user.username, &user.role).map_err(internal)?;
+    let refresh_token = auth::create_refresh_token(user.id, &user.username, &user.role).map_err(internal)?;
     auth::revoke_token(&req.refresh_token).await;
-    Ok(Json(AuthResponse { token, refresh_token, user_id: claims.user_id, username: claims.username, role: claims.role }))
+    Ok(Json(AuthResponse { token, refresh_token, user_id: user.id, username: user.username, role: user.role }))
 }
 
 // --- Timer ---
