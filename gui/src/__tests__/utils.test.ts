@@ -38,3 +38,38 @@ describe("matchSearch", () => {
     expect(matchSearch("authentication", "tion")).toBe(true);
   });
 });
+
+// --- formatDate / formatDateTime / formatNumber ---
+
+import { formatDate, formatDateTime, formatNumber } from "../utils";
+
+describe("formatDate", () => {
+  it("formats ISO date string", () => {
+    const result = formatDate("2026-03-15T10:30:00Z");
+    expect(result).toBeTruthy();
+    expect(result.length).toBeGreaterThan(0);
+  });
+
+  it("falls back on invalid input", () => {
+    expect(formatDate("not-a-date")).toBeTruthy();
+  });
+});
+
+describe("formatDateTime", () => {
+  it("formats ISO datetime string", () => {
+    const result = formatDateTime("2026-03-15T10:30:00Z");
+    expect(result).toBeTruthy();
+    expect(result.length).toBeGreaterThan(5);
+  });
+});
+
+describe("formatNumber", () => {
+  it("formats integer", () => {
+    expect(formatNumber(1234)).toBeTruthy();
+  });
+
+  it("formats with decimals", () => {
+    const result = formatNumber(3.14159, undefined, 2);
+    expect(result).toContain("3");
+  });
+});
