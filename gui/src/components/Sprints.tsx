@@ -247,7 +247,7 @@ function BoardView({ board, reload }: { board: SprintBoard; reload: () => void }
   };
 
   const Column = ({ title, tasks, color }: { title: string; tasks: Task[]; color: string }) => (
-    <div className="flex-1 min-w-0">
+    <div className="flex-1 min-w-0" role="list" aria-label={`${title} tasks`}>
       <div className={`text-xs font-medium mb-2 ${color}`}>{title} ({tasks.length})</div>
       <div className="space-y-1.5">
         {tasks.map(t => (

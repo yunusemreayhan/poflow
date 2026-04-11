@@ -80,16 +80,19 @@ async fn set_connection(state: tauri::State<'_, Arc<AppState>>, base_url: String
 
 #[tauri::command]
 async fn write_file(path: String, content: String) -> Result<(), String> {
-    // Only allow writing to user's data/download directories
     let p = std::path::Path::new(&path);
+    // Only allow writing to user's download/document/desktop directories (not all of data dir)
     let allowed = dirs::download_dir()
         .into_iter()
         .chain(dirs::document_dir())
-        .chain(dirs::data_dir())
         .chain(dirs::desktop_dir())
         .any(|dir| p.starts_with(&dir));
     if !allowed {
-        return Err("Write denied: path must be in Downloads, Documents, Desktop, or data directory".to_string());
+        return Err("Write denied: path must be in Downloads, Documents, or Desktop directory".to_string());
+    }
+    // Prevent path traversal
+    if path.contains("..") {
+        return Err("Write denied: path traversal not allowed".to_string());
     }
     std::fs::write(&path, content).map_err(|e| e.to_string())
 }
