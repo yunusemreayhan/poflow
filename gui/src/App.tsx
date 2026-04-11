@@ -158,10 +158,12 @@ export default function App() {
     // Use ticket exchange to avoid JWT in URL (logged in server access logs)
     const url = useStore.getState().serverUrl;
     let sseInstance: EventSource | null = null;
+    let unmounted = false;
 
     const connectSse = async () => {
       try {
         const resp = await apiCall<{ ticket: string }>("POST", "/api/timer/ticket");
+        if (unmounted) return;
         sseInstance = new EventSource(`${url}/api/timer/sse?ticket=${encodeURIComponent(resp.ticket)}`);
       } catch {
         // Ticket exchange failed — SSE unavailable, rely on polling fallback
@@ -211,6 +213,7 @@ export default function App() {
     const taskSafety = setInterval(loadTasks, 30000);
 
     return () => {
+      unmounted = true;
       sseInstance?.close();
       clearInterval(timerFallback);
       clearInterval(taskSafety);

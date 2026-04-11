@@ -30,6 +30,7 @@ pub async fn update_config(State(engine): State<AppState>, claims: Claims, Json(
         notify_sound: None,
     };
     db::set_user_config(&engine.pool, claims.user_id, &uc).await.map_err(internal)?;
+    engine.invalidate_user_config_cache(claims.user_id).await;
     // Root also updates global config
     if claims.role == "root" {
         cfg.save().map_err(internal)?;

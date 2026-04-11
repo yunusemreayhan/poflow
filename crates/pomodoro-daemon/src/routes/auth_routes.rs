@@ -29,6 +29,14 @@ pub async fn login(headers: axum::http::HeaderMap, State(engine): State<AppState
     if !valid {
         return Err(err(StatusCode::UNAUTHORIZED, "Invalid credentials"));
     }
+    // Rehash if bcrypt cost is outdated (upgrade path)
+    let current_cost = user.password_hash.split('$').nth(2).and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
+    if current_cost < 12 {
+        let pw2 = req.password.clone();
+        if let Ok(new_hash) = tokio::task::spawn_blocking(move || bcrypt::hash(&pw2, 12)).await.map_err(internal)? {
+            db::update_user_password(&engine.pool, user.id, &new_hash).await.ok();
+        }
+    }
     let token = auth::create_token(user.id, &user.username, &user.role).map_err(internal)?;
     let refresh_token = auth::create_refresh_token(user.id, &user.username, &user.role).map_err(internal)?;
     Ok(Json(AuthResponse { token, refresh_token, user_id: user.id, username: user.username, role: user.role }))

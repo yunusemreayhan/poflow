@@ -158,8 +158,7 @@ pub async fn room_ws(
     let mut change_rx = engine.changes.subscribe();
     let pool = engine.pool.clone();
 
-    // Auto-join room if not already a member
-    db::join_room(&pool, room_id, user_id).await.ok();
+    // Don't auto-join — connecting to observe shouldn't mutate membership
 
     Ok(ws.on_upgrade(move |mut socket| async move {
         use axum::extract::ws::Message;

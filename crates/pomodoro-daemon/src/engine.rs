@@ -72,6 +72,8 @@ pub struct Engine {
     /// Broadcasts the state of whichever user just changed
     pub tx: watch::Sender<EngineState>,
     pub changes: broadcast::Sender<ChangeEvent>,
+    /// Cached per-user configs (user_id → (config, fetched_at))
+    user_config_cache: Arc<Mutex<HashMap<i64, (Config, std::time::Instant)>>>,
 }
 
 impl Engine {
@@ -91,6 +93,7 @@ impl Engine {
             pool,
             tx,
             changes,
+            user_config_cache: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
@@ -104,6 +107,15 @@ impl Engine {
     }
 
     pub async fn get_user_config(&self, user_id: i64) -> Config {
+        // Check cache first (60s TTL)
+        {
+            let cache = self.user_config_cache.lock().await;
+            if let Some((cfg, fetched)) = cache.get(&user_id) {
+                if fetched.elapsed().as_secs() < 60 {
+                    return cfg.clone();
+                }
+            }
+        }
         let mut config = self.config.lock().await.clone();
         if let Ok(Some(uc)) = db::get_user_config(&self.pool, user_id).await {
             if let Some(v) = uc.work_duration_min { config.work_duration_min = v as u32; }
@@ -115,6 +127,7 @@ impl Engine {
             if let Some(v) = uc.daily_goal { config.daily_goal = v as u32; }
             if let Some(v) = uc.theme { config.theme = v; }
         }
+        self.user_config_cache.lock().await.insert(user_id, (config.clone(), std::time::Instant::now()));
         config
     }
 
@@ -272,25 +285,18 @@ impl Engine {
             let mut states = self.states.lock().await;
             let mut comps = Vec::new();
 
-            // Pre-load per-user configs for active users
+            // Pre-load per-user configs for active users (uses cache)
             let user_ids: Vec<i64> = states.iter()
                 .filter(|(_, s)| s.status == TimerStatus::Running)
                 .map(|(uid, _)| *uid)
                 .collect();
+            // Release states lock briefly to fetch configs, then re-acquire
+            drop(states);
             let mut user_configs = std::collections::HashMap::new();
             for uid in &user_ids {
-                if let Ok(Some(uc)) = db::get_user_config(&self.pool, *uid).await {
-                    let mut cfg = global_config.clone();
-                    if let Some(v) = uc.work_duration_min { cfg.work_duration_min = v as u32; }
-                    if let Some(v) = uc.short_break_min { cfg.short_break_min = v as u32; }
-                    if let Some(v) = uc.long_break_min { cfg.long_break_min = v as u32; }
-                    if let Some(v) = uc.long_break_interval { cfg.long_break_interval = v as u32; }
-                    if let Some(v) = uc.auto_start_breaks { cfg.auto_start_breaks = v != 0; }
-                    if let Some(v) = uc.auto_start_work { cfg.auto_start_work = v != 0; }
-                    if let Some(v) = uc.daily_goal { cfg.daily_goal = v as u32; }
-                    user_configs.insert(*uid, cfg);
-                }
+                user_configs.insert(*uid, self.get_user_config(*uid).await);
             }
+            states = self.states.lock().await;
 
             for uid in &user_ids {
                 let config = user_configs.get(uid).unwrap_or(&global_config);
@@ -389,9 +395,10 @@ impl Engine {
     }
 
     pub async fn get_state(&self, user_id: i64) -> EngineState {
-        let states = self.states.lock().await;
         let config = self.config.lock().await.clone();
+        let states = self.states.lock().await;
         let mut state = states.get(&user_id).cloned().unwrap_or_else(|| Self::idle_state(user_id, &config));
+        drop(states);
         // Always refresh daily_completed from DB for accuracy after restart
         state.daily_completed = db::get_today_completed_for_user(&self.pool, Some(user_id)).await.unwrap_or(state.daily_completed);
         state
@@ -405,7 +412,12 @@ impl Engine {
     pub async fn update_config(&self, config: Config) -> anyhow::Result<()> {
         config.save()?;
         *self.config.lock().await = config;
+        self.user_config_cache.lock().await.clear();
         Ok(())
+    }
+
+    pub async fn invalidate_user_config_cache(&self, user_id: i64) {
+        self.user_config_cache.lock().await.remove(&user_id);
     }
 
     pub async fn get_config(&self) -> Config {

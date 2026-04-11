@@ -68,7 +68,10 @@ pub async fn add_team_root_tasks(State(engine): State<AppState>, claims: Claims,
     if !db::is_team_admin(&engine.pool, id, claims.user_id).await.map_err(internal)? && claims.role != "root" {
         return Err(err(StatusCode::FORBIDDEN, "Team admin only"));
     }
-    for tid in req.task_ids { db::add_team_root_task(&engine.pool, id, tid).await.map_err(internal)?; }
+    for tid in req.task_ids {
+        db::get_task(&engine.pool, tid).await.map_err(|_| err(StatusCode::NOT_FOUND, &format!("Task {} not found", tid)))?;
+        db::add_team_root_task(&engine.pool, id, tid).await.map_err(internal)?;
+    }
     Ok(StatusCode::NO_CONTENT)
 }
 

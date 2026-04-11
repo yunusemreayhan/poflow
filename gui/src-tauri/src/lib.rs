@@ -103,6 +103,14 @@ async fn write_file(path: String, content: String) -> Result<(), String> {
     if path.contains("..") {
         return Err("Write denied: path traversal not allowed".to_string());
     }
+    // Block executable file extensions
+    let blocked_ext = [".desktop", ".sh", ".bash", ".bat", ".cmd", ".exe", ".ps1", ".app", ".run"];
+    if let Some(ext) = p.extension().and_then(|e| e.to_str()) {
+        let dot_ext = format!(".{}", ext.to_lowercase());
+        if blocked_ext.contains(&dot_ext.as_str()) {
+            return Err(format!("Write denied: .{} files not allowed", ext));
+        }
+    }
     tokio::fs::write(&path, content).await.map_err(|e| e.to_string())
 }
 

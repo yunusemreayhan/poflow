@@ -40,7 +40,10 @@ pub async fn add_epic_group_tasks(State(engine): State<AppState>, claims: Claims
     if detail.group.created_by != claims.user_id as i64 && claims.role != "root" {
         return Err(err(StatusCode::FORBIDDEN, "Not owner"));
     }
-    for tid in req.task_ids { db::add_epic_group_task(&engine.pool, id, tid).await.map_err(internal)?; }
+    for tid in req.task_ids {
+        db::get_task(&engine.pool, tid).await.map_err(|_| err(StatusCode::NOT_FOUND, &format!("Task {} not found", tid)))?;
+        db::add_epic_group_task(&engine.pool, id, tid).await.map_err(internal)?;
+    }
     Ok(StatusCode::NO_CONTENT)
 }
 
