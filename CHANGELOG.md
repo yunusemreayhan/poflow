@@ -8,9 +8,14 @@
 - Rate limiting on refresh endpoint
 - Removed legacy SSE ?token= query parameter (ticket-only)
 - Rate limiter fallback for missing IP headers
-- Improved SSRF check for webhook URLs (169.254, .local, 172.16-31)
-- SHA-256 for token blocklist hashing (was DefaultHasher)
-- SHA-256 for webhook HMAC signatures (was DefaultHasher)
+- Improved SSRF check (169.254, .local, 172.16-31 range)
+- SHA-256 for token blocklist and webhook HMAC (was DefaultHasher)
+- JWT secret fails hard without /dev/urandom (no weak fallback)
+- Config/DB file permissions 0600 on Unix
+- Tauri write_file uses async I/O
+- Tauri api_call sanitizes error responses
+- Auth key derivation uses SHA-256 (32-byte key)
+- Non-HTTPS connection warning
 - Username validation in profile update
 - Password max length 128 chars
 
@@ -28,6 +33,10 @@
 - AdminPanel null-checks API response
 - TeamManager uses /api/users (was /api/admin/users)
 - team_id filter included in task count query
+- daily_completed counter refreshed from DB on get_state
+- doReveal countdown guarded against unmounted component
+- Move up/down uses Promise.all (no race condition)
+- BurnsView taskId updates when tasks populate
 
 ### Authorization & Validation
 - Sprint task add/remove requires sprint owner
@@ -45,6 +54,16 @@
 - Password visibility toggle on auth screen
 - Leave room button for non-admin members
 - Sprint start/complete confirmation dialogs
+- Task picker dropdown in Timer view
+- Sprint audit logging (create/start/complete)
+- Webhook dispatch for sprint events
+- Webhook retry (3 attempts, exponential backoff)
+- Sprint scope indicator in burn form
+- Shared reqwest client for webhooks
+- Atomic config file writes
+- Template form builder (structured UI)
+- Turkish locale
+- String interpolation and pluralization helpers
 
 ### Accessibility
 - Context menu: Escape key, ARIA roles (menu/menuitem)
@@ -59,6 +78,10 @@
 - Removed unused imports and dead code
 - Module-level variables instead of (window as any) globals
 - Snapshot errors logged instead of silently ignored
+- CommentSection extracted to own file
+- useSseDebounce custom hook (replaces duplicated pattern)
+- Consistent HTTP status codes (room endpoints → 204)
+- Null-check apiCall results before setState
 
 ---
 
