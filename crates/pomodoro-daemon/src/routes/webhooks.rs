@@ -16,8 +16,11 @@ pub async fn create_webhook(State(engine): State<AppState>, claims: Claims, Json
     if !req.url.starts_with("http://") && !req.url.starts_with("https://") {
         return Err(err(StatusCode::BAD_REQUEST, "URL must start with http:// or https://"));
     }
-    // Block private/loopback IPs to prevent SSRF
+    // Reject URLs with embedded credentials or suspicious patterns
     if let Ok(url) = url::Url::parse(&req.url) {
+        if url.username() != "" || url.password().is_some() {
+            return Err(err(StatusCode::BAD_REQUEST, "Webhook URL must not contain credentials"));
+        }
         if let Some(host) = url.host_str() {
             let blocked = ["localhost", "127.0.0.1", "0.0.0.0", "::1", "[::1]"];
             if blocked.contains(&host) || host.starts_with("10.") || host.starts_with("192.168.")

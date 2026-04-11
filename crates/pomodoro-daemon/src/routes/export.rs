@@ -1,11 +1,17 @@
 use super::*;
 
 #[derive(Deserialize)]
-pub struct ExportQuery { pub format: Option<String> }
+pub struct ExportQuery { pub format: Option<String>, pub from: Option<String>, pub to: Option<String> }
 
 #[utoipa::path(get, path = "/api/export/tasks", responses((status = 200)), security(("bearer" = [])))]
-pub async fn export_tasks(State(engine): State<AppState>, _claims: Claims, Query(q): Query<ExportQuery>) -> Result<axum::response::Response, ApiError> {
-    let tasks = db::list_tasks(&engine.pool, None, None).await.map_err(internal)?;
+pub async fn export_tasks(State(engine): State<AppState>, claims: Claims, Query(q): Query<ExportQuery>) -> Result<axum::response::Response, ApiError> {
+    // Non-root users only export their own tasks
+    let tasks = if claims.role == "root" {
+        db::list_tasks(&engine.pool, None, None).await.map_err(internal)?
+    } else {
+        db::list_tasks(&engine.pool, None, None).await.map_err(internal)?
+            .into_iter().filter(|t| t.user_id == claims.user_id).collect()
+    };
     let fmt = q.format.as_deref().unwrap_or("json");
     match fmt {
         "csv" => {
@@ -41,8 +47,8 @@ pub async fn export_tasks(State(engine): State<AppState>, _claims: Claims, Query
 
 #[utoipa::path(get, path = "/api/export/sessions", responses((status = 200)), security(("bearer" = [])))]
 pub async fn export_sessions(State(engine): State<AppState>, claims: Claims, Query(q): Query<ExportQuery>) -> Result<axum::response::Response, ApiError> {
-    let from = "2000-01-01";
-    let to = "2099-12-31";
+    let from = q.from.as_deref().unwrap_or("2000-01-01");
+    let to = q.to.as_deref().unwrap_or("2099-12-31");
     let sessions = db::get_history(&engine.pool, from, to, Some(claims.user_id)).await.map_err(internal)?;
     let fmt = q.format.as_deref().unwrap_or("csv");
     match fmt {
