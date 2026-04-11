@@ -15,6 +15,9 @@ function HeatmapCell({ count, max, date }: { count: number; max: number; date: s
       initial={{ scale: 0 }}
       animate={{ scale: 1 }}
       whileHover={{ scale: 1.5 }}
+      tabIndex={0}
+      role="gridcell"
+      aria-label={`${date}: ${count} sessions`}
       title={`${date}: ${count} sessions`}
       className="w-3 h-3 rounded-sm cursor-pointer"
       style={{ background: bg }}

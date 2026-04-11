@@ -275,6 +275,7 @@ export const useStore = create<Store>((set, get) => ({
   },
 
   deleteTask: async (id) => {
+    const task = get().tasks.find(t => t.id === id);
     get().showConfirm("Delete this task and all subtasks?", async () => {
       await apiCall("DELETE", `/api/tasks/${id}`);
       // Remove task and all descendants from local state
@@ -285,7 +286,7 @@ export const useStore = create<Store>((set, get) => ({
       };
       collect(id);
       set(s => ({ tasks: s.tasks.filter(t => !descendants.has(t.id)) }));
-      get().toast("Task deleted");
+      get().toast(`Deleted "${task?.title || "task"}"`, "success");
     });
   },
 
