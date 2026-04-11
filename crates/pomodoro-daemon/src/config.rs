@@ -77,6 +77,10 @@ impl Config {
         let tmp = path.with_extension("toml.tmp");
         std::fs::write(&tmp, toml::to_string_pretty(self)?)?;
         std::fs::rename(&tmp, &path)?;
+        #[cfg(unix)] {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).ok();
+        }
         Ok(())
     }
 }

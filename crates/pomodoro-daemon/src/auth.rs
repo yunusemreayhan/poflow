@@ -45,22 +45,7 @@ fn secret() -> &'static [u8] {
             if f.read_exact(&mut buf).is_ok() { got_entropy = true; }
         }
         if !got_entropy {
-            // Fallback: multiple entropy sources hashed iteratively
-            use std::collections::hash_map::DefaultHasher;
-            use std::hash::{Hash, Hasher};
-            for i in 0..8 {
-                let mut h = DefaultHasher::new();
-                std::process::id().hash(&mut h);
-                std::time::SystemTime::now().hash(&mut h);
-                std::thread::current().id().hash(&mut h);
-                i.hash(&mut h);
-                // Yield to add timing jitter
-                std::thread::yield_now();
-                std::time::SystemTime::now().hash(&mut h);
-                let v = h.finish();
-                buf[i * 8..(i + 1) * 8].copy_from_slice(&v.to_le_bytes());
-            }
-            tracing::warn!("/dev/urandom unavailable — JWT secret generated with reduced entropy");
+            panic!("FATAL: /dev/urandom unavailable and no JWT secret configured. Set POMODORO_JWT_SECRET env var or ensure /dev/urandom is accessible.");
         }
         if let Some(parent) = secret_path.parent() { std::fs::create_dir_all(parent).ok(); }
         std::fs::write(&secret_path, &buf).ok();

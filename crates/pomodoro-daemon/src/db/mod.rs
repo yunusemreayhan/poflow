@@ -29,6 +29,10 @@ pub async fn connect() -> Result<Pool> {
         .min_connections(1)
         .connect_with(opts).await?;
     migrate(&pool).await?;
+    #[cfg(unix)] {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).ok();
+    }
     seed_root_user(&pool).await?;
     Ok(pool)
 }
