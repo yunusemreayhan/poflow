@@ -1,6 +1,12 @@
 use super::*;
 use std::collections::HashMap;
 
+#[utoipa::path(get, path = "/api/health", responses((status = 200)))]
+pub async fn health(State(engine): State<AppState>) -> Json<serde_json::Value> {
+    let db_ok = sqlx::query("SELECT 1").execute(&engine.pool).await.is_ok();
+    let active_timers = engine.states.lock().await.values().filter(|s| s.status == crate::engine::TimerStatus::Running).count();
+    Json(serde_json::json!({ "status": if db_ok { "ok" } else { "degraded" }, "db": db_ok, "active_timers": active_timers }))
+}
 
 #[utoipa::path(get, path = "/api/tasks/{id}/votes", responses((status = 200, body = Vec<db::RoomVote>)), security(("bearer" = [])))]
 pub async fn get_task_votes(State(engine): State<AppState>, _claims: Claims, Path(id): Path<i64>) -> ApiResult<Vec<db::RoomVote>> {
