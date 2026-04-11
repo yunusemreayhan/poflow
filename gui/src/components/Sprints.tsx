@@ -29,7 +29,7 @@ export default function Sprints() {
 
   useEffect(() => {
     load();
-    const onSse = () => load();
+    let sseTimer: ReturnType<typeof setTimeout>; const onSse = () => { clearTimeout(sseTimer); sseTimer = setTimeout(load, 500); };
     window.addEventListener("sse-sprints", onSse);
     return () => window.removeEventListener("sse-sprints", onSse);
   }, [load]);
@@ -167,7 +167,7 @@ function SprintView({ id, onBack }: { id: number; onBack: () => void }) {
 
   useEffect(() => {
     load();
-    const onSse = () => load();
+    let sseTimer: ReturnType<typeof setTimeout>; const onSse = () => { clearTimeout(sseTimer); sseTimer = setTimeout(load, 500); };
     window.addEventListener("sse-sprints", onSse);
     return () => window.removeEventListener("sse-sprints", onSse);
   }, [load]);

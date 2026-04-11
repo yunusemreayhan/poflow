@@ -449,6 +449,14 @@ export default function TaskList({ selectMode, onSelect, selectedTaskId, votedTa
   const [search, setSearch] = useState("");
   const [bulkSelected, setBulkSelected] = useState<Set<number>>(new Set());
   const [treeKey, setTreeKey] = useState(0);
+  const [bulkSprints, setBulkSprints] = useState<{ id: number; name: string }[]>([]);
+
+  useEffect(() => {
+    if (bulkSelected.size > 0 && bulkSprints.length === 0) {
+      apiCall<{ id: number; name: string; status: string }[]>("GET", "/api/sprints?status=active")
+        .then(s => setBulkSprints(s || [])).catch(() => {});
+    }
+  }, [bulkSelected.size]);
 
   const tree = useMemo(() => {
     let t = tasks;
@@ -558,6 +566,15 @@ export default function TaskList({ selectMode, onSelect, selectedTaskId, votedTa
               setBulkSelected(new Set());
             });
           }} className="px-2 py-0.5 rounded text-xs bg-[var(--color-danger)]/20 text-[var(--color-danger)]">🗑 Delete</button>
+          <select onChange={async e => {
+            const sid = e.target.value; if (!sid) return;
+            await apiCall("POST", `/api/sprints/${sid}/tasks`, { task_ids: [...bulkSelected] });
+            useStore.getState().loadTasks(); useStore.getState().toast(`Added ${bulkSelected.size} tasks to sprint`);
+            setBulkSelected(new Set()); e.target.value = "";
+          }} className="px-2 py-0.5 rounded text-xs bg-white/5 text-white/40 outline-none" defaultValue="">
+            <option value="" disabled>🏃 Add to sprint...</option>
+            {bulkSprints.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
           <button onClick={() => setBulkSelected(new Set())} className="ml-auto text-xs text-white/30 hover:text-white/50">Clear</button>
         </div>
       )}
