@@ -86,3 +86,20 @@ fn escape_csv(s: &str) -> String {
         s.to_string()
     }
 }
+
+#[utoipa::path(get, path = "/api/export/burns/{sprint_id}", responses((status = 200)), security(("bearer" = [])))]
+pub async fn export_burns(State(engine): State<AppState>, _claims: Claims, Path(sprint_id): Path<i64>) -> Result<axum::response::Response, ApiError> {
+    let burns = db::list_burns(&engine.pool, sprint_id).await.map_err(internal)?;
+    let mut csv = String::from("created_at,task_id,points,hours,username,source,note\n");
+    for b in &burns {
+        csv.push_str(&format!("{},{},{},{},{},{},{}\n",
+            b.created_at, b.task_id, b.points, b.hours,
+            escape_csv(&b.username), escape_csv(&b.source),
+            escape_csv(b.note.as_deref().unwrap_or(""))));
+    }
+    Ok(axum::response::Response::builder()
+        .status(StatusCode::OK)
+        .header("content-type", "text/csv")
+        .header("content-disposition", &format!("attachment; filename=\"burns_sprint_{}.csv\"", sprint_id))
+        .body(axum::body::Body::from(csv)).map_err(|e| internal(e.to_string()))?)
+}

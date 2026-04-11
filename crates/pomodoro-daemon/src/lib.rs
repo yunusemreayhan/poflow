@@ -119,6 +119,7 @@ pub fn build_router(engine: Arc<engine::Engine>) -> Router {
         .route("/api/tasks/reorder", axum::routing::post(routes::reorder_tasks))
         .route("/api/export/tasks", get(routes::export_tasks))
         .route("/api/export/sessions", get(routes::export_sessions))
+        .route("/api/export/burns/{sprint_id}", get(routes::export_burns))
         .route("/api/audit", get(routes::list_audit))
         .route("/api/labels", get(routes::list_labels).post(routes::create_label))
         .route("/api/labels/{id}", delete(routes::delete_label))
