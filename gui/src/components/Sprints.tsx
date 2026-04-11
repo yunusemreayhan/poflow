@@ -39,7 +39,7 @@ export default function Sprints() {
       useStore.getState().toast("End date must be after start date", "error");
       return;
     }
-    const body: any = { name: form.name.trim() };
+    const body: Record<string, unknown> = { name: form.name.trim() };
     if (form.project) body.project = form.project;
     if (form.goal) body.goal = form.goal;
     if (form.start_date) body.start_date = form.start_date;

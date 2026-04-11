@@ -82,14 +82,14 @@ function TaskNode({ node, depth, onView, selectMode, onSelect, selectedTaskId, v
         initial={{ opacity: 0, x: -10 }}
         animate={{ opacity: 1, x: 0 }}
         draggable={!selectMode}
-        onDragStart={(e: any) => {
+        onDragStart={(e: React.DragEvent) => {
           e.dataTransfer?.setData("text/plain", String(t.id));
           e.dataTransfer.effectAllowed = "move";
           // Reduce opacity of dragged element
           setTimeout(() => { if (e.target) e.target.style.opacity = "0.4"; }, 0);
         }}
-        onDragEnd={(e: any) => { if (e.target) e.target.style.opacity = "1"; }}
-        onDragOver={(e: any) => {
+        onDragEnd={(e: React.DragEvent) => { if (e.target) e.target.style.opacity = "1"; }}
+        onDragOver={(e: React.DragEvent) => {
           e.preventDefault();
           const rect = e.currentTarget.getBoundingClientRect();
           const y = e.clientY - rect.top;
@@ -97,7 +97,7 @@ function TaskNode({ node, depth, onView, selectMode, onSelect, selectedTaskId, v
           setDropZone(zone);
         }}
         onDragLeave={() => setDropZone(null)}
-        onDrop={async (e: any) => {
+        onDrop={async (e: React.DragEvent) => {
           e.preventDefault(); e.stopPropagation(); setDropZone(null);
           const dragId = Number(e.dataTransfer?.getData("text/plain"));
           if (!dragId || dragId === t.id) return;

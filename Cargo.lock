@@ -3486,6 +3486,7 @@ dependencies = [
 name = "pomodoro-gui"
 version = "0.1.0"
 dependencies = [
+ "dirs 5.0.1",
  "reqwest 0.12.28",
  "serde",
  "serde_json",

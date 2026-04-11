@@ -97,23 +97,43 @@ async fn write_file(path: String, content: String) -> Result<(), String> {
     std::fs::write(&path, content).map_err(|e| e.to_string())
 }
 
+fn auth_key() -> Vec<u8> {
+    // Machine-specific key derived from hostname + username
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+    let mut h = DefaultHasher::new();
+    whoami::hostname().hash(&mut h);
+    whoami::username().hash(&mut h);
+    "pomodoro-gui-auth".hash(&mut h);
+    h.finish().to_le_bytes().to_vec()
+}
+
+fn xor_bytes(data: &[u8], key: &[u8]) -> Vec<u8> {
+    data.iter().enumerate().map(|(i, b)| b ^ key[i % key.len()]).collect()
+}
+
+fn auth_dir() -> std::path::PathBuf {
+    dirs::data_dir().unwrap_or_else(|| std::path::PathBuf::from(".")).join("pomodoro-gui")
+}
+
 #[tauri::command]
 async fn save_auth(_state: tauri::State<'_, Arc<AppState>>, data: String) -> Result<(), String> {
-    let dir = dirs::data_dir().unwrap_or_else(|| std::path::PathBuf::from(".")).join("pomodoro-gui");
+    let dir = auth_dir();
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    std::fs::write(dir.join(".auth"), data).map_err(|e| e.to_string())
+    let encrypted = xor_bytes(data.as_bytes(), &auth_key());
+    std::fs::write(dir.join(".auth"), encrypted).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 async fn load_auth(_state: tauri::State<'_, Arc<AppState>>) -> Result<String, String> {
-    let path = dirs::data_dir().unwrap_or_else(|| std::path::PathBuf::from(".")).join("pomodoro-gui").join(".auth");
-    std::fs::read_to_string(&path).map_err(|e| e.to_string())
+    let raw = std::fs::read(auth_dir().join(".auth")).map_err(|e| e.to_string())?;
+    let decrypted = xor_bytes(&raw, &auth_key());
+    String::from_utf8(decrypted).map_err(|_| "Failed to decrypt auth data".to_string())
 }
 
 #[tauri::command]
 async fn clear_auth(_state: tauri::State<'_, Arc<AppState>>) -> Result<(), String> {
-    let path = dirs::data_dir().unwrap_or_else(|| std::path::PathBuf::from(".")).join("pomodoro-gui").join(".auth");
-    let _ = std::fs::remove_file(&path);
+    let _ = std::fs::remove_file(auth_dir().join(".auth"));
     Ok(())
 }
 
