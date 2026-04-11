@@ -45,7 +45,7 @@ export function TemplateManager() {
           className="w-full bg-white/5 border border-white/10 rounded px-2 py-1 text-xs text-[var(--color-text)] outline-none" />
         <div className="flex gap-2">
           <label className="text-xs text-[var(--color-dim)] flex items-center gap-1">Priority
-            <select value={priority} onChange={e => setPriority(Number(e.target.value))}
+            <select value={priority} onChange={e => setPriority(Number(e.target.value))} aria-label="Priority"
               className="bg-white/5 border border-white/10 rounded px-1 py-0.5 text-xs text-[var(--color-text)]">
               {[1,2,3,4,5].map(p => <option key={p} value={p}>{p}</option>)}
             </select>

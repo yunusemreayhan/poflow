@@ -187,7 +187,7 @@ export default function Timer() {
         {isIdle && (
           <div className="flex flex-col items-center gap-3">
             {activeTasks.length > 0 && (
-              <select value={selectedTaskId ?? ""} onChange={e => setSelectedTaskId(e.target.value ? Number(e.target.value) : undefined)}
+              <select value={selectedTaskId ?? ""} onChange={e => setSelectedTaskId(e.target.value ? Number(e.target.value) : undefined)} aria-label="Select task for timer"
                 className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white/70 outline-none max-w-[240px] truncate"
                 aria-label="Select task to focus on">
                 <option value="">No task (free focus)</option>

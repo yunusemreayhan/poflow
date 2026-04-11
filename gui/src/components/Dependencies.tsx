@@ -40,7 +40,7 @@ export function TaskDependencies({ taskId, allTasks }: { taskId: number; allTask
         {deps.length === 0 && <span className="text-xs text-[var(--color-dim)]">{t.none}</span>}
       </div>
       {available.length > 0 && (
-        <select onChange={e => { if (e.target.value) add(Number(e.target.value)); e.target.value = ""; }}
+        <select onChange={e => { if (e.target.value) add(Number(e.target.value)); e.target.value = ""; }} aria-label="Add dependency"
           className="text-xs px-2 py-1 rounded bg-[var(--color-surface)] border border-white/10 text-[var(--color-text)]"
           defaultValue="" aria-label="Add dependency">
           <option value="" disabled>{t.addDependency}</option>
