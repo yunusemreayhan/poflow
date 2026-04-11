@@ -273,10 +273,10 @@ function BoardView({ board, reload }: { board: SprintBoard; reload: () => void }
   };
 
   const Column = ({ title, tasks, color, status }: { title: string; tasks: Task[]; color: string; status: string }) => (
-    <div className="flex-1 min-w-0" role="list" aria-label={`${title} tasks`}
-      onDragOver={e => { e.preventDefault(); e.currentTarget.classList.add("bg-white/5"); }}
-      onDragLeave={e => e.currentTarget.classList.remove("bg-white/5")}
-      onDrop={e => { e.currentTarget.classList.remove("bg-white/5"); const id = Number(e.dataTransfer.getData("text/plain")); if (id) changeStatus(id, status); }}>
+    <div className="flex-1 min-w-0 rounded-lg border-2 border-transparent transition-colors" role="list" aria-label={`${title} tasks`}
+      onDragOver={e => { e.preventDefault(); e.currentTarget.style.borderColor = "var(--color-accent)"; e.currentTarget.style.background = "rgba(124,58,237,0.05)"; }}
+      onDragLeave={e => { e.currentTarget.style.borderColor = "transparent"; e.currentTarget.style.background = ""; }}
+      onDrop={e => { e.currentTarget.style.borderColor = "transparent"; e.currentTarget.style.background = ""; const id = Number(e.dataTransfer.getData("text/plain")); if (id) changeStatus(id, status); }}>
       <div className={`text-xs font-medium mb-2 ${color}`}>{title} ({tasks.length})</div>
       <div className="space-y-1.5 min-h-[40px] rounded p-1 transition-colors">
         {tasks.map(t => (

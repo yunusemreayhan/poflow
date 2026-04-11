@@ -503,7 +503,7 @@ export default function TaskList({ selectMode, onSelect, selectedTaskId, votedTa
   const { tasks, createTask, teamScope } = useStore();
   const [newTitle, setNewTitle] = useState("");
   const [filter, setFilter] = useState<"all" | "active">("all");
-  const [viewingTask, setViewingTask] = useState<number | null>(null);
+  const [viewStack, setViewStack] = useState<number[]>([]);
   const [search, setSearch] = useState("");
   const [bulkSelected, setBulkSelected] = useState<Set<number>>(new Set());
   const [treeKey, setTreeKey] = useState(0);
@@ -557,8 +557,9 @@ export default function TaskList({ selectMode, onSelect, selectedTaskId, votedTa
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
-  if (viewingTask !== null) {
-    return <TaskDetailView taskId={viewingTask} onBack={() => setViewingTask(null)} onNavigate={(id) => setViewingTask(id)} />;
+  if (viewStack.length > 0) {
+    const viewingTask = viewStack[viewStack.length - 1];
+    return <TaskDetailView taskId={viewingTask} onBack={() => setViewStack(s => s.slice(0, -1))} onNavigate={(id) => setViewStack(s => [...s, id])} />;
   }
 
   return (
@@ -667,7 +668,7 @@ export default function TaskList({ selectMode, onSelect, selectedTaskId, votedTa
                 />
               )}
               <div className="flex-1">
-                <TaskNode node={node} depth={0} onView={setViewingTask}
+                <TaskNode node={node} depth={0} onView={(id) => setViewStack([id])}
                   selectMode={selectMode} onSelect={onSelect} selectedTaskId={selectedTaskId} votedTaskIds={votedTaskIds}
                   selectLabel={selectLabel} selectClassName={selectClassName}
                   bulkSelected={bulkSelected} setBulkSelected={setBulkSelected} />
