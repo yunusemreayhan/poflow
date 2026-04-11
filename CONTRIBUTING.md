@@ -85,3 +85,39 @@ cd gui && npx tsc --noEmit
 cd gui && cargo tauri build --bundles deb
 # Output: target/release/bundle/deb/Pomodoro_*.deb
 ```
+
+## Project Structure
+
+```
+crates/
+  pomodoro-daemon/     # Rust HTTP backend (axum + SQLite)
+    src/db/            # Database layer (one file per entity)
+    src/routes/        # HTTP handlers (one file per resource)
+    src/engine.rs      # Timer engine (per-user state machine)
+    src/auth.rs        # JWT auth + token blocklist
+  pomodoro-cli/        # CLI client
+gui/
+  src/components/      # React components
+  src/store/           # Zustand store + API types
+  src/i18n.ts          # Internationalization
+  src-tauri/           # Tauri backend (Rust)
+```
+
+## Frontend Patterns
+
+- **Zustand** store — single store, optimistic updates for mutations
+- **`useT()`** hook from `i18n.ts` for user-facing strings
+- CSS: Tailwind utility classes + CSS variables for theming
+
+### Adding a New Locale
+1. Copy the `en` object in `gui/src/i18n.ts`
+2. Translate all values
+3. Add to the `locales` map
+
+## Backend Patterns
+
+### Adding a New Endpoint
+1. DB function in `src/db/<entity>.rs`
+2. Route handler in `src/routes/<entity>.rs`
+3. Register in `routes/mod.rs` + `lib.rs`
+4. Add `#[utoipa::path]` + register in `ApiDoc` (main.rs)
