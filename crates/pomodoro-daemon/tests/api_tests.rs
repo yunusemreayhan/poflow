@@ -2959,3 +2959,225 @@ async fn test_attachment_size_limit() {
     let resp = app.clone().oneshot(req).await.unwrap();
     assert_eq!(resp.status(), 201);
 }
+
+// ---- Task search/filter ----
+
+#[tokio::test]
+async fn test_task_search_filter() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"Backend API","project":"backend"})))).await.unwrap();
+    app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"Frontend UI","project":"frontend"})))).await.unwrap();
+    // Search by text
+    let resp = app.clone().oneshot(auth_req("GET", "/api/tasks?search=backend", &tok, None)).await.unwrap();
+    let tasks = body_json(resp).await;
+    assert!(tasks.as_array().unwrap().iter().all(|t| t["title"].as_str().unwrap().to_lowercase().contains("backend") || t["project"].as_str().map_or(false, |p| p.to_lowercase().contains("backend"))));
+    // Filter by project
+    let resp = app.clone().oneshot(auth_req("GET", "/api/tasks?project=frontend", &tok, None)).await.unwrap();
+    let tasks = body_json(resp).await;
+    for t in tasks.as_array().unwrap() {
+        assert_eq!(t["project"], "frontend");
+    }
+}
+
+// ---- Task pagination ----
+
+#[tokio::test]
+async fn test_task_pagination() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    for i in 0..5 { app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":format!("Page{}", i)})))).await.unwrap(); }
+    let resp = app.clone().oneshot(auth_req("GET", "/api/tasks?page=1&per_page=2", &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    assert!(resp.headers().get("x-total-count").is_some());
+    assert!(resp.headers().get("x-page").is_some());
+    let total: i64 = resp.headers().get("x-total-count").unwrap().to_str().unwrap().parse().unwrap();
+    assert!(total >= 5);
+    let tasks = body_json(resp).await;
+    assert_eq!(tasks.as_array().unwrap().len(), 2);
+}
+
+// ---- History with date range ----
+
+#[tokio::test]
+async fn test_history_date_range() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("GET", "/api/history?from=2026-01-01&to=2026-12-31", &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+}
+
+// ---- Stats endpoint ----
+
+#[tokio::test]
+async fn test_stats_endpoint() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("GET", "/api/stats?from=2026-01-01&to=2026-12-31", &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let stats = body_json(resp).await;
+    assert!(stats.is_array());
+}
+
+// ---- Burn summary ----
+
+#[tokio::test]
+async fn test_burn_summary_empty() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let sprint = body_json(app.clone().oneshot(auth_req("POST", "/api/sprints", &tok, Some(json!({"name":"SumSprint"})))).await.unwrap()).await;
+    let sid = sprint["id"].as_i64().unwrap();
+    let resp = app.clone().oneshot(auth_req("GET", &format!("/api/sprints/{}/burn-summary", sid), &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let summary = body_json(resp).await;
+    assert!(summary.is_array());
+}
+
+// ---- Velocity endpoint ----
+
+#[tokio::test]
+async fn test_velocity_with_limit() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("GET", "/api/sprints/velocity?sprints=5", &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let vel = body_json(resp).await;
+    assert!(vel.is_array());
+}
+
+// ---- Task detail with children ----
+
+#[tokio::test]
+async fn test_task_detail_with_children() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let parent = body_json(app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"Parent"})))).await.unwrap()).await;
+    let pid = parent["id"].as_i64().unwrap();
+    app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"Child1","parent_id":pid})))).await.unwrap();
+    app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"Child2","parent_id":pid})))).await.unwrap();
+    let resp = app.clone().oneshot(auth_req("GET", &format!("/api/tasks/{}", pid), &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let detail = body_json(resp).await;
+    assert_eq!(detail["children"].as_array().unwrap().len(), 2);
+}
+
+// ---- Comment ownership ----
+
+#[tokio::test]
+async fn test_comment_cross_user() {
+    let app = app().await;
+    let tok_a = register_user(&app, "commentA").await;
+    let tok_b = register_user(&app, "commentB").await;
+    let task = body_json(app.clone().oneshot(auth_req("POST", "/api/tasks", &tok_a, Some(json!({"title":"T"})))).await.unwrap()).await;
+    let tid = task["id"].as_i64().unwrap();
+    // B can add comment to A's task (comments are collaborative)
+    let resp = app.clone().oneshot(auth_req("POST", &format!("/api/tasks/{}/comments", tid), &tok_b, Some(json!({"content":"Nice work!"})))).await.unwrap();
+    assert!(resp.status().is_success());
+    let comment = body_json(resp).await;
+    let cid = comment["id"].as_i64().unwrap();
+    // A cannot delete B's comment
+    let resp = app.clone().oneshot(auth_req("DELETE", &format!("/api/comments/{}", cid), &tok_a, None)).await.unwrap();
+    assert_eq!(resp.status(), 403);
+    // B can delete their own comment
+    let resp = app.clone().oneshot(auth_req("DELETE", &format!("/api/comments/{}", cid), &tok_b, None)).await.unwrap();
+    assert!(resp.status().is_success());
+}
+
+// ---- Assignee add/remove ----
+
+#[tokio::test]
+async fn test_assignee_add_list_remove() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    register_user(&app, "assigneeUser").await;
+    let task = body_json(app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"T"})))).await.unwrap()).await;
+    let tid = task["id"].as_i64().unwrap();
+    // Add assignee
+    let resp = app.clone().oneshot(auth_req("POST", &format!("/api/tasks/{}/assignees", tid), &tok, Some(json!({"username":"assigneeUser"})))).await.unwrap();
+    assert!(resp.status().is_success());
+    // List assignees
+    let resp = app.clone().oneshot(auth_req("GET", &format!("/api/tasks/{}/assignees", tid), &tok, None)).await.unwrap();
+    let assignees = body_json(resp).await;
+    assert!(assignees.as_array().unwrap().contains(&json!("assigneeUser")));
+    // Remove assignee
+    let resp = app.clone().oneshot(auth_req("DELETE", &format!("/api/tasks/{}/assignees/assigneeUser", tid), &tok, None)).await.unwrap();
+    assert!(resp.status().is_success());
+}
+
+// ---- Global burndown ----
+
+#[tokio::test]
+async fn test_global_burndown_empty() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("GET", "/api/sprints/burndown", &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+}
+
+// ---- Task sprints endpoint ----
+
+#[tokio::test]
+async fn test_task_sprints_with_data() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let sprint = body_json(app.clone().oneshot(auth_req("POST", "/api/sprints", &tok, Some(json!({"name":"TS"})))).await.unwrap()).await;
+    let task = body_json(app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"T"})))).await.unwrap()).await;
+    app.clone().oneshot(auth_req("POST", &format!("/api/sprints/{}/tasks", sprint["id"]), &tok, Some(json!({"task_ids":[task["id"]]})))).await.unwrap();
+    let resp = app.clone().oneshot(auth_req("GET", "/api/task-sprints", &tok, None)).await.unwrap();
+    let ts = body_json(resp).await;
+    assert!(ts.as_array().unwrap().iter().any(|e| e["task_id"] == task["id"]));
+}
+
+// ---- Burn totals endpoint ----
+
+#[tokio::test]
+async fn test_burn_totals_endpoint() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("GET", "/api/burn-totals", &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+}
+
+// ---- All assignees endpoint ----
+
+#[tokio::test]
+async fn test_all_assignees_endpoint() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("GET", "/api/assignees", &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+}
+
+// ---- Config validation bounds ----
+
+#[tokio::test]
+async fn test_config_all_bounds() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("GET", "/api/config", &tok, None)).await.unwrap();
+    let cfg = body_json(resp).await;
+    // work_duration_min = 0 should fail
+    let mut bad = cfg.clone(); bad["work_duration_min"] = json!(0);
+    let resp = app.clone().oneshot(auth_req("PUT", "/api/config", &tok, Some(bad))).await.unwrap();
+    assert_eq!(resp.status(), 400);
+    // work_duration_min = 241 should fail
+    let mut bad = cfg.clone(); bad["work_duration_min"] = json!(241);
+    let resp = app.clone().oneshot(auth_req("PUT", "/api/config", &tok, Some(bad))).await.unwrap();
+    assert_eq!(resp.status(), 400);
+    // short_break_min = 0 should fail
+    let mut bad = cfg.clone(); bad["short_break_min"] = json!(0);
+    let resp = app.clone().oneshot(auth_req("PUT", "/api/config", &tok, Some(bad))).await.unwrap();
+    assert_eq!(resp.status(), 400);
+    // long_break_min = 0 should fail
+    let mut bad = cfg.clone(); bad["long_break_min"] = json!(0);
+    let resp = app.clone().oneshot(auth_req("PUT", "/api/config", &tok, Some(bad))).await.unwrap();
+    assert_eq!(resp.status(), 400);
+    // daily_goal = 51 should fail
+    let mut bad = cfg.clone(); bad["daily_goal"] = json!(51);
+    let resp = app.clone().oneshot(auth_req("PUT", "/api/config", &tok, Some(bad))).await.unwrap();
+    assert_eq!(resp.status(), 400);
+    // estimation_mode = "invalid" should fail
+    let mut bad = cfg.clone(); bad["estimation_mode"] = json!("invalid");
+    let resp = app.clone().oneshot(auth_req("PUT", "/api/config", &tok, Some(bad))).await.unwrap();
+    assert_eq!(resp.status(), 400);
+}
