@@ -51,24 +51,28 @@ pub async fn delete_user(pool: &Pool, id: i64) -> Result<()> {
     }
     // B10: Wrap in transaction for atomicity
     let mut tx = pool.begin().await?;
+    // B1-v24: Verify reassignment target exists before proceeding
+    let target: Option<(i64,)> = sqlx::query_as("SELECT id FROM users WHERE role = 'root' AND id != ? LIMIT 1")
+        .bind(id).fetch_optional(&mut *tx).await?;
+    let target_id = target.map(|(id,)| id).ok_or_else(|| anyhow::anyhow!("No other root user to reassign resources to"))?;
     sqlx::query("DELETE FROM burn_log WHERE user_id = ?").bind(id).execute(&mut *tx).await?;
     sqlx::query("DELETE FROM comments WHERE user_id = ?").bind(id).execute(&mut *tx).await?;
     sqlx::query("DELETE FROM task_assignees WHERE user_id = ?").bind(id).execute(&mut *tx).await?;
     sqlx::query("DELETE FROM room_members WHERE user_id = ?").bind(id).execute(&mut *tx).await?;
     sqlx::query("DELETE FROM room_votes WHERE user_id = ?").bind(id).execute(&mut *tx).await?;
-    sqlx::query("UPDATE audit_log SET user_id = (SELECT id FROM users WHERE role = 'root' AND id != ? LIMIT 1) WHERE user_id = ?").bind(id).bind(id).execute(&mut *tx).await?;
+    sqlx::query("UPDATE audit_log SET user_id = ? WHERE user_id = ?").bind(target_id).bind(id).execute(&mut *tx).await?;
     sqlx::query("DELETE FROM webhooks WHERE user_id = ?").bind(id).execute(&mut *tx).await?;
     sqlx::query("DELETE FROM notifications WHERE user_id = ?").bind(id).execute(&mut *tx).await?;
     sqlx::query("DELETE FROM notification_prefs WHERE user_id = ?").bind(id).execute(&mut *tx).await?;
     sqlx::query("DELETE FROM task_watchers WHERE user_id = ?").bind(id).execute(&mut *tx).await?;
     sqlx::query("DELETE FROM user_configs WHERE user_id = ?").bind(id).execute(&mut *tx).await?;
     sqlx::query("DELETE FROM team_members WHERE user_id = ?").bind(id).execute(&mut *tx).await?;
-    sqlx::query("UPDATE sessions SET user_id = (SELECT id FROM users WHERE role = 'root' AND id != ? LIMIT 1) WHERE user_id = ?").bind(id).bind(id).execute(&mut *tx).await?;
-    sqlx::query("UPDATE tasks SET user_id = (SELECT id FROM users WHERE role = 'root' AND id != ? LIMIT 1) WHERE user_id = ?").bind(id).bind(id).execute(&mut *tx).await?;
-    sqlx::query("UPDATE sprint_tasks SET added_by_id = (SELECT id FROM users WHERE role = 'root' AND id != ? LIMIT 1) WHERE added_by_id = ?").bind(id).bind(id).execute(&mut *tx).await?;
-    sqlx::query("UPDATE rooms SET creator_id = (SELECT id FROM users WHERE role = 'root' AND id != ? LIMIT 1) WHERE creator_id = ?").bind(id).bind(id).execute(&mut *tx).await?;
-    sqlx::query("UPDATE sprints SET created_by_id = (SELECT id FROM users WHERE role = 'root' AND id != ? LIMIT 1) WHERE created_by_id = ?").bind(id).bind(id).execute(&mut *tx).await?;
-    sqlx::query("UPDATE epic_groups SET created_by = (SELECT id FROM users WHERE role = 'root' AND id != ? LIMIT 1) WHERE created_by = ?").bind(id).bind(id).execute(&mut *tx).await?;
+    sqlx::query("UPDATE sessions SET user_id = ? WHERE user_id = ?").bind(target_id).bind(id).execute(&mut *tx).await?;
+    sqlx::query("UPDATE tasks SET user_id = ? WHERE user_id = ?").bind(target_id).bind(id).execute(&mut *tx).await?;
+    sqlx::query("UPDATE sprint_tasks SET added_by_id = ? WHERE added_by_id = ?").bind(target_id).bind(id).execute(&mut *tx).await?;
+    sqlx::query("UPDATE rooms SET creator_id = ? WHERE creator_id = ?").bind(target_id).bind(id).execute(&mut *tx).await?;
+    sqlx::query("UPDATE sprints SET created_by_id = ? WHERE created_by_id = ?").bind(target_id).bind(id).execute(&mut *tx).await?;
+    sqlx::query("UPDATE epic_groups SET created_by = ? WHERE created_by = ?").bind(target_id).bind(id).execute(&mut *tx).await?;
     sqlx::query("DELETE FROM users WHERE id = ?").bind(id).execute(&mut *tx).await?;
     tx.commit().await?;
     Ok(())
