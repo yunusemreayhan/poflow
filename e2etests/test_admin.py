@@ -1,16 +1,12 @@
 """Admin E2E: user management, backup/restore, audit log."""
 
-import time, json, os, urllib.request
+import json, os, urllib.request
 import pytest
 import harness
-from harness import ROOT_PASSWORD
+from harness import ROOT_PASSWORD, click_tab
 
 _ID = os.getpid()
 
-
-def click_tab(app, title):
-    app.execute_js(f'document.querySelector(\'button[title="{title}"]\')?.click()')
-    time.sleep(1)
 
 
 def api(method, path, body=None, token=None):

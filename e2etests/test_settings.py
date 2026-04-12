@@ -1,14 +1,10 @@
 """Settings flow E2E: change config via API, verify GUI reflects changes."""
 
-import time, json, os, urllib.request
+import json, os, urllib.request
 import pytest
 import harness
-from harness import ROOT_PASSWORD, connect_gui_to_daemon, gui_login
+from harness import ROOT_PASSWORD, click_tab, reload_and_login
 
-
-def click_tab(app, title):
-    app.execute_js(f'document.querySelector(\'button[title="{title}"]\')?.click()')
-    time.sleep(1)
 
 
 def api(method, path, body=None, token=None):
@@ -31,15 +27,6 @@ def api(method, path, body=None, token=None):
 def token():
     return api("POST", "/api/auth/login", {"username": "root", "password": ROOT_PASSWORD})["token"]
 
-
-def reload_and_login(app):
-    """Reload page to force config re-fetch, then re-login."""
-    app.execute_js("location.reload()")
-    time.sleep(3)
-    body = app.text(app.find("body"))
-    if "Sign In" in body:
-        connect_gui_to_daemon(app)
-        gui_login(app, "root", ROOT_PASSWORD)
 
 
 class TestSettingsDisplay:

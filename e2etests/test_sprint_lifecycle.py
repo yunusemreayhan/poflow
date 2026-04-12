@@ -3,12 +3,8 @@
 import time, json, os, urllib.request
 import pytest
 import harness
-from harness import ROOT_PASSWORD
+from harness import ROOT_PASSWORD, click_tab
 
-
-def click_tab(app, title):
-    app.execute_js(f'document.querySelector(\'button[title="{title}"]\')?.click()')
-    time.sleep(1)
 
 
 def api(method, path, body=None, token=None):
@@ -39,14 +35,19 @@ def click_sprint(app, name):
             if(d[i].textContent.includes('{name}')&&d[i].className.indexOf('cursor-pointer')>=0)
                 {{d[i].click();break;}}
     """)
-    time.sleep(1)
+    # Wait for sprint detail to load
+    deadline = time.time() + 5
+    while time.time() < deadline:
+        body = app.text(app.find("body"))
+        if "Board" in body or "Todo" in body or "Complete" in body or "completed" in body:
+            break
+        time.sleep(0.3)
 
 
 def nav_sprint(app, name):
     """Navigate away then back to Sprints to force data reload."""
     click_tab(app, "Timer")
     click_tab(app, "Sprints")
-    time.sleep(0.5)
     click_sprint(app, name)
 
 
@@ -67,7 +68,6 @@ def sprint(daemon):
 class TestSprintDisplay:
     def test_visible_in_list(self, logged_in, sprint):
         click_tab(logged_in, "Refresh data")
-        time.sleep(0.5)
         click_tab(logged_in, "Sprints")
         assert NAME in logged_in.page_source()
 

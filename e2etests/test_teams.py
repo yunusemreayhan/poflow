@@ -1,16 +1,12 @@
 """Teams E2E: create teams, manage members, verify in GUI settings."""
 
-import time, json, os, urllib.request
+import json, os, urllib.request
 import pytest
 import harness
-from harness import ROOT_PASSWORD
+from harness import ROOT_PASSWORD, click_tab
 
 _ID = os.getpid()
 
-
-def click_tab(app, title):
-    app.execute_js(f'document.querySelector(\'button[title="{title}"]\')?.click()')
-    time.sleep(1)
 
 
 def api(method, path, body=None, token=None):
@@ -65,13 +61,8 @@ class TestTeams:
     def test_team_visible_in_settings(self, logged_in):
         t = token()
         api("POST", "/api/teams", {"name": f"TmGui_{_ID}"}, t)
-        logged_in.execute_js("location.reload()")
-        time.sleep(3)
-        body = logged_in.text(logged_in.find("body"))
-        if "Sign In" in body:
-            from harness import connect_gui_to_daemon, gui_login
-            connect_gui_to_daemon(logged_in)
-            gui_login(logged_in, "root", ROOT_PASSWORD)
+        from harness import reload_and_login
+        reload_and_login(logged_in)
         click_tab(logged_in, "Settings")
         src = logged_in.page_source()
         assert f"TmGui_{_ID}" in src or "Team" in src

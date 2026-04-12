@@ -1,9 +1,9 @@
 """Exhaustive config tests: every field, boundary values, invalid inputs, combinations."""
 
-import time, json, os, urllib.request
+import json, os, urllib.request
 import pytest
 import harness
-from harness import ROOT_PASSWORD, connect_gui_to_daemon, gui_login
+from harness import ROOT_PASSWORD, click_tab, reload_and_login
 
 _tok = {}
 
@@ -51,18 +51,6 @@ def tok():
     return _tok["root"]
 
 
-def reload_and_login(app):
-    app.execute_js("location.reload()")
-    time.sleep(3)
-    body = app.text(app.find("body"))
-    if "Sign In" in body:
-        connect_gui_to_daemon(app)
-        gui_login(app, "root", ROOT_PASSWORD)
-
-
-def click_tab(app, title):
-    app.execute_js(f'document.querySelector(\'button[title="{title}"]\')?.click()')
-    time.sleep(1)
 
 
 class TestConfigFields:

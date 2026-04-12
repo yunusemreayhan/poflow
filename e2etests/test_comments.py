@@ -1,14 +1,10 @@
 """Comments E2E: add comment via API, verify visible in GUI task detail."""
 
-import time, json, os, urllib.request
+import json, os, urllib.request
 import pytest
 import harness
-from harness import ROOT_PASSWORD
+from harness import ROOT_PASSWORD, click_tab
 
-
-def click_tab(app, title):
-    app.execute_js(f'document.querySelector(\'button[title="{title}"]\')?.click()')
-    time.sleep(1)
 
 
 def api(method, path, body=None, token=None):
@@ -72,7 +68,6 @@ class TestComments:
 
         click_tab(logged_in, "Timer")
         click_tab(logged_in, "Tasks")
-        time.sleep(0.5)
 
         # The task node shows comment count via MessageSquare icon
         # Check if "2" appears near the task

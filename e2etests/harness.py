@@ -116,9 +116,9 @@ def connect_gui_to_daemon(app):
         "try { window.__TAURI_INTERNALS__.invoke('clear_auth'); } catch(e) {}"
         "try { window.__TAURI_INTERNALS__.invoke('set_token', { token: '' }); } catch(e) {}"
     )
-    time.sleep(0.3)
+    _wait_stable(app, 0.3)
     app.execute_js("location.reload()")
-    time.sleep(3)
+    app.wait_for_text("Sign In", timeout=10)
 
 
 def gui_login(app, username: str, password: str):
@@ -131,9 +131,15 @@ def gui_login(app, username: str, password: str):
         "nativeSet.call(inputs[1], '" + password + "');"
         "inputs[1].dispatchEvent(new Event('input', { bubbles: true }));"
     )
-    time.sleep(0.3)
+    _wait_stable(app, 0.3)
     app.click_text("Sign In", "button")
-    time.sleep(2)
+    # Wait for either timer page or error message
+    deadline = time.time() + 10
+    while time.time() < deadline:
+        body = app.text(app.find("body"))
+        if "Start Focus" in body or "error" in body.lower() or "invalid" in body.lower():
+            return
+        time.sleep(0.3)
 
 
 def gui_logout(app):
@@ -145,7 +151,7 @@ def gui_logout(app):
                     b.click();
             });
         """)
-        time.sleep(1)
+        app.wait_for_text("Sign In", timeout=5)
     except Exception:
         pass
 
@@ -153,11 +159,54 @@ def gui_logout(app):
 def gui_register(app, username: str, password: str):
     """Register through the GUI register form."""
     app.click_text("No account? Register", "button")
-    time.sleep(0.5)
+    _wait_stable(app, 0.3)
     app.type_into("input[placeholder='Username']", username)
     app.type_into("input[placeholder*='Password']", password)
     app.click_text("Create Account", "button")
-    time.sleep(2)
+    # Wait for either timer page or error
+    deadline = time.time() + 10
+    while time.time() < deadline:
+        body = app.text(app.find("body"))
+        if "Start Focus" in body or "error" in body.lower() or "bad_request" in body.lower():
+            return
+        time.sleep(0.3)
+
+
+def _wait_stable(app, min_wait=0.2):
+    """Minimal wait for DOM to settle after JS execution."""
+    time.sleep(min_wait)
+
+
+def click_tab(app, title, wait_text=None):
+    """Click a sidebar tab and wait for the page to update.
+
+    If wait_text is given, polls until that text appears in the body.
+    Otherwise waits a minimal amount for the DOM to settle.
+    """
+    app.execute_js(f"document.querySelector('button[title=\"{title}\"]')?.click()")
+    if wait_text:
+        app.wait_for_text(wait_text, timeout=5)
+    else:
+        _wait_stable(app, 0.5)
+
+
+def reload_and_login(app):
+    """Reload page to force config re-fetch, then re-login if needed."""
+    app.execute_js("location.reload()")
+    # Wait for page to load (either login screen or app)
+    deadline = time.time() + 10
+    while time.time() < deadline:
+        try:
+            body = app.text(app.find("body"))
+            if "Sign In" in body or "Start Focus" in body:
+                break
+        except Exception:
+            pass
+        time.sleep(0.3)
+    body = app.text(app.find("body"))
+    if "Sign In" in body:
+        connect_gui_to_daemon(app)
+        gui_login(app, "root", ROOT_PASSWORD)
 
 
 def api_register(username: str, password: str) -> dict:

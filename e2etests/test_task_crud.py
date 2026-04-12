@@ -1,14 +1,10 @@
 """Task CRUD E2E: create/edit/delete via API, verify via GUI."""
 
-import time, json, os, urllib.request
+import json, os, urllib.request
 import pytest
 import harness
-from harness import ROOT_PASSWORD
+from harness import ROOT_PASSWORD, click_tab
 
-
-def click_tab(app, title):
-    app.execute_js(f'document.querySelector(\'button[title="{title}"]\')?.click()')
-    time.sleep(1)
 
 
 def api(method, path, body=None, token=None):
@@ -36,7 +32,6 @@ def refresh_tasks(app):
     """Navigate away and back to force task list reload."""
     click_tab(app, "Timer")
     click_tab(app, "Tasks")
-    time.sleep(0.5)
 
 
 _ID = os.getpid()

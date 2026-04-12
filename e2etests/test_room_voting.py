@@ -3,12 +3,8 @@
 import time, json, os, urllib.request
 import pytest
 import harness
-from harness import ROOT_PASSWORD
+from harness import ROOT_PASSWORD, click_tab
 
-
-def click_tab(app, title):
-    app.execute_js(f'document.querySelector(\'button[title="{title}"]\')?.click()')
-    time.sleep(1)
 
 
 def api(method, path, body=None, token=None):
@@ -39,7 +35,13 @@ def click_room(app, name):
             if(els[i].textContent.includes('{name}')&&els[i].className.indexOf('cursor-pointer')>=0)
                 {{els[i].click();break;}}
     """)
-    time.sleep(1.5)
+    # Wait for room detail to load
+    deadline = time.time() + 5
+    while time.time() < deadline:
+        body = app.text(app.find("body"))
+        if name in body and ("voting" in body.lower() or "idle" in body.lower() or "Reveal" in body or "members" in body.lower()):
+            break
+        time.sleep(0.3)
 
 
 _ID = os.getpid()
@@ -50,7 +52,6 @@ class TestRoomDisplay:
         t = token()
         api("POST", "/api/rooms", {"name": f"Rm_{_ID}", "estimation_unit": "points"}, t)
         click_tab(logged_in, "Refresh data")
-        time.sleep(0.5)
         click_tab(logged_in, "Rooms")
         assert f"Rm_{_ID}" in logged_in.page_source()
 

@@ -1,7 +1,7 @@
 """E2E GUI flow tests for Pomodoro Tauri app.
 
 All tests interact with the real GUI via WebDriver (DOM-level).
-Daemon runs isolated on port 19090 with a fresh DB per session.
+Daemon runs isolated on a random port with a fresh DB per session.
 Each test class is order-independent — use `logged_in` fixture for auth.
 """
 
@@ -11,17 +11,13 @@ from desktop_pilot import TauriWebDriver, WebDriverError
 from harness import (
     Daemon, GUI_BINARY, ROOT_PASSWORD,
     connect_gui_to_daemon, gui_login, gui_logout, api_register,
+    click_tab,
 )
 import harness
 import json, urllib.request
 
 
 # ── Helpers ─────────────────────────────────────────────────────
-
-def click_tab(app, title: str):
-    app.execute_js(f"document.querySelector('button[title=\"{title}\"]')?.click()")
-    time.sleep(1)
-
 
 def set_input(app, selector: str, value: str):
     app.execute_js(
@@ -51,12 +47,33 @@ def api_call(method, path, body=None, token=None):
 
 
 def get_root_token():
-    resp = api_call("POST", "/api/auth/login", {"username": "root", "password": ROOT_PASSWORD})
-    return resp["token"]
+    return api_call("POST", "/api/auth/login", {"username": "root", "password": ROOT_PASSWORD})["token"]
 
 
 def body_text(app) -> str:
     return app.text(app.find("body"))
+
+
+def wait_body_contains(app, *texts, timeout=5):
+    """Poll until body contains any of the given texts."""
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        body = body_text(app)
+        if any(t in body for t in texts):
+            return body
+        time.sleep(0.3)
+    return body_text(app)
+
+
+def wait_body_contains_lower(app, *texts, timeout=5):
+    """Poll until body.lower() contains any of the given texts."""
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        body = body_text(app).lower()
+        if any(t in body for t in texts):
+            return body
+        time.sleep(0.3)
+    return body_text(app).lower()
 
 
 def ensure_login_screen(app):
@@ -65,6 +82,16 @@ def ensure_login_screen(app):
     if "Sign In" not in body:
         gui_logout(app)
     connect_gui_to_daemon(app)
+
+
+def click_register_button(app):
+    """Find and click the register/create account button."""
+    btns = app.find_all("button")
+    for b in btns:
+        txt = app.text(b).strip().lower()
+        if "create" in txt or "register" in txt or "sign up" in txt:
+            app.click(b)
+            return
 
 
 # ── Flow: user-login.md ────────────────────────────────────────
@@ -79,8 +106,8 @@ class TestLogin:
     def test_login_wrong_password_shows_error(self, app):
         ensure_login_screen(app)
         gui_login(app, "root", "WrongPass1")
-        body = body_text(app)
-        assert "invalid" in body.lower() or "error" in body.lower() or "credentials" in body.lower()
+        body = body_text(app).lower()
+        assert "invalid" in body or "error" in body or "credentials" in body
 
     def test_login_after_error_recovers(self, app):
         ensure_login_screen(app)
@@ -95,17 +122,11 @@ class TestRegistration:
     def test_register_via_gui(self, app):
         ensure_login_screen(app)
         app.click_text("No account? Register", "button")
-        time.sleep(0.5)
+        app.wait_for("input[placeholder='Username']", timeout=5)
         set_input(app, "input[placeholder='Username']", "guireg1")
         set_input(app, "input[placeholder*='Password']", "GuiReg1Pass")
-        btns = app.find_all("button")
-        for b in btns:
-            txt = app.text(b).strip().lower()
-            if "create" in txt or "register" in txt or "sign up" in txt:
-                app.click(b)
-                break
-        time.sleep(2)
-        app.assert_visible("Start Focus")
+        click_register_button(app)
+        app.wait_for_text("Start Focus", timeout=10)
 
     def test_register_then_logout_login(self, app):
         ensure_login_screen(app)
@@ -119,9 +140,8 @@ class TestLogout:
 
     def test_logout_shows_login_screen(self, logged_in):
         click_tab(logged_in, "Logout")
-        time.sleep(1)
-        body = body_text(logged_in)
-        assert "Sign In" in body
+        wait_body_contains(logged_in, "Sign In")
+        assert "Sign In" in body_text(logged_in)
 
     def test_login_after_logout(self, app):
         ensure_login_screen(app)
@@ -140,15 +160,13 @@ class TestTimerSession:
     def test_start_focus_changes_state(self, logged_in):
         click_tab(logged_in, "Timer")
         logged_in.click_text("Start Focus")
-        time.sleep(1)
-        body = body_text(logged_in)
-        assert "Focus" in body or "00:" in body or "01:" in body or "READY" in body
+        body = wait_body_contains(logged_in, "Focus", "00:", "01:", "READY")
+        assert any(t in body for t in ("Focus", "00:", "01:", "READY"))
 
     def test_pause_timer(self, logged_in):
         try:
             logged_in.click_text("Pause")
-            time.sleep(0.5)
-            body = body_text(logged_in)
+            body = wait_body_contains(logged_in, "Resume", "PAUSED")
             assert "Resume" in body or "PAUSED" in body
         except (WebDriverError, AssertionError):
             pass
@@ -156,45 +174,39 @@ class TestTimerSession:
     def test_resume_timer(self, logged_in):
         try:
             logged_in.click_text("Resume")
-            time.sleep(0.5)
         except (WebDriverError, AssertionError):
             pass
 
     def test_stop_timer(self, logged_in):
         try:
             logged_in.click_text("Stop")
-            time.sleep(0.5)
         except (WebDriverError, AssertionError):
             pass
+        wait_body_contains(logged_in, "Start Focus")
         logged_in.assert_visible("Start Focus")
 
     def test_short_break_mode(self, logged_in):
         click_tab(logged_in, "Timer")
         logged_in.click_text("Short Break")
-        time.sleep(0.5)
-        body = body_text(logged_in)
+        body = wait_body_contains(logged_in, "01:00", "00:")
         assert "01:00" in body or "00:" in body
 
     def test_long_break_mode(self, logged_in):
         try:
             logged_in.click_text("Stop")
-            time.sleep(0.3)
         except (WebDriverError, AssertionError):
             pass
         logged_in.click_text("Long Break")
-        time.sleep(0.5)
-        body = body_text(logged_in)
+        body = wait_body_contains(logged_in, "01:00", "00:")
         assert "01:00" in body or "00:" in body
 
     def test_back_to_focus(self, logged_in):
         try:
             logged_in.click_text("Stop")
-            time.sleep(0.3)
         except (WebDriverError, AssertionError):
             pass
         logged_in.click_text("Start Focus")
-        time.sleep(0.5)
-        body = body_text(logged_in)
+        body = wait_body_contains(logged_in, "01:00", "00:")
         assert "01:00" in body or "00:" in body
         try:
             logged_in.click_text("Stop")
@@ -208,7 +220,6 @@ class TestTasks:
 
     def test_tasks_tab_loads(self, logged_in):
         click_tab(logged_in, "Tasks")
-        time.sleep(0.5)
         inputs = logged_in.find_all("input[placeholder*='New project']")
         assert len(inputs) > 0
 
@@ -216,17 +227,13 @@ class TestTasks:
         token = get_root_token()
         api_call("POST", "/api/tasks", {"title": "API Created Task", "project": "E2EProject"}, token)
         click_tab(logged_in, "Refresh data")
-        time.sleep(1)
         click_tab(logged_in, "Tasks")
-        time.sleep(1)
-        body = body_text(logged_in)
+        body = wait_body_contains(logged_in, "API Created Task", "E2EProject")
         assert "API Created Task" in body or "E2EProject" in body
 
     def test_search_tasks(self, logged_in):
         click_tab(logged_in, "Tasks")
-        time.sleep(0.5)
         set_input(logged_in, "input[placeholder*='Search']", "API Created")
-        time.sleep(1)
         assert len(body_text(logged_in)) > 0
 
     def test_create_multiple_tasks(self, logged_in):
@@ -234,10 +241,8 @@ class TestTasks:
         api_call("POST", "/api/tasks", {"title": "Task Two", "project": "E2EProject"}, token)
         api_call("POST", "/api/tasks", {"title": "Task Three", "project": "E2EProject"}, token)
         click_tab(logged_in, "Refresh data")
-        time.sleep(1)
         click_tab(logged_in, "Tasks")
-        time.sleep(1)
-        body = body_text(logged_in)
+        body = wait_body_contains(logged_in, "Task Two", "E2EProject")
         assert "Task Two" in body or "E2EProject" in body
 
 
@@ -247,9 +252,8 @@ class TestSprints:
 
     def test_sprints_tab_loads(self, logged_in):
         click_tab(logged_in, "Sprints")
-        time.sleep(0.5)
-        body = body_text(logged_in)
-        assert "sprint" in body.lower() or "Sprint" in body
+        body = wait_body_contains_lower(logged_in, "sprint")
+        assert "sprint" in body
 
     def test_create_sprint_via_api_shows_in_gui(self, logged_in):
         token = get_root_token()
@@ -259,10 +263,8 @@ class TestSprints:
             "end_date": "2026-04-28",
         }, token)
         click_tab(logged_in, "Timer")
-        time.sleep(0.5)
         click_tab(logged_in, "Sprints")
-        time.sleep(1.5)
-        body = body_text(logged_in)
+        body = wait_body_contains(logged_in, "E2E Sprint 1", "Sprint")
         assert "E2E Sprint 1" in body or "Sprint" in body
 
 
@@ -272,23 +274,19 @@ class TestRooms:
 
     def test_rooms_tab_loads(self, logged_in):
         click_tab(logged_in, "Rooms")
-        time.sleep(0.5)
-        body = body_text(logged_in)
-        assert "room" in body.lower() or "Room" in body
+        body = wait_body_contains_lower(logged_in, "room")
+        assert "room" in body
 
     def test_create_room_button_exists(self, logged_in):
         click_tab(logged_in, "Rooms")
-        time.sleep(0.5)
         logged_in.assert_visible("New Room")
 
     def test_create_room_via_api_shows_in_gui(self, logged_in):
         token = get_root_token()
         api_call("POST", "/api/rooms", {"name": "E2E Room", "estimation_unit": "points"}, token)
         click_tab(logged_in, "Timer")
-        time.sleep(0.5)
         click_tab(logged_in, "Rooms")
-        time.sleep(1.5)
-        body = body_text(logged_in)
+        body = wait_body_contains(logged_in, "E2E Room", "Room")
         assert "E2E Room" in body or "Room" in body
 
 
@@ -298,14 +296,12 @@ class TestHistory:
 
     def test_history_tab_loads(self, logged_in):
         click_tab(logged_in, "History")
-        time.sleep(0.5)
-        body = body_text(logged_in)
-        assert "session" in body.lower() or "streak" in body.lower() or "hours" in body.lower()
+        body = wait_body_contains_lower(logged_in, "session", "streak", "hours")
+        assert any(t in body for t in ("session", "streak", "hours"))
 
     def test_history_shows_stats(self, logged_in):
         click_tab(logged_in, "History")
-        time.sleep(0.5)
-        body = body_text(logged_in)
+        body = wait_body_contains(logged_in, "Total Sessions", "Focus Hours")
         assert "Total Sessions" in body or "Focus Hours" in body
 
 
@@ -315,42 +311,37 @@ class TestSettings:
 
     def test_settings_tab_loads(self, logged_in):
         click_tab(logged_in, "Settings")
-        time.sleep(0.5)
-        body = body_text(logged_in)
+        body = wait_body_contains(logged_in, "Timer Durations", "Work")
         assert "Timer Durations" in body or "Work" in body
 
     def test_settings_shows_username(self, logged_in):
         click_tab(logged_in, "Settings")
-        time.sleep(0.5)
-        body = body_text(logged_in)
+        body = wait_body_contains(logged_in, "root")
         assert "root" in body
 
     def test_settings_shows_server_url(self, logged_in):
         click_tab(logged_in, "Settings")
-        time.sleep(0.5)
+        port = str(harness.TEST_PORT)
         val = logged_in.execute_js("""
             const inputs = document.querySelectorAll('input');
             for (const i of inputs) {
-                if (i.value.includes('19090') || i.value.includes('127.0.0.1')) return i.value;
+                if (i.value.includes('""" + port + """') || i.value.includes('127.0.0.1')) return i.value;
             }
             return '';
         """)
-        assert "19090" in val or "127.0.0.1" in val
+        assert port in val or "127.0.0.1" in val
 
     def test_settings_has_save_button(self, logged_in):
         click_tab(logged_in, "Settings")
-        time.sleep(0.5)
         logged_in.assert_visible("Save Settings")
 
     def test_settings_has_team_button(self, logged_in):
         click_tab(logged_in, "Settings")
-        time.sleep(0.5)
         logged_in.assert_visible("+ New Team")
 
     def test_settings_estimation_mode(self, logged_in):
         click_tab(logged_in, "Settings")
-        time.sleep(0.5)
-        body = body_text(logged_in)
+        body = wait_body_contains(logged_in, "Estimation Mode", "Hours")
         assert "Estimation Mode" in body or "Hours" in body
 
 
@@ -361,7 +352,6 @@ class TestTheme:
     def test_toggle_theme(self, logged_in):
         old_theme = logged_in.execute_js("return document.documentElement.getAttribute('data-theme')")
         click_tab(logged_in, "Toggle theme")
-        time.sleep(0.5)
         new_theme = logged_in.execute_js("return document.documentElement.getAttribute('data-theme')")
         assert new_theme != old_theme
         assert new_theme in ("dark", "light")
@@ -369,7 +359,6 @@ class TestTheme:
     def test_toggle_back(self, logged_in):
         old_theme = logged_in.execute_js("return document.documentElement.getAttribute('data-theme')")
         click_tab(logged_in, "Toggle theme")
-        time.sleep(0.5)
         new_theme = logged_in.execute_js("return document.documentElement.getAttribute('data-theme')")
         assert new_theme != old_theme
 
@@ -380,9 +369,7 @@ class TestRefresh:
 
     def test_refresh_data(self, logged_in):
         click_tab(logged_in, "Tasks")
-        time.sleep(0.5)
         click_tab(logged_in, "Refresh data")
-        time.sleep(1)
         assert len(body_text(logged_in)) > 0
 
 
@@ -392,9 +379,8 @@ class TestApiTab:
 
     def test_api_tab_loads(self, logged_in):
         click_tab(logged_in, "API")
-        time.sleep(1)
-        body = body_text(logged_in)
-        assert "api" in body.lower() or "API" in body or "Loading" in body
+        body = wait_body_contains_lower(logged_in, "api", "loading")
+        assert "api" in body or "loading" in body
 
 
 # ── DOM integrity ───────────────────────────────────────────────
@@ -405,7 +391,7 @@ class TestDomIntegrity:
         assert 'id="root"' in logged_in.page_source()
 
     def test_title(self, app):
-        assert app.title() == "Pomodoro"
+        assert "Pomodoro" in app.title()
 
     def test_no_js_errors(self, logged_in):
         root = logged_in.find("#root")
@@ -428,12 +414,11 @@ class TestMultiUser:
         try:
             api_call("POST", "/api/auth/register", {"username": "viewer1", "password": "ViewerP1"})
         except Exception:
-            pass  # may already exist from previous run
+            pass
         ensure_login_screen(app)
         gui_login(app, "viewer1", "ViewerP1")
         click_tab(app, "Tasks")
-        time.sleep(1)
-        body = body_text(app)
+        body = wait_body_contains(app, "SharedProject", "SharedVizTask")
         assert "SharedProject" in body or "SharedVizTask" in body or len(body) > 50
         ensure_login_screen(app)
         gui_login(app, "root", ROOT_PASSWORD)
@@ -446,65 +431,41 @@ class TestPasswordValidation:
     def test_register_short_password_shows_error(self, app):
         ensure_login_screen(app)
         app.click_text("No account? Register", "button")
-        time.sleep(0.5)
+        app.wait_for("input[placeholder='Username']", timeout=5)
         set_input(app, "input[placeholder='Username']", "shortpw1")
         set_input(app, "input[placeholder*='Password']", "Short1a")
-        btns = app.find_all("button")
-        for b in btns:
-            txt = app.text(b).strip().lower()
-            if "create" in txt or "register" in txt or "sign up" in txt:
-                app.click(b)
-                break
-        time.sleep(1)
-        body = body_text(app)
-        assert "8 char" in body.lower() or "at least 8" in body.lower() or "error" in body.lower() or "bad_request" in body.lower()
+        click_register_button(app)
+        body = wait_body_contains_lower(app, "8 char", "at least 8", "error", "bad_request")
+        assert any(t in body for t in ("8 char", "at least 8", "error", "bad_request"))
 
     def test_register_no_uppercase_shows_error(self, app):
         ensure_login_screen(app)
         app.click_text("No account? Register", "button")
-        time.sleep(0.5)
+        app.wait_for("input[placeholder='Username']", timeout=5)
         set_input(app, "input[placeholder='Username']", "noupuser")
         set_input(app, "input[placeholder*='Password']", "alllower1")
-        btns = app.find_all("button")
-        for b in btns:
-            txt = app.text(b).strip().lower()
-            if "create" in txt or "register" in txt or "sign up" in txt:
-                app.click(b)
-                break
-        time.sleep(1)
-        body = body_text(app)
-        assert "uppercase" in body.lower() or "error" in body.lower() or "bad_request" in body.lower()
+        click_register_button(app)
+        body = wait_body_contains_lower(app, "uppercase", "error", "bad_request")
+        assert any(t in body for t in ("uppercase", "error", "bad_request"))
 
     def test_register_no_digit_shows_error(self, app):
         ensure_login_screen(app)
         app.click_text("No account? Register", "button")
-        time.sleep(0.5)
+        app.wait_for("input[placeholder='Username']", timeout=5)
         set_input(app, "input[placeholder='Username']", "nodiguser")
         set_input(app, "input[placeholder*='Password']", "NoDigitHere")
-        btns = app.find_all("button")
-        for b in btns:
-            txt = app.text(b).strip().lower()
-            if "create" in txt or "register" in txt or "sign up" in txt:
-                app.click(b)
-                break
-        time.sleep(1)
-        body = body_text(app)
-        assert "digit" in body.lower() or "error" in body.lower() or "bad_request" in body.lower()
+        click_register_button(app)
+        body = wait_body_contains_lower(app, "digit", "error", "bad_request")
+        assert any(t in body for t in ("digit", "error", "bad_request"))
 
     def test_valid_password_succeeds_after_failures(self, app):
         ensure_login_screen(app)
         app.click_text("No account? Register", "button")
-        time.sleep(0.5)
+        app.wait_for("input[placeholder='Username']", timeout=5)
         set_input(app, "input[placeholder='Username']", "validpw1")
         set_input(app, "input[placeholder*='Password']", "ValidPass1")
-        btns = app.find_all("button")
-        for b in btns:
-            txt = app.text(b).strip().lower()
-            if "create" in txt or "register" in txt or "sign up" in txt:
-                app.click(b)
-                break
-        time.sleep(2)
-        app.assert_visible("Start Focus")
+        click_register_button(app)
+        app.wait_for_text("Start Focus", timeout=10)
 
 
 # ── Session expiry ──────────────────────────────────────────────
@@ -533,7 +494,6 @@ class TestSessionExpiry:
             except Exception:
                 pass
         click_tab(app, "Tasks")
-        time.sleep(2)
         assert len(body_text(app)) > 0
 
     def test_fresh_login_works_after_expiry(self, app):

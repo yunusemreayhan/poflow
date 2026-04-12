@@ -198,7 +198,8 @@ class TestSessionNote:
     def test_update_note(self, logged_in):
         t = tok()
         api("POST", "/api/timer/start", {"task_id": None}, t)
-        time.sleep(1)
+        # Brief pause so the session has non-zero duration
+        import time as _time; _time.sleep(0.5)
         api("POST", "/api/timer/stop", token=t)
         history = api("GET", "/api/history", token=t)
         if history:
