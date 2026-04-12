@@ -258,6 +258,7 @@ export default function TaskList({ selectMode, onSelect, selectedTaskId, votedTa
                 <th scope="col" className="py-1 px-1 w-6"></th>
                 {([["title","Title"],["status","Status"],["priority","Priority"],["estimated","Est"],["due","Due"],["user","Owner"]] as const).map(([k,label]) => (
                   <th key={k} scope="col" className={`py-1 px-1 cursor-pointer hover:text-white/50 ${tableSort === k ? "text-white/60" : ""}`}
+                    aria-sort={tableSort === k ? "descending" : undefined}
                     onClick={() => setTableSort(k as any)}>{label}{tableSort === k ? " ▾" : ""}</th>
                 ))}
               </tr>
