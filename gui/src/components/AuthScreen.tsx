@@ -56,14 +56,19 @@ export default function AuthScreen() {
           {/* Server URL */}
           <div className="flex items-center gap-2 mb-1">
             {editingServer ? (
-              <input value={serverDraft} onChange={(e) => setServerDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") { setServerUrl(serverDraft); setEditingServer(false); }
-                  if (e.key === "Escape") { setServerDraft(serverUrl); setEditingServer(false); }
-                }}
-                onBlur={() => { setServerUrl(serverDraft); setEditingServer(false); }}
-                className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white outline-none focus:border-[var(--color-accent)] font-mono"
-                autoFocus />
+              <div className="flex-1 flex gap-1">
+                <input value={serverDraft} onChange={(e) => setServerDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") { setServerUrl(serverDraft); setEditingServer(false); }
+                    if (e.key === "Escape") { setServerDraft(serverUrl); setEditingServer(false); }
+                  }}
+                  className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white outline-none focus:border-[var(--color-accent)] font-mono"
+                  autoFocus />
+                <button type="button" onClick={() => { setServerUrl(serverDraft); setEditingServer(false); }}
+                  className="text-xs px-2 py-1 rounded bg-[var(--color-accent)] text-white">✓</button>
+                <button type="button" onClick={() => { setServerDraft(serverUrl); setEditingServer(false); }}
+                  className="text-xs px-2 py-1 rounded bg-white/10 text-white/60">✕</button>
+              </div>
             ) : (
               <button onClick={() => setEditingServer(true)}
                 className="flex-1 text-left text-xs text-white/30 hover:text-white/60 font-mono truncate transition-colors flex items-center gap-1"
