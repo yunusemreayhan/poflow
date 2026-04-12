@@ -46,6 +46,8 @@ export default function EstimationRoomView({ roomId, onBack }: { roomId: number;
   }, [state?.room.current_task_id, state?.votes]);
 
   // F9: Discussion timer — tracks time spent on current task
+  // BL17: Configurable discussion time limit (default 2 min)
+  const [discussionLimit] = useState(() => Number(localStorage.getItem("discussion_limit_s") || 120));
   const [discussionStart, setDiscussionStart] = useState<number | null>(null);
   const [elapsed, setElapsed] = useState(0);
   useEffect(() => {
@@ -134,6 +136,9 @@ export default function EstimationRoomView({ roomId, onBack }: { roomId: number;
               {room.status}
             </span>
             <span>{members.length} members</span>
+            {/* BL18: Share room ID */}
+            <button onClick={() => { navigator.clipboard.writeText(`Room #${state.room.id}: ${room.name}`); useStore.getState().toast("Room ID copied"); }}
+              className="text-white/20 hover:text-white/50">📋 Share</button>
           </div>
         </div>
         {/* Tabs */}
@@ -184,7 +189,7 @@ export default function EstimationRoomView({ roomId, onBack }: { roomId: number;
                   <>
                     <div className="text-lg font-semibold text-white mb-2 flex items-center gap-2">
                       {current_task.title}
-                      {elapsed > 0 && <span className="text-xs font-mono text-white/30">{Math.floor(elapsed / 60)}:{String(elapsed % 60).padStart(2, "0")}</span>}
+                      {elapsed > 0 && <span className={`text-xs font-mono ${elapsed > discussionLimit ? "text-red-400" : "text-white/30"}`}>{Math.floor(elapsed / 60)}:{String(elapsed % 60).padStart(2, "0")}{elapsed > discussionLimit ? " ⏰" : ""}</span>}
                       {isAdmin && <button onClick={() => { setEditTitle(current_task.title); setEditDesc(current_task.description || ""); setEditingTask(true); }}
                         className="text-white/20 hover:text-white/50"><Edit3 size={14} /></button>}
                     </div>

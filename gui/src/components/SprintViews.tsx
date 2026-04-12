@@ -184,9 +184,18 @@ export function VelocityChart() {
 
   if (data.length < 2) return null;
 
+  // BL22: Compute trend insights
+  const avgPts = data.reduce((s, d) => s + d.points, 0) / data.length;
+  const lastPts = data[data.length - 1].points;
+  const trend = lastPts > avgPts * 1.1 ? "↑ above avg" : lastPts < avgPts * 0.9 ? "↓ below avg" : "→ stable";
+  const trendColor = lastPts > avgPts * 1.1 ? "text-green-400" : lastPts < avgPts * 0.9 ? "text-red-400" : "text-white/40";
+
   return (
     <div className="bg-[var(--color-surface)] p-3 rounded-lg border border-white/5">
-      <div className="text-xs text-white/50 font-medium mb-2">Velocity Trend</div>
+      <div className="flex justify-between items-center mb-2">
+        <div className="text-xs text-white/50 font-medium">Velocity Trend</div>
+        <div className="text-[10px] text-white/30">avg {avgPts.toFixed(1)}pt · <span className={trendColor}>{trend}</span></div>
+      </div>
       <ResponsiveContainer width="100%" height={120}>
         <AreaChart data={data}>
           <XAxis dataKey="sprint" tick={{ fill: "var(--color-chart-axis)", fontSize: 9 }} axisLine={false} tickLine={false} />

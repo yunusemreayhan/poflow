@@ -179,7 +179,9 @@ function SprintView({ id, onBack }: { id: number; onBack: () => void }) {
   const [detail, setDetail] = useState<SprintDetail | null>(null);
   const [board, setBoard] = useState<SprintBoard | null>(null);
   const [loading, setLoading] = useState(true);
+  // BL4: Auto-select backlog tab for planning sprints
   const [tab, setTab] = useState<"board" | "backlog" | "burns" | "burndown" | "summary">("board");
+  useEffect(() => { if (detail?.sprint.status === "planning") setTab("backlog"); }, [detail?.sprint.status]);
   const [rootIds, setRootIds] = useState<number[]>([]);
   const [wipLimit, setWipLimit] = useState(() => Number(localStorage.getItem(`wip_${id}`) || 5));
   const allTasks = useStore(s => s.tasks);
