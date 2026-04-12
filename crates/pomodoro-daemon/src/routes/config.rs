@@ -16,6 +16,8 @@ pub async fn update_config(State(engine): State<AppState>, claims: Claims, Json(
     if cfg.daily_goal > 50 { return Err(err(StatusCode::BAD_REQUEST, "daily_goal must be 0-50")); }
     if !["hours", "points"].contains(&cfg.estimation_mode.as_str()) { return Err(err(StatusCode::BAD_REQUEST, "estimation_mode must be 'hours' or 'points'")); }
     if !["dark", "light"].contains(&cfg.theme.as_str()) { return Err(err(StatusCode::BAD_REQUEST, "theme must be 'dark' or 'light'")); }
+    // BL2/V1: Validate auto_archive_days (0 = disabled, 1-3650 = active)
+    if cfg.auto_archive_days > 3650 { return Err(err(StatusCode::BAD_REQUEST, "auto_archive_days must be 0-3650")); }
     // Save per-user overrides
     let uc = db::UserConfig {
         user_id: claims.user_id,

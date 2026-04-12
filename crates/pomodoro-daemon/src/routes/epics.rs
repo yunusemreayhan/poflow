@@ -89,7 +89,10 @@ pub async fn get_sprint_root_tasks(State(engine): State<AppState>, _claims: Clai
 pub async fn add_sprint_root_tasks(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>, Json(req): Json<EpicGroupTasksRequest>) -> Result<StatusCode, ApiError> {
     let sprint = db::get_sprint(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Sprint not found"))?;
     if !is_owner_or_root(sprint.created_by_id, &claims) { return Err(err(StatusCode::FORBIDDEN, "Not sprint owner")); }
-    for tid in req.task_ids { db::add_sprint_root_task(&engine.pool, id, tid).await.map_err(internal)?; }
+    for tid in &req.task_ids {
+        db::add_sprint_root_task(&engine.pool, id, *tid).await
+            .map_err(|e| if e.to_string().contains("FOREIGN KEY") { err(StatusCode::BAD_REQUEST, &format!("Task {} not found", tid)) } else { internal(e) })?;
+    }
     engine.notify(ChangeEvent::Sprints);
     Ok(StatusCode::NO_CONTENT)
 }

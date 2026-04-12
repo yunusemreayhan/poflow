@@ -47,6 +47,9 @@ pub async fn export_tasks(State(engine): State<AppState>, claims: Claims, Query(
 pub async fn export_sessions(State(engine): State<AppState>, claims: Claims, Query(q): Query<ExportQuery>) -> Result<axum::response::Response, ApiError> {
     let from = q.from.as_deref().unwrap_or("2000-01-01");
     let to = q.to.as_deref().unwrap_or("2099-12-31");
+    // V3: Validate date format
+    if chrono::NaiveDate::parse_from_str(from, "%Y-%m-%d").is_err() { return Err(err(StatusCode::BAD_REQUEST, "Invalid 'from' date format (expected YYYY-MM-DD)")); }
+    if chrono::NaiveDate::parse_from_str(to, "%Y-%m-%d").is_err() { return Err(err(StatusCode::BAD_REQUEST, "Invalid 'to' date format (expected YYYY-MM-DD)")); }
     let user_filter = if claims.role == "root" { None } else { Some(claims.user_id) };
     let sessions = db::get_history(&engine.pool, from, to, user_filter).await.map_err(internal)?;
     let fmt = q.format.as_deref().unwrap_or("csv");
