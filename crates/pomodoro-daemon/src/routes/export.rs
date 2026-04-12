@@ -174,6 +174,12 @@ pub struct ImportJsonTask {
 #[utoipa::path(post, path = "/api/import/tasks/json", responses((status = 200)), security(("bearer" = [])))]
 pub async fn import_tasks_json(State(engine): State<AppState>, claims: Claims, Json(req): Json<ImportJsonRequest>) -> ApiResult<serde_json::Value> {
     if req.tasks.len() > 500 { return Err(err(StatusCode::BAD_REQUEST, "Too many tasks (max 500)")); }
+    // V2: Count total tasks including children
+    fn count_tasks(tasks: &[ImportJsonTask]) -> usize {
+        tasks.iter().map(|t| 1 + t.children.as_ref().map(|c| count_tasks(c)).unwrap_or(0)).sum()
+    }
+    let total = count_tasks(&req.tasks);
+    if total > 2000 { return Err(err(StatusCode::BAD_REQUEST, format!("Too many total tasks including children ({}, max 2000)", total))); }
     let mut created = 0i64;
     let mut tx = engine.pool.begin().await.map_err(internal)?;
     async fn import_tree(tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>, user_id: i64, tasks: &[ImportJsonTask], parent_id: Option<i64>, created: &mut i64, depth: u32) -> Result<(), String> {

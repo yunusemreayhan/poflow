@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { apiCall } from "../store/api";
 import { useStore } from "../store/store";
 import { matchSearch } from "../utils";
@@ -109,6 +109,7 @@ export function BoardView({ board, reload, wipLimit: wipLimitProp }: { board: Sp
 export function BacklogView({ sprintId, taskIds, reload, capacityHours, tasks: sprintTasks }: { sprintId: number; taskIds: Set<number>; reload: () => void; capacityHours?: number | null; tasks?: Task[] }) {
   const leafOnly = useStore(s => s.config?.leaf_only_mode ?? false);
   const tasks = useStore(s => s.tasks);
+  const taskMap = useMemo(() => new Map(tasks.map(t => [t.id, t])), [tasks]);
   const [rootIds, setRootIds] = useState<number[]>([]);
   const [scopeIds, setScopeIds] = useState<Set<number> | null>(null);
   const [rootSearch, setRootSearch] = useState("");
@@ -155,7 +156,7 @@ export function BacklogView({ sprintId, taskIds, reload, capacityHours, tasks: s
       <div className="space-y-1">
         <div className="text-xs text-white/50 font-medium">Sprint Scope (root tasks)</div>
         {rootIds.map(rid => {
-          const t = tasks.find(tk => tk.id === rid);
+          const t = taskMap.get(rid);
           return t ? (
             <div key={rid} className="flex items-center gap-2 text-xs text-white/70">
               <span className="flex-1 truncate">{t.title}</span>

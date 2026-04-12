@@ -26,6 +26,7 @@ export default function Sprints() {
   const currentUser = useStore(s => s.username);
   const [loading, setLoading] = useState(true);
   const rootTasks = allTasks.filter(t => t.parent_id === null);
+  const taskMap = useMemo(() => new Map(allTasks.map(t => [t.id, t])), [allTasks]);
 
   // BL2: Count user's tasks per sprint
   const myTasksPerSprint = useMemo(() => {
@@ -110,7 +111,7 @@ export default function Sprints() {
           <div className="space-y-1">
             <div className="text-xs text-white/40">Scope to root tasks (optional):</div>
             {createRoots.map(rid => {
-              const t = allTasks.find(tk => tk.id === rid);
+              const t = taskMap.get(rid);
               return t ? (
                 <div key={rid} className="flex items-center gap-2 text-xs text-white/70">
                   <span className="flex-1 truncate">{t.title}</span>
@@ -185,6 +186,7 @@ function SprintView({ id, onBack }: { id: number; onBack: () => void }) {
   const [rootIds, setRootIds] = useState<number[]>([]);
   const [wipLimit, setWipLimit] = useState(() => Number(localStorage.getItem(`wip_${id}`) || 5));
   const allTasks = useStore(s => s.tasks);
+  const taskMap = useMemo(() => new Map(allTasks.map(t => [t.id, t])), [allTasks]);
 
   const load = useCallback(async () => {
     const [d, b, r] = await Promise.all([
@@ -306,7 +308,7 @@ function SprintView({ id, onBack }: { id: number; onBack: () => void }) {
         <div className="flex gap-1 flex-wrap">
           <span className="text-[10px] text-white/30">Scope:</span>
           {rootIds.map(rid => {
-            const t = allTasks.find(tk => tk.id === rid);
+            const t = taskMap.get(rid);
             return t ? <span key={rid} className="text-[10px] bg-white/5 px-1.5 py-0.5 rounded text-white/50">{t.title}</span> : null;
           })}
         </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { apiCall } from "../store/api";
 import { useStore } from "../store/store";
 import { matchSearch } from "../utils";
@@ -16,6 +16,7 @@ export default function EpicBurndown() {
   const [open, setOpen] = useState(false);
   const [epicSearch, setEpicSearch] = useState("");
   const tasks = useStore(s => s.tasks);
+  const taskMap = useMemo(() => new Map(tasks.map(t => [t.id, t])), [tasks]);
 
   const loadGroups = useCallback(async () => {
     const d = await apiCall<EpicGroup[]>("GET", "/api/epics");
@@ -111,7 +112,7 @@ export default function EpicBurndown() {
           <div className="space-y-1">
             <div className="text-xs text-white/40">Root tasks in group:</div>
             {detail.task_ids.map(tid => {
-              const t = tasks.find(tk => tk.id === tid);
+              const t = taskMap.get(tid);
               return t ? (
                 <div key={tid} className="flex items-center gap-2 text-xs text-white/70">
                   <span className="flex-1 truncate">{t.title}</span>
