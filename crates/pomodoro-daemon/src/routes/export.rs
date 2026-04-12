@@ -150,6 +150,8 @@ pub async fn import_tasks_csv(State(engine): State<AppState>, claims: Claims, Js
         let description = idx_description.and_then(|i| cols.get(i)).map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
         let tags = idx_tags.and_then(|i| cols.get(i)).map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
         let due_date = idx_due_date.and_then(|i| cols.get(i)).map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
+        // B3/V1: Validate due_date format
+        if let Some(ref d) = due_date { if !valid_date(d) { errors.push(format!("Line {}: invalid due_date '{}'", i + 2, d)); continue; } }
         let now = db::now_str();
         if let Err(e) = sqlx::query("INSERT INTO tasks (user_id, title, description, project, tags, priority, estimated, actual, estimated_hours, remaining_points, due_date, status, sort_order, created_at, updated_at) VALUES (?,?,?,?,?,?,?,0,0.0,0.0,?,'backlog',0,?,?)")
             .bind(claims.user_id).bind(&title).bind(description.as_deref()).bind(project.as_deref()).bind(tags.as_deref()).bind(priority).bind(estimated).bind(due_date.as_deref()).bind(&now).bind(&now)

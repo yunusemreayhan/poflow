@@ -28,7 +28,7 @@ pub async fn duplicate_task(State(engine): State<AppState>, claims: Claims, Path
     Ok((StatusCode::CREATED, Json(t)))
 }
 
-fn valid_date(s: &str) -> bool {
+pub(super) fn valid_date(s: &str) -> bool {
     chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").is_ok()
 }
 
