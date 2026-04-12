@@ -95,6 +95,9 @@ interface Store {
   confirmDialog: { msg: string; onConfirm: () => void; confirmLabel?: string } | null;
   showConfirm: (msg: string, onConfirm: () => void, confirmLabel?: string) => void;
   dismissConfirm: () => void;
+  // Focus mode
+  focusMode: boolean;
+  toggleFocusMode: () => void;
 }
 
 export const useStore = create<Store>((set, get) => ({
@@ -131,6 +134,8 @@ export const useStore = create<Store>((set, get) => ({
   confirmDialog: null,
   showConfirm: (msg, onConfirm, confirmLabel) => set({ confirmDialog: { msg, onConfirm, confirmLabel } }),
   dismissConfirm: () => set({ confirmDialog: null }),
+  focusMode: false,
+  toggleFocusMode: () => set(s => ({ focusMode: !s.focusMode })),
 
   setTab: (tab) => set({ activeTab: tab }),
 

@@ -141,7 +141,7 @@ function Sidebar() {
 }
 
 export default function App() {
-  const { activeTab, poll, loadTasks, connected, token, toasts, dismissToast, confirmDialog, dismissConfirm, loading } = useStore();
+  const { activeTab, poll, loadTasks, connected, token, toasts, dismissToast, confirmDialog, dismissConfirm, loading, focusMode } = useStore();
   const t = useT();
 
   useEffect(() => {
@@ -251,6 +251,10 @@ export default function App() {
           e.preventDefault();
           document.getElementById("task-search")?.focus();
         }
+        if (e.key === "F11") {
+          e.preventDefault();
+          store.toggleFocusMode();
+        }
       }
     };
     window.addEventListener("keydown", handler);
@@ -284,10 +288,15 @@ export default function App() {
       <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:top-2 focus:left-2 focus:px-4 focus:py-2 focus:bg-[var(--color-accent)] focus:text-white focus:rounded-lg focus:text-sm">
         {t.skipToContent}
       </a>
-      <nav aria-label="Main navigation">
+      <nav aria-label="Main navigation" style={{ display: focusMode ? "none" : undefined }}>
         <Sidebar />
       </nav>
       <main id="main-content" className="flex-1 overflow-hidden relative">
+        {focusMode && (
+          <button onClick={() => useStore.getState().toggleFocusMode()}
+            className="absolute top-2 right-2 z-50 text-xs text-white/30 hover:text-white/60 px-2 py-1 rounded bg-white/5"
+            title="Exit focus mode (F11)">✕ Exit Focus</button>
+        )}
         {/* Loading indicator */}
         {(loading.tasks || loading.history || loading.stats || loading.config) && (
           <div className="absolute top-0 left-0 right-0 h-0.5 z-40 bg-[var(--color-accent)]/20 overflow-hidden">
@@ -303,13 +312,13 @@ export default function App() {
             transition={{ duration: 0.15 }}
             className="h-full overflow-y-auto"
           >
-            {activeTab === "timer" && <Timer />}
-            <div style={{ display: activeTab === "tasks" ? undefined : "none" }}><TaskList /></div>
-            {activeTab === "sprints" && <Sprints />}
-            {activeTab === "rooms" && <Rooms />}
-            {activeTab === "history" && <History />}
-            {activeTab === "api" && <ApiReference />}
-            {activeTab === "settings" && <Settings />}
+            {(focusMode || activeTab === "timer") && <Timer />}
+            <div style={{ display: !focusMode && activeTab === "tasks" ? undefined : "none" }}><TaskList /></div>
+            {!focusMode && activeTab === "sprints" && <Sprints />}
+            {!focusMode && activeTab === "rooms" && <Rooms />}
+            {!focusMode && activeTab === "history" && <History />}
+            {!focusMode && activeTab === "api" && <ApiReference />}
+            {!focusMode && activeTab === "settings" && <Settings />}
           </motion.div>
         </AnimatePresence>
 
