@@ -126,7 +126,7 @@ pub async fn carryover_sprint(State(engine): State<AppState>, claims: Claims, Pa
     let incomplete: Vec<i64> = tasks.iter().filter(|t| t.status != "completed" && t.status != "archived").map(|t| t.id).collect();
     if incomplete.is_empty() { return Err(err(StatusCode::BAD_REQUEST, "No incomplete tasks to carry over")); }
     let new_name = format!("{} (carry-over)", sprint.name);
-    let new_sprint = db::create_sprint(&engine.pool, claims.user_id, &new_name, sprint.project.as_deref(), None, None, None, sprint.capacity_hours).await.map_err(internal)?;
+    let new_sprint = db::create_sprint(&engine.pool, claims.user_id, &new_name, sprint.project.as_deref(), None, sprint.start_date.as_deref(), sprint.end_date.as_deref(), sprint.capacity_hours).await.map_err(internal)?;
     db::add_sprint_tasks(&engine.pool, new_sprint.id, &incomplete, claims.user_id).await.map_err(internal)?;
     engine.notify(ChangeEvent::Sprints);
     Ok(Json(new_sprint))

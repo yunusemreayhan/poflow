@@ -4,31 +4,31 @@ Full audit of 56 backend .rs files (6523 LOC), 53 frontend .ts/.tsx files (9261 
 
 ## Security (7 items)
 
-- [ ] **S1.** `health` endpoint computes `migration_version`, `active_timers`, `tasks` heartbeat map, and `db_size` but returns only `{status, db}` — dead code wastes CPU on every health check. Remove the unused computations or gate behind `?verbose=1` with auth.
-- [ ] **S2.** `create_backup` uses `format!("VACUUM INTO '{}'", path_str)` with single-quote escaping — still vulnerable to path injection if `POMODORO_DATA_DIR` contains crafted values. Use parameterized approach or validate path characters.
-- [ ] **S3.** `seed_root_user` creates user "root" with password "root" and bcrypt cost 12 — the default password bypasses `validate_password` (no uppercase/digit). Should generate a random password and print it, or refuse to start without `POMODORO_ROOT_PASSWORD`.
-- [ ] **S4.** `token_hash` truncates SHA-256 to 128 bits (16 bytes) — reduces collision resistance. Use full 256-bit hash for token blocklist keys.
-- [ ] **S5.** Attachment `upload_attachment` reads entire file into memory (`Bytes`) before writing — a 10MB upload holds 10MB in RAM. Use streaming write with `axum::body::Body` to reduce memory pressure.
-- [ ] **S6.** `TaskAttachments` component uses `fetch()` directly with `serverUrl + path` bypassing the Tauri `invoke("api_call")` abstraction — this leaks the auth token to the browser's network layer and bypasses CSRF protection (`x-requested-with` header). Route through Tauri IPC or add the header.
-- [ ] **S7.** `matchSearch` in `utils.ts` accepts regex via `/pattern/` syntax — user-controlled regex can cause ReDoS. Add a timeout or disallow regex in search.
+- [x] **S1.** `health` endpoint computes `migration_version`, `active_timers`, `tasks` heartbeat map, and `db_size` but returns only `{status, db}` — dead code wastes CPU on every health check. Remove the unused computations or gate behind `?verbose=1` with auth.
+- [x] **S2.** `create_backup` uses `format!("VACUUM INTO '{}'", path_str)` with single-quote escaping — still vulnerable to path injection if `POMODORO_DATA_DIR` contains crafted values. Use parameterized approach or validate path characters.
+- [x] **S3.** `seed_root_user` creates user "root" with password "root" and bcrypt cost 12 — the default password bypasses `validate_password` (no uppercase/digit). Should generate a random password and print it, or refuse to start without `POMODORO_ROOT_PASSWORD`.
+- [x] **S4.** `token_hash` truncates SHA-256 to 128 bits (16 bytes) — reduces collision resistance. Use full 256-bit hash for token blocklist keys.
+- [x] **S5.** Attachment `upload_attachment` reads entire file into memory (`Bytes`) before writing — a 10MB upload holds 10MB in RAM. Use streaming write with `axum::body::Body` to reduce memory pressure.
+- [x] **S6.** `TaskAttachments` component uses `fetch()` directly with `serverUrl + path` bypassing the Tauri `invoke("api_call")` abstraction — this leaks the auth token to the browser's network layer and bypasses CSRF protection (`x-requested-with` header). Route through Tauri IPC or add the header.
+- [x] **S7.** `matchSearch` in `utils.ts` accepts regex via `/pattern/` syntax — user-controlled regex can cause ReDoS. Add a timeout or disallow regex in search.
 
 ## Bugs (18 items)
 
-- [ ] **B1.** `App.tsx` — `timerRunning` is declared inside `App()` but referenced in `Sidebar()` which is a separate component — `timerRunning` is not in scope for `Sidebar`. The sidebar timer indicator dot never shows.
-- [ ] **B2.** `kick_member` in rooms.rs doesn't call `engine.notify(ChangeEvent::Rooms)` — kicked user's UI won't update until next poll.
+- [x] **B1.** `App.tsx` — `timerRunning` is declared inside `App()` but referenced in `Sidebar()` which is a separate component — `timerRunning` is not in scope for `Sidebar`. The sidebar timer indicator dot never shows.
+- [x] **B2.** `kick_member` in rooms.rs doesn't call `engine.notify(ChangeEvent::Rooms)` — kicked user's UI won't update until next poll.
 - [ ] **B3.** `delete_user` reassigns `audit_log.user_id` to root but the `audit_log` JOIN in `list_audit` uses `JOIN users u ON a.user_id = u.id` — if no other root exists (edge case: deleting second-to-last root), the UPDATE subquery returns NULL and the INSERT fails.
-- [ ] **B4.** `carryover_sprint` creates a new sprint but doesn't copy `start_date`/`end_date` — the carry-over sprint has no dates, making burndown charts useless.
-- [ ] **B5.** `export_tasks` CSV doesn't include `description` column — data loss on round-trip import/export since `import_tasks_csv` also doesn't handle description.
-- [ ] **B6.** `TemplateManager` passes `data` as a string (`JSON.stringify({title, priority, estimated})`) but `CreateTemplateRequest` expects `data: serde_json::Value` — the backend receives a JSON string instead of a JSON object, causing double-encoding.
-- [ ] **B7.** `CommentSection` uses `confirm("Delete this comment?")` — native dialog, inconsistent with the rest of the app which uses `showConfirm`.
-- [ ] **B8.** `TaskAttachments` uses `confirm("Delete this attachment?")` — same native dialog issue.
-- [ ] **B9.** `Rooms` component uses `confirm("Delete this room?")` — same native dialog issue.
-- [ ] **B10.** `purge_task` only deletes the target task but not its soft-deleted descendants — orphaned child tasks remain in DB with `deleted_at` set but parent gone.
+- [x] **B4.** `carryover_sprint` creates a new sprint but doesn't copy `start_date`/`end_date` — the carry-over sprint has no dates, making burndown charts useless.
+- [x] **B5.** `export_tasks` CSV doesn't include `description` column — data loss on round-trip import/export since `import_tasks_csv` also doesn't handle description.
+- [x] **B6.** `TemplateManager` passes `data` as a string (`JSON.stringify({title, priority, estimated})`) but `CreateTemplateRequest` expects `data: serde_json::Value` — the backend receives a JSON string instead of a JSON object, causing double-encoding.
+- [x] **B7.** `CommentSection` uses `confirm("Delete this comment?")` — native dialog, inconsistent with the rest of the app which uses `showConfirm`.
+- [x] **B8.** `TaskAttachments` uses `confirm("Delete this attachment?")` — same native dialog issue.
+- [x] **B9.** `Rooms` component uses `confirm("Delete this room?")` — same native dialog issue.
+- [x] **B10.** `purge_task` only deletes the target task but not its soft-deleted descendants — orphaned child tasks remain in DB with `deleted_at` set but parent gone.
 - [ ] **B11.** `update_task` fetches the full task via `get_task` (with JOIN) just to read current values for the UPDATE — wasteful when only changing one field. Not a correctness bug but causes unnecessary DB load.
 - [ ] **B12.** `get_room_state` fetches all room votes with `LIMIT 500` but doesn't filter by `deleted_at IS NULL` on the tasks JOIN — vote history may reference soft-deleted tasks.
 - [ ] **B13.** `list_tasks_paged` with `assignee` filter uses JOIN but the `count_tasks` equivalent also JOINs — if a task has multiple assignees matching the same username (impossible due to PK), count would be wrong. Not a real bug but the JOIN pattern differs from the non-assignee path.
 - [ ] **B14.** `SprintParts.tsx` `Column` component has `useCallback` that captures `touchDrag` state — stale closure on touch drag operations (carried from v17 B17).
-- [ ] **B15.** `recurrence` processing in `main.rs` uses `today` for idempotency check (`last_created == today`) but `today` is computed once at loop start — if the loop runs across midnight, it uses stale date.
+- [x] **B15.** `recurrence` processing in `main.rs` uses `today` for idempotency check (`last_created == today`) but `today` is computed once at loop start — if the loop runs across midnight, it uses stale date.
 - [ ] **B16.** `get_user_id_by_username` returns `Result<i64>` but callers in `kick_member` and `add_assignee` map the error to NOT_FOUND — if the DB connection fails, the user gets "User not found" instead of a 500.
 - [ ] **B17.** `image` preview in `TaskAttachments` uses `useStore.getState().serverUrl` directly in `<img src>` — no auth header, so the image request will fail with 401 if the server requires auth on attachment downloads.
 - [ ] **B18.** `due_date` reminder loop in `main.rs` only notifies via desktop notification (`notify_due_task`) but doesn't create in-app notifications — users who disable desktop notifications miss due date warnings entirely.

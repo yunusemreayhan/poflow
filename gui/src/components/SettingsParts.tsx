@@ -16,15 +16,16 @@ export function TemplateManager() {
 
   const create = async () => {
     if (!name.trim()) return;
-    const data = JSON.stringify({ title, priority, estimated });
+    const data = { title, priority, estimated };
     await apiCall("POST", "/api/templates", { name: name.trim(), data });
     setName(""); setTitle(""); load();
   };
 
-  const del = async (id: number) => {
-    if (!confirm("Delete this template?")) return;
-    await apiCall("DELETE", `/api/templates/${id}`);
-    load();
+  const del = (id: number) => {
+    useStore.getState().showConfirm("Delete this template?", async () => {
+      await apiCall("DELETE", `/api/templates/${id}`);
+      load();
+    });
   };
 
   const apply = async (t: Template) => {
@@ -84,10 +85,11 @@ export function WebhookManager() {
     setUrl(""); load();
   };
 
-  const del = async (id: number) => {
-    if (!confirm("Delete this webhook?")) return;
-    await apiCall("DELETE", `/api/webhooks/${id}`);
-    load();
+  const del = (id: number) => {
+    useStore.getState().showConfirm("Delete this webhook?", async () => {
+      await apiCall("DELETE", `/api/webhooks/${id}`);
+      load();
+    });
   };
 
   return (
@@ -175,10 +177,11 @@ export function TrashView() {
     useStore.getState().loadTasks();
   };
 
-  const purge = async (id: number) => {
-    if (!confirm("Permanently delete this task? This cannot be undone.")) return;
-    await apiCall("DELETE", `/api/tasks/${id}/permanent`);
-    setTasks(prev => prev.filter(t => t.id !== id));
+  const purge = (id: number) => {
+    useStore.getState().showConfirm("Permanently delete this task? This cannot be undone.", async () => {
+      await apiCall("DELETE", `/api/tasks/${id}/permanent`);
+      setTasks(prev => prev.filter(t => t.id !== id));
+    });
   };
 
   if (loading) return <div className="text-xs text-white/40">Loading...</div>;

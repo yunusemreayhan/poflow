@@ -72,6 +72,7 @@ pub async fn kick_member(State(engine): State<AppState>, claims: Claims, Path((i
     let uid = db::get_user_id_by_username(&engine.pool, &username).await.map_err(|_| err(StatusCode::NOT_FOUND, "User not found"))?;
     if uid == claims.user_id { return Err(err(StatusCode::BAD_REQUEST, "Cannot kick yourself")); }
     db::leave_room(&engine.pool, id, uid).await.map_err(internal)?;
+    engine.notify(crate::engine::ChangeEvent::Rooms);
     Ok(StatusCode::NO_CONTENT)
 }
 

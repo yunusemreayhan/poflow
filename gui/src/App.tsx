@@ -30,6 +30,7 @@ function Sidebar() {
   const { activeTab, setTab, connected, username, logout, activeTeamId, setActiveTeam } = useStore();
   const t = useT();
   const config = useStore(s => s.config);
+  const timerRunning = useStore(s => s.engine?.status === "Running");
   const [theme, setThemeLocal] = useState(() => localStorage.getItem("theme") || "dark");
   const [teams, setTeams] = useState<{ id: number; name: string }[]>([]);
 

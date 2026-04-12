@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Eye, Check, Crown, Trash2, Plus, X, Edit3 } from "lucide-react";
 import { apiCall } from "../store/api";
+import { useStore } from "../store/store";
 import type { Room } from "../store/api";
 import { useStore } from "../store/store";
 import TaskList from "./TaskList";
@@ -33,10 +34,11 @@ function RoomList({ onSelect }: { onSelect: (id: number) => void }) {
     onSelect(room.id);
   };
 
-  const remove = async (id: number) => {
-    if (!confirm("Delete this room? This cannot be undone.")) return;
-    await apiCall("DELETE", `/api/rooms/${id}`);
-    load();
+  const remove = (id: number) => {
+    useStore.getState().showConfirm("Delete this room? This cannot be undone.", async () => {
+      await apiCall("DELETE", `/api/rooms/${id}`);
+      load();
+    });
   };
 
   const [showClosed, setShowClosed] = useState(false);
