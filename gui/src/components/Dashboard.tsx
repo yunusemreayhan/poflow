@@ -1,10 +1,12 @@
 import { useStore } from "../store/store";
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 
 export default function Dashboard() {
   const { tasks, stats, sprints } = useStore();
 
-  const today = new Date().toISOString().slice(0, 10);
+  // B2: Recompute today every minute to handle midnight rollover
+  const [today, setToday] = useState(() => new Date().toISOString().slice(0, 10));
+  useEffect(() => { const id = setInterval(() => setToday(new Date().toISOString().slice(0, 10)), 60000); return () => clearInterval(id); }, []);
   const todayStats = stats.find(s => s.date === today);
   const activeSprint = sprints.find(s => s.status === "active");
   const overdue = useMemo(() => tasks.filter(t => t.due_date && t.due_date < today && t.status !== "completed" && t.status !== "archived"), [tasks, today]);

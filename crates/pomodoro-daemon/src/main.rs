@@ -52,6 +52,10 @@ use utoipa_swagger_ui::SwaggerUi;
         routes::list_attachments, routes::upload_attachment, routes::download_attachment, routes::delete_attachment,
         routes::list_templates, routes::create_template, routes::delete_template,
         routes::refresh_token,
+        routes::update_session_note,
+        routes::carryover_sprint,
+        routes::export_room_history,
+        routes::import_tasks_json,
     ),
     components(schemas(
         db::Task, db::Session, db::Comment, db::User, db::TaskDetail, db::SessionWithPath, db::DayStat, db::TaskAssignee,

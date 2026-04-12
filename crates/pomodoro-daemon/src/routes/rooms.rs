@@ -148,7 +148,13 @@ pub async fn close_room(State(engine): State<AppState>, claims: Claims, Path(id)
 
 
 // F8: Export room estimation history as JSON
-pub async fn export_room_history(State(engine): State<AppState>, _claims: Claims, Path(id): Path<i64>) -> Result<axum::response::Response, ApiError> {
+#[utoipa::path(get, path = "/api/rooms/{id}/export", responses((status = 200)), security(("bearer" = [])))]
+pub async fn export_room_history(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>) -> Result<axum::response::Response, ApiError> {
+    // B4: Verify room membership
+    let members = db::get_room_members(&engine.pool, id).await.map_err(internal)?;
+    if !members.iter().any(|m| m.user_id == claims.user_id) && claims.role != "root" {
+        return Err(err(StatusCode::FORBIDDEN, "Not a room member"));
+    }
     let state = db::get_room_state(&engine.pool, id).await.map_err(internal)?;
     let body = serde_json::to_vec(&state.vote_history).map_err(internal)?;
     Ok(axum::response::Response::builder()

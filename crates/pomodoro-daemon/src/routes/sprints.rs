@@ -99,10 +99,10 @@ pub async fn complete_sprint(State(engine): State<AppState>, claims: Claims, Pat
 }
 
 // F5: Sprint carry-over — move incomplete tasks to a new sprint
+#[utoipa::path(post, path = "/api/sprints/{id}/carryover", responses((status = 200, body = db::Sprint)), security(("bearer" = [])))]
 pub async fn carryover_sprint(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>) -> ApiResult<db::Sprint> {
-    let sprint = db::get_sprint(&engine.pool, id).await.map_err(internal)?;
+    let sprint = get_owned_sprint(&engine.pool, id, &claims).await?;
     if sprint.status != "completed" { return Err(err(StatusCode::BAD_REQUEST, "Sprint must be completed first")); }
-    if !is_owner_or_root(sprint.created_by_id, &claims) { return Err(err(StatusCode::FORBIDDEN, "Not owner")); }
     let tasks = db::get_sprint_tasks(&engine.pool, id).await.map_err(internal)?;
     let incomplete: Vec<i64> = tasks.iter().filter(|t| t.status != "completed" && t.status != "archived").map(|t| t.id).collect();
     if incomplete.is_empty() { return Err(err(StatusCode::BAD_REQUEST, "No incomplete tasks to carry over")); }
@@ -123,14 +123,16 @@ pub async fn add_sprint_tasks(State(engine): State<AppState>, claims: Claims, Pa
     get_owned_sprint(&engine.pool, id, &claims).await?;
     if req.task_ids.len() > 500 { return Err(err(StatusCode::BAD_REQUEST, "Too many task IDs (max 500)")); }
     if req.task_ids.is_empty() { return Err(err(StatusCode::BAD_REQUEST, "task_ids cannot be empty")); }
+    // V2: Deduplicate task IDs
+    let task_ids: Vec<i64> = req.task_ids.iter().copied().collect::<std::collections::HashSet<_>>().into_iter().collect();
     // Batch validate all tasks exist and are not soft-deleted
-    let ph = req.task_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+    let ph = task_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
     let q = format!("SELECT COUNT(*) FROM tasks WHERE id IN ({}) AND deleted_at IS NULL", ph);
     let mut query = sqlx::query_as::<_, (i64,)>(&q);
-    for id in &req.task_ids { query = query.bind(id); }
+    for id in &task_ids { query = query.bind(id); }
     let (found,): (i64,) = query.fetch_one(&engine.pool).await.map_err(internal)?;
-    if found != req.task_ids.len() as i64 { return Err(err(StatusCode::NOT_FOUND, "One or more tasks not found")); }
-    let result = db::add_sprint_tasks(&engine.pool, id, &req.task_ids, claims.user_id).await.map_err(internal)?;
+    if found != task_ids.len() as i64 { return Err(err(StatusCode::NOT_FOUND, "One or more tasks not found")); }
+    let result = db::add_sprint_tasks(&engine.pool, id, &task_ids, claims.user_id).await.map_err(internal)?;
     if db::get_sprint(&engine.pool, id).await.map(|s| s.status == "active").unwrap_or(false) {
         if let Err(e) = db::snapshot_sprint(&engine.pool, id).await { tracing::warn!("Snapshot failed: {}", e); }
     }

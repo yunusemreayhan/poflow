@@ -137,6 +137,9 @@ pub async fn create_sse_ticket(claims: Claims) -> ApiResult<serde_json::Value> {
     if tickets.len() > 50 {
         tickets.retain(|_, (_, t)| now.duration_since(*t).as_secs() < 30);
     }
+    // S1: Limit active tickets per user to prevent ticket pool exhaustion
+    let user_tickets = tickets.values().filter(|(uid, t)| *uid == claims.user_id && now.duration_since(*t).as_secs() < 30).count();
+    if user_tickets >= 5 { return Err(err(StatusCode::TOO_MANY_REQUESTS, "Too many active tickets")); }
     tickets.insert(ticket.clone(), (claims.user_id, now));
     Ok(Json(serde_json::json!({ "ticket": ticket })))
 }

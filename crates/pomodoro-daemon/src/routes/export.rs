@@ -131,30 +131,36 @@ pub async fn import_tasks_csv(State(engine): State<AppState>, claims: Claims, Js
 }
 
 // F4: JSON task import
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 pub struct ImportJsonRequest { pub tasks: Vec<ImportJsonTask> }
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 pub struct ImportJsonTask {
     pub title: String, pub description: Option<String>, pub project: Option<String>,
-    pub priority: Option<i64>, pub estimated: Option<i64>, pub children: Option<Vec<ImportJsonTask>>,
+    pub priority: Option<i64>, pub estimated: Option<i64>,
+    #[schema(no_recursion)]
+    pub children: Option<Vec<ImportJsonTask>>,
 }
 
+#[utoipa::path(post, path = "/api/import/tasks/json", responses((status = 200)), security(("bearer" = [])))]
 pub async fn import_tasks_json(State(engine): State<AppState>, claims: Claims, Json(req): Json<ImportJsonRequest>) -> ApiResult<serde_json::Value> {
     if req.tasks.len() > 500 { return Err(err(StatusCode::BAD_REQUEST, "Too many tasks (max 500)")); }
     let mut created = 0i64;
-    async fn import_tree(pool: &db::Pool, user_id: i64, tasks: &[ImportJsonTask], parent_id: Option<i64>, created: &mut i64) -> Result<(), String> {
+    async fn import_tree(pool: &db::Pool, user_id: i64, tasks: &[ImportJsonTask], parent_id: Option<i64>, created: &mut i64, depth: u32) -> Result<(), String> {
+        if depth > 20 { return Err("Max nesting depth (20) exceeded".to_string()); }
         for t in tasks {
+            if t.title.trim().is_empty() { return Err("Title cannot be empty".to_string()); }
+            if t.title.len() > 500 { return Err(format!("Title too long: {}", &t.title[..50])); }
             let task = db::create_task(pool, user_id, parent_id, &t.title, t.description.as_deref(), t.project.as_deref(), None, t.priority.unwrap_or(3).clamp(1, 5), t.estimated.unwrap_or(0), 0.0, 0.0, None)
                 .await.map_err(|e| e.to_string())?;
             *created += 1;
             if let Some(children) = &t.children {
-                Box::pin(import_tree(pool, user_id, children, Some(task.id), created)).await?;
+                Box::pin(import_tree(pool, user_id, children, Some(task.id), created, depth + 1)).await?;
             }
         }
         Ok(())
     }
     let mut errors = Vec::new();
-    if let Err(e) = import_tree(&engine.pool, claims.user_id, &req.tasks, None, &mut created).await {
+    if let Err(e) = import_tree(&engine.pool, claims.user_id, &req.tasks, None, &mut created, 0).await {
         errors.push(e);
     }
     engine.notify(ChangeEvent::Tasks);

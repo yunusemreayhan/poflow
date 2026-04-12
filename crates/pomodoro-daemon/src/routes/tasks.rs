@@ -100,6 +100,7 @@ pub async fn get_task_sessions(State(engine): State<AppState>, _claims: Claims, 
 }
 
 // F7: Update session note
+#[utoipa::path(put, path = "/api/sessions/{id}/note", request_body = UpdateSessionNoteRequest, responses((status = 200, body = db::Session)), security(("bearer" = [])))]
 pub async fn update_session_note(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>, Json(req): Json<UpdateSessionNoteRequest>) -> ApiResult<db::Session> {
     let session = db::get_session(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Session not found"))?;
     if !is_owner_or_root(session.user_id, &claims) { return Err(err(StatusCode::FORBIDDEN, "Not session owner")); }
@@ -136,6 +137,7 @@ pub async fn update_task(State(engine): State<AppState>, claims: Claims, Path(id
             return Err(err(StatusCode::CONFLICT, "Task was modified by another user. Please refresh and try again."));
         }
     }
+    if let Some(Some(wdm)) = req.work_duration_minutes { if wdm < 1 || wdm > 480 { return Err(err(StatusCode::BAD_REQUEST, "work_duration_minutes must be 1-480")); } }
     let t = db::update_task(&engine.pool, id, req.title.as_deref(),
         req.description.as_ref().map(|o| o.as_deref()),
         req.project.as_ref().map(|o| o.as_deref()),

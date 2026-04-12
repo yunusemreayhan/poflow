@@ -185,13 +185,18 @@ export default function TaskList({ selectMode, onSelect, selectedTaskId, votedTa
           <table className="w-full">
             <thead className="sticky top-0 bg-[var(--color-bg)]">
               <tr className="text-white/30 text-left">
-                <th className="py-1 px-2">Title</th><th className="py-1 px-1">Status</th><th className="py-1 px-1">Priority</th>
+                <th className="py-1 px-1 w-6"></th><th className="py-1 px-2">Title</th><th className="py-1 px-1">Status</th><th className="py-1 px-1">Priority</th>
                 <th className="py-1 px-1">Est</th><th className="py-1 px-1">Due</th><th className="py-1 px-1">Owner</th>
               </tr>
             </thead>
             <tbody>
               {sorted.flatMap(function flat(n: TreeNode): TreeNode[] { return [n, ...n.children.flatMap(flat)]; }).map(n => (
                 <tr key={n.task.id} onClick={() => setViewStack([n.task.id])} className="hover:bg-white/5 cursor-pointer border-t border-white/5">
+                  <td className="py-1 px-1 w-6">
+                    {!selectMode && <input type="checkbox" checked={bulkSelected.has(n.task.id)}
+                      onChange={e => { const next = new Set(bulkSelected); if (e.target.checked) next.add(n.task.id); else next.delete(n.task.id); setBulkSelected(next); }}
+                      onClick={e => e.stopPropagation()} className="accent-[var(--color-accent)]" />}
+                  </td>
                   <td className="py-1 px-2 text-white/80 truncate max-w-[200px]">{n.task.title}</td>
                   <td className="py-1 px-1 text-white/40">{n.task.status}</td>
                   <td className="py-1 px-1 text-white/40">P{n.task.priority}</td>

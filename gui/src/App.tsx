@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence, MotionConfig } from "framer-motion";
-import { Timer as TimerIcon, ListTodo, BarChart3, Settings as SettingsIcon, Wifi, WifiOff, Code2, LogOut, Users, Zap, Sun, Moon, RefreshCw } from "lucide-react";
+import { Timer as TimerIcon, ListTodo, BarChart3, Settings as SettingsIcon, Wifi, WifiOff, Code2, LogOut, Users, Zap, Sun, Moon, RefreshCw, LayoutDashboard } from "lucide-react";
 import { useStore } from "./store/store";
 import { useT } from "./i18n";
 import { apiCall } from "./store/api";
@@ -17,7 +17,7 @@ import Sprints from "./components/Sprints";
 
 const TABS = [
   { id: "timer", icon: TimerIcon, labelKey: "timer" },
-  { id: "dashboard", icon: BarChart3, labelKey: "dashboard" },
+  { id: "dashboard", icon: LayoutDashboard, labelKey: "dashboard" },
   { id: "tasks", icon: ListTodo, labelKey: "tasks" },
   { id: "sprints", icon: Zap, labelKey: "sprints" },
   { id: "rooms", icon: Users, labelKey: "rooms" },
