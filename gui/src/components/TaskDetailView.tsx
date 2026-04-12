@@ -19,6 +19,7 @@ function DetailNode({ detail, depth, onRefresh, hoursMap }: { detail: TaskDetail
   const [showSessions, setShowSessions] = useState(false);
   const [showTimeReports, setShowTimeReports] = useState(false);
   const [showVotes, setShowVotes] = useState(false);
+  const [deps, setDeps] = useState<number[]>([]);
   const [taskVotes, setTaskVotes] = useState<{ username: string; value: number | null; room_id: number }[]>([]);
   const [timeReports, setTimeReports] = useState<TimeReport[]>([]);
   const [assignees, setAssignees] = useState<string[]>([]);
@@ -41,6 +42,7 @@ function DetailNode({ detail, depth, onRefresh, hoursMap }: { detail: TaskDetail
       allUsers.length ? Promise.resolve(allUsers) : apiCall<string[]>("GET", "/api/users").catch(() => [] as string[]),
       apiCall<string[]>("GET", `/api/tasks/${t.id}/burn-users`).catch(() => [] as string[]),
     ]).then(([tr, a, u, bu]) => { setTimeReports(tr); setAssignees(a); setAllUsers(u); setBurnUsers(bu); });
+    apiCall<number[]>("GET", `/api/tasks/${t.id}/dependencies`).then(d => d && setDeps(d)).catch(() => {});
   }, [t.id]);
 
   const saveField = (field: string, value: string) => {
@@ -244,6 +246,17 @@ function DetailNode({ detail, depth, onRefresh, hoursMap }: { detail: TaskDetail
             )}
           </div>
         </div>
+
+        {/* U7: Dependencies */}
+        {deps.length > 0 && (
+          <div className="flex items-center gap-2 flex-wrap mb-3">
+            <span className="text-[10px] text-white/30">Blocked by:</span>
+            {deps.map(depId => {
+              const depTask = useStore.getState().tasks.find(t2 => t2.id === depId);
+              return <span key={depId} className="text-xs bg-white/5 px-2 py-0.5 rounded text-white/60">{depTask ? depTask.title : `#${depId}`}</span>;
+            })}
+          </div>
+        )}
 
         {/* Time Reports */}
         <button onClick={() => setShowTimeReports(!showTimeReports)}

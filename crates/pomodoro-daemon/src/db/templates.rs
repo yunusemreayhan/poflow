@@ -25,3 +25,7 @@ pub async fn delete_template(pool: &Pool, id: i64) -> Result<()> {
     sqlx::query("DELETE FROM task_templates WHERE id = ?").bind(id).execute(pool).await?;
     Ok(())
 }
+
+pub async fn get_template(pool: &Pool, id: i64) -> Result<TaskTemplate> {
+    Ok(sqlx::query_as("SELECT * FROM task_templates WHERE id = ?").bind(id).fetch_one(pool).await?)
+}

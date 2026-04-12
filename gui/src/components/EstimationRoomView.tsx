@@ -9,6 +9,9 @@ import TaskList from "./TaskList";
 
 const POINT_CARDS = [0, 0.5, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89];
 const HOUR_CARDS = [0, 0.5, 1, 2, 3, 4, 5, 6, 8, 10, 12, 16, 20, 24, 32, 40];
+const TSHIRT_CARDS = [0, 1, 2, 3, 5, 8]; // XS=1, S=2, M=3, L=5, XL=8
+const TSHIRT_LABELS: Record<number, string> = { 0: "?", 1: "XS", 2: "S", 3: "M", 5: "L", 8: "XL" };
+const CARD_PRESETS: Record<string, number[]> = { points: POINT_CARDS, hours: HOUR_CARDS, mandays: HOUR_CARDS, tshirt: TSHIRT_CARDS };
 
 export default function EstimationRoomView({ roomId, onBack }: { roomId: number; onBack: () => void }) {
   const { username } = useStore();
@@ -59,7 +62,7 @@ export default function EstimationRoomView({ roomId, onBack }: { roomId: number;
 
   const { room, members, current_task, votes, vote_history } = state;
   const isAdmin = members.find(m => m.username === username)?.role === "admin";
-  const cards = room.estimation_unit === "points" ? POINT_CARDS : HOUR_CARDS;
+  const cards = CARD_PRESETS[room.estimation_unit] || POINT_CARDS;
   const myVote = votes.find(v => v.username === username);
   const allVoted = votes.length > 0 && votes.every(v => v.voted);
   const notVoted = votes.filter(v => !v.voted).map(v => v.username);
@@ -230,7 +233,7 @@ export default function EstimationRoomView({ roomId, onBack }: { roomId: number;
                         : myVote?.voted ? "border-white/10 bg-white/5 text-white/30"
                         : "border-white/10 bg-white/5 text-white/70 hover:border-white/30"
                       }`}>
-                      {c}
+                      {room.estimation_unit === "tshirt" ? (TSHIRT_LABELS[c] || c) : c}
                     </motion.button>
                   ))}
                 </div>

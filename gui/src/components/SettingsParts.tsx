@@ -95,8 +95,16 @@ export function WebhookManager() {
       <div className="flex gap-2 mb-2">
         <input value={url} onChange={e => setUrl(e.target.value)} placeholder="https://example.com/hook"
           className="flex-1 bg-white/5 border border-white/10 rounded px-2 py-1 text-xs text-[var(--color-text)] outline-none" />
-        <input value={events} onChange={e => setEvents(e.target.value)} placeholder="* or task.created"
-          className="w-32 bg-white/5 border border-white/10 rounded px-2 py-1 text-xs text-[var(--color-text)] outline-none" />
+        <select value={events} onChange={e => setEvents(e.target.value)}
+          className="w-40 bg-white/5 border border-white/10 rounded px-2 py-1 text-xs text-[var(--color-text)] outline-none">
+          <option value="*">All events</option>
+          <option value="task.created">task.created</option>
+          <option value="task.updated">task.updated</option>
+          <option value="task.deleted">task.deleted</option>
+          <option value="sprint.created">sprint.created</option>
+          <option value="sprint.started">sprint.started</option>
+          <option value="sprint.completed">sprint.completed</option>
+        </select>
         <button onClick={create} className="px-3 py-1 rounded text-xs bg-[var(--color-accent)] text-white">Add</button>
       </div>
       {hooks.map(h => (

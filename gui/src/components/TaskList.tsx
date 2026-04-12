@@ -115,7 +115,7 @@ export default function TaskList({ selectMode, onSelect, selectedTaskId, votedTa
           onKeyDown={(e) => e.key === "Enter" && handleAddRoot()}
           onPaste={(e) => {
             const text = e.clipboardData.getData("text");
-            const lines = text.split("\n").map(l => l.replace(/^[-*•]\s*/, "").trim()).filter(Boolean);
+            const lines = text.split("\n").map(l => l.replace(/^[-*•]\s*/, "").replace(/^- \[[ x]\] /, "").trim()).filter(Boolean);
             if (lines.length > 1) {
               e.preventDefault();
               lines.forEach(l => createTask(l));

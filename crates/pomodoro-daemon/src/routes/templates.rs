@@ -30,3 +30,23 @@ pub async fn delete_template(State(engine): State<AppState>, claims: Claims, Pat
     db::delete_template(&engine.pool, id).await.map_err(internal)?;
     Ok(StatusCode::NO_CONTENT)
 }
+
+// F11: Instantiate template with variable resolution
+#[utoipa::path(post, path = "/api/templates/{id}/instantiate", responses((status = 201)), security(("bearer" = [])))]
+pub async fn instantiate_template(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>) -> Result<(StatusCode, Json<db::Task>), ApiError> {
+    let tmpl = db::get_template(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Template not found"))?;
+    if !is_owner_or_root(tmpl.user_id, &claims) { return Err(err(StatusCode::FORBIDDEN, "Not owner")); }
+    let data: serde_json::Value = serde_json::from_str(&tmpl.data).map_err(internal)?;
+    let today = chrono::Utc::now().naive_utc().format("%Y-%m-%d").to_string();
+    // Resolve variables in title and description
+    let resolve = |s: &str| s.replace("{{today}}", &today).replace("{{username}}", &claims.username);
+    let title = resolve(data["title"].as_str().unwrap_or(&tmpl.name));
+    let desc = data["description"].as_str().map(|s| resolve(s));
+    let project = data["project"].as_str().map(|s| s.to_string());
+    let priority = data["priority"].as_i64().unwrap_or(3);
+    let estimated = data["estimated"].as_i64().unwrap_or(0);
+    let t = db::create_task(&engine.pool, claims.user_id, None, &title, desc.as_deref(), project.as_deref(), None, priority, estimated, 0.0, 0.0, None)
+        .await.map_err(internal)?;
+    engine.notify(ChangeEvent::Tasks);
+    Ok((StatusCode::CREATED, Json(t)))
+}

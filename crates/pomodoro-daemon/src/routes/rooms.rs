@@ -19,7 +19,7 @@ pub async fn create_room(State(engine): State<AppState>, claims: Claims, Json(re
     if req.name.trim().is_empty() { return Err(err(StatusCode::BAD_REQUEST, "Room name cannot be empty")); }
     if req.name.len() > 200 { return Err(err(StatusCode::BAD_REQUEST, "Room name too long (max 200 chars)")); }
     let unit = req.estimation_unit.as_deref().unwrap_or("points");
-    if !["points", "hours", "mandays"].contains(&unit) { return Err(err(StatusCode::BAD_REQUEST, "estimation_unit must be points, hours, or mandays")); }
+    if !["points", "hours", "mandays", "tshirt"].contains(&unit) { return Err(err(StatusCode::BAD_REQUEST, "estimation_unit must be points, hours, mandays, or tshirt")); }
     let room_type = req.room_type.as_deref().unwrap_or("estimation");
     if room_type != "estimation" { return Err(err(StatusCode::BAD_REQUEST, "room_type must be 'estimation'")); }
     // V2: Limit active rooms per user

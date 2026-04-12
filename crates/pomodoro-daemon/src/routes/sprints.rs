@@ -165,6 +165,26 @@ pub async fn get_global_burndown(State(engine): State<AppState>, _claims: Claims
 #[derive(Deserialize)]
 pub struct VelocityQuery { pub sprints: Option<i64> }
 
+// F3: Sprint comparison
+#[derive(Deserialize)]
+pub struct CompareQuery { pub a: i64, pub b: i64 }
+
+#[utoipa::path(get, path = "/api/sprints/compare", responses((status = 200)), security(("bearer" = [])))]
+pub async fn compare_sprints(State(engine): State<AppState>, _claims: Claims, Query(q): Query<CompareQuery>) -> ApiResult<serde_json::Value> {
+    let (a, b) = tokio::join!(
+        db::get_sprint_detail(&engine.pool, q.a),
+        db::get_sprint_detail(&engine.pool, q.b)
+    );
+    let a = a.map_err(|_| err(StatusCode::NOT_FOUND, "Sprint A not found"))?;
+    let b = b.map_err(|_| err(StatusCode::NOT_FOUND, "Sprint B not found"))?;
+    let done_a = a.tasks.iter().filter(|t| t.status == "completed").count();
+    let done_b = b.tasks.iter().filter(|t| t.status == "completed").count();
+    Ok(Json(serde_json::json!({
+        "a": {"id": a.sprint.id, "name": a.sprint.name, "total_tasks": a.tasks.len(), "done_tasks": done_a, "capacity_hours": a.sprint.capacity_hours},
+        "b": {"id": b.sprint.id, "name": b.sprint.name, "total_tasks": b.tasks.len(), "done_tasks": done_b, "capacity_hours": b.sprint.capacity_hours},
+    })))
+}
+
 #[utoipa::path(get, path = "/api/sprints/velocity", responses((status = 200)), security(("bearer" = [])))]
 pub async fn get_velocity(State(engine): State<AppState>, _claims: Claims, Query(q): Query<VelocityQuery>) -> ApiResult<Vec<serde_json::Value>> {
     let n = q.sprints.unwrap_or(10).min(50);

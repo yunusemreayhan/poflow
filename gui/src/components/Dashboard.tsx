@@ -93,6 +93,32 @@ export default function Dashboard() {
           ))}
         </div>
       )}
+
+      {/* F12: Active timers from other users */}
+      <ActiveTimers />
+    </div>
+  );
+}
+
+function ActiveTimers() {
+  const [timers, setTimers] = useState<{ username: string; phase: string; task: string | null; elapsed_s: number; duration_s: number }[]>([]);
+  const username = useStore(s => s.username);
+  useEffect(() => {
+    const load = () => apiCall<typeof timers>("GET", "/api/timer/active").then(d => d && setTimers(d.filter(t => t.username !== username))).catch(() => {});
+    load();
+    const id = setInterval(load, 15000);
+    return () => clearInterval(id);
+  }, [username]);
+  if (timers.length === 0) return null;
+  return (
+    <div className="glass p-3 rounded-lg">
+      <div className="text-xs text-white/40 mb-2">Team Activity</div>
+      {timers.map((t, i) => (
+        <div key={i} className="text-xs text-white/50 flex justify-between">
+          <span>🍅 {t.username}{t.task ? ` — ${t.task}` : ""}</span>
+          <span className="text-white/20">{Math.floor((t.duration_s - t.elapsed_s) / 60)}m left</span>
+        </div>
+      ))}
     </div>
   );
 }

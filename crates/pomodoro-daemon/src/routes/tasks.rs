@@ -18,6 +18,31 @@ fn valid_date(s: &str) -> bool {
     chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").is_ok()
 }
 
+// F1: Search endpoint with highlighted snippets
+#[derive(Deserialize)]
+pub struct SearchQuery { pub q: String, pub limit: Option<i64> }
+
+#[utoipa::path(get, path = "/api/tasks/search", responses((status = 200)), security(("bearer" = [])))]
+pub async fn search_tasks(State(engine): State<AppState>, _claims: Claims, Query(q): Query<SearchQuery>) -> ApiResult<Vec<serde_json::Value>> {
+    if q.q.trim().is_empty() { return Ok(Json(vec![])); }
+    let limit = q.limit.unwrap_or(20).min(100);
+    let results = db::search_tasks_fts(&engine.pool, &q.q, limit).await.map_err(internal)?;
+    Ok(Json(results.into_iter().map(|(id, title, snippet)| serde_json::json!({"id": id, "title": title, "snippet": snippet})).collect()))
+}
+
+// F4: Task time tracking summary
+#[utoipa::path(get, path = "/api/tasks/{id}/time-summary", responses((status = 200)), security(("bearer" = [])))]
+pub async fn get_task_time_summary(State(engine): State<AppState>, _claims: Claims, Path(id): Path<i64>) -> ApiResult<serde_json::Value> {
+    let rows: Vec<(String, f64, i64)> = sqlx::query_as(
+        "SELECT u.username, COALESCE(SUM(s.duration_s),0)/3600.0, COUNT(s.id) \
+         FROM sessions s JOIN users u ON s.user_id = u.id \
+         WHERE s.task_id = ? AND s.status = 'completed' GROUP BY s.user_id ORDER BY SUM(s.duration_s) DESC")
+        .bind(id).fetch_all(&engine.pool).await.map_err(internal)?;
+    let total_hours: f64 = rows.iter().map(|(_, h, _)| h).sum();
+    let by_user: Vec<serde_json::Value> = rows.into_iter().map(|(u, h, c)| serde_json::json!({"username": u, "hours": (h * 100.0).round() / 100.0, "sessions": c})).collect();
+    Ok(Json(serde_json::json!({"task_id": id, "total_hours": (total_hours * 100.0).round() / 100.0, "by_user": by_user})))
+}
+
 #[utoipa::path(get, path = "/api/tasks/trash", responses((status = 200, body = Vec<db::Task>)), security(("bearer" = [])))]
 pub async fn list_deleted_tasks(State(engine): State<AppState>, claims: Claims) -> ApiResult<Vec<db::Task>> {
     let user_filter = if claims.role == "root" { None } else { Some(claims.user_id) };

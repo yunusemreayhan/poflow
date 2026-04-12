@@ -64,6 +64,11 @@ use utoipa_swagger_ui::SwaggerUi;
         routes::health,
         routes::change_password,
         routes::edit_comment,
+        routes::search_tasks,
+        routes::get_task_time_summary,
+        routes::compare_sprints,
+        routes::instantiate_template,
+        routes::get_active_timers,
     ),
     components(schemas(
         db::Task, db::Session, db::Comment, db::User, db::TaskDetail, db::SessionWithPath, db::DayStat, db::TaskAssignee,

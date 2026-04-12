@@ -6,6 +6,29 @@ pub async fn get_state(State(engine): State<AppState>, claims: Claims) -> ApiRes
     Ok(Json(engine.get_state(claims.user_id).await))
 }
 
+// F12: List active timers for all users (team visibility)
+#[utoipa::path(get, path = "/api/timer/active", responses((status = 200)), security(("bearer" = [])))]
+pub async fn get_active_timers(State(engine): State<AppState>, _claims: Claims) -> ApiResult<Vec<serde_json::Value>> {
+    let states = engine.states.lock().await;
+    let mut active = Vec::new();
+    for (uid, s) in states.iter() {
+        if s.status != crate::engine::TimerStatus::Idle {
+            let username: Option<(String,)> = sqlx::query_as("SELECT username FROM users WHERE id = ?")
+                .bind(uid).fetch_optional(&engine.pool).await.unwrap_or(None);
+            let task_title: Option<(String,)> = if let Some(tid) = s.current_task_id {
+                sqlx::query_as("SELECT title FROM tasks WHERE id = ?").bind(tid).fetch_optional(&engine.pool).await.unwrap_or(None)
+            } else { None };
+            active.push(serde_json::json!({
+                "username": username.map(|u| u.0).unwrap_or_default(),
+                "phase": s.phase, "status": s.status,
+                "task": task_title.map(|t| t.0),
+                "elapsed_s": s.elapsed_s, "duration_s": s.duration_s,
+            }));
+        }
+    }
+    Ok(Json(active))
+}
+
 #[utoipa::path(post, path = "/api/timer/start", request_body = StartRequest, responses((status = 200, body = crate::engine::EngineState)), security(("bearer" = [])))]
 pub async fn start(State(engine): State<AppState>, claims: Claims, Json(req): Json<StartRequest>) -> ApiResult<crate::engine::EngineState> {
     let phase = req.phase.as_deref().map(|s| match s { "short_break" => TimerPhase::ShortBreak, "long_break" => TimerPhase::LongBreak, _ => TimerPhase::Work });

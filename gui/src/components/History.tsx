@@ -29,6 +29,9 @@ export default function History() {
   const { stats, loadStats, history, loadHistory } = useStore();
   const [userFilter, setUserFilter] = useState<string>("all");
   const [showCount, setShowCount] = useState(20);
+  // U4: Date range filter
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
 
   useEffect(() => {
     loadStats();
@@ -41,9 +44,12 @@ export default function History() {
     return Array.from(set).sort();
   }, [history]);
 
-  const filteredHistory = useMemo(() =>
-    userFilter === "all" ? history : history.filter((s) => s.user === userFilter),
-  [history, userFilter]);
+  const filteredHistory = useMemo(() => {
+    let h = userFilter === "all" ? history : history.filter((s) => s.user === userFilter);
+    if (dateFrom) h = h.filter(s => s.started_at >= dateFrom);
+    if (dateTo) h = h.filter(s => s.started_at <= dateTo + "T23:59:59");
+    return h;
+  }, [history, userFilter, dateFrom, dateTo]);
 
   // Rebuild stats from filtered history for per-user view
   const filteredStats = useMemo(() => {
@@ -108,6 +114,12 @@ export default function History() {
         {userFilter !== "all" && (
           <span className="text-xs text-white/40">Showing data for @{userFilter}</span>
         )}
+        <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+          className="bg-white/5 border border-white/10 rounded px-2 py-1 text-xs text-white/60 outline-none" />
+        <span className="text-white/20 text-xs">to</span>
+        <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+          className="bg-white/5 border border-white/10 rounded px-2 py-1 text-xs text-white/60 outline-none" />
+        {(dateFrom || dateTo) && <button onClick={() => { setDateFrom(""); setDateTo(""); }} className="text-xs text-white/30 hover:text-white/60">✕</button>}
       </div>
 
       {/* Summary cards */}

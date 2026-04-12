@@ -12,6 +12,18 @@ export function BoardView({ board, reload }: { board: SprintBoard; reload: () =>
   };
   // U2: Touch drag state
   const [touchDrag, setTouchDrag] = useState<{ id: number; startX: number } | null>(null);
+  // U3: Task labels
+  const [taskLabels, setTaskLabels] = useState<Record<number, { name: string; color: string }[]>>({});
+  useEffect(() => {
+    const allIds = [...board.todo, ...board.in_progress, ...board.done].map(t => t.id);
+    if (allIds.length === 0) return;
+    Promise.all(allIds.map(id => apiCall<{ name: string; color: string }[]>("GET", `/api/tasks/${id}/labels`).then(labels => ({ id, labels: labels || [] })).catch(() => ({ id, labels: [] as { name: string; color: string }[] }))))
+      .then(results => {
+        const map: Record<number, { name: string; color: string }[]> = {};
+        results.forEach(r => { if (r.labels.length > 0) map[r.id] = r.labels; });
+        setTaskLabels(map);
+      });
+  }, [board]);
 
   const WIP_LIMIT = 5;
   const Column = useCallback(({ title, tasks, color, status }: { title: string; tasks: Task[]; color: string; status: string }) => (
@@ -45,6 +57,7 @@ export function BoardView({ board, reload }: { board: SprintBoard; reload: () =>
             }}
             className="bg-[var(--color-surface)] p-2 rounded border border-white/5 group cursor-grab active:cursor-grabbing">
             <div className="text-xs text-white/90 truncate">{t.title}</div>
+            {taskLabels[t.id] && <div className="flex gap-0.5 mt-0.5 flex-wrap">{taskLabels[t.id].map(l => <span key={l.name} className="text-[8px] px-1 rounded" style={{ background: l.color + "30", color: l.color }}>{l.name}</span>)}</div>}
             <div className="text-[10px] text-white/30 flex gap-1 mt-1">
               {t.estimated_hours > 0 && <span>{t.estimated_hours}h</span>}
               {t.remaining_points > 0 && <span>{t.remaining_points}pt</span>}
