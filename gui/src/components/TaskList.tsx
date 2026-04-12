@@ -194,6 +194,14 @@ function TaskNode({ node, depth, onView, selectMode, onSelect, selectedTaskId, v
             setCtxBurnUsers(allAssignees.get(t.id) || []);
             setCtxMenu({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
           }
+          // F9: Press 's' to cycle task status
+          if (e.key === "s" && !e.ctrlKey && !e.metaKey && !e.altKey && isOwner) {
+            e.preventDefault();
+            const cycle = ["backlog", "active", "in_progress", "completed"];
+            const idx = cycle.indexOf(t.status);
+            const next = cycle[(idx + 1) % cycle.length];
+            updateTask(t.id, { status: next });
+          }
         }}
       >
         {/* Bulk checkbox for subtasks */}

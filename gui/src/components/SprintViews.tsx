@@ -172,9 +172,9 @@ export function VelocityChart() {
   const [data, setData] = useState<{ sprint: string; points: number; hours: number }[]>([]);
 
   useEffect(() => {
-    apiCall<{ sprint_name: string; total_points: number; total_hours: number }[]>("GET", "/api/sprints/velocity")
+    apiCall<{ sprint: string; points: number; hours: number }[]>("GET", "/api/sprints/velocity")
       .then(v => {
-        if (v) setData(v.map(d => ({ sprint: d.sprint_name, points: d.total_points, hours: d.total_hours })));
+        if (v) setData(v.map(d => ({ sprint: d.sprint, points: d.points, hours: d.hours })));
       }).catch(() => {});
   }, []);
 

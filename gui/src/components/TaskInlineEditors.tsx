@@ -13,6 +13,13 @@ interface Props {
 export function InlineTimeReport({ taskId, depth, show, onClose, onLogged }: Props & { onLogged: (h: number) => void }) {
   const [hours, setHours] = useState("");
   const [desc, setDesc] = useState("");
+  const [history, setHistory] = useState<{ id: number; hours: number; username: string; created_at: string; note: string | null }[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
+
+  const loadHistory = () => {
+    apiCall<{ id: number; hours: number; username: string; created_at: string; note: string | null }[]>("GET", `/api/tasks/${taskId}/time`)
+      .then(h => h && setHistory(h)).catch(() => {});
+  };
 
   const submit = async () => {
     const h = parseFloat(hours);
@@ -20,7 +27,8 @@ export function InlineTimeReport({ taskId, depth, show, onClose, onLogged }: Pro
     if (!confirm(`Log ${h} hours?`)) return;
     await apiCall("POST", `/api/tasks/${taskId}/time`, { hours: h, description: desc || undefined });
     onLogged(h);
-    setHours(""); setDesc(""); onClose();
+    setHours(""); setDesc("");
+    if (showHistory) loadHistory();
   };
 
   return (
@@ -34,8 +42,23 @@ export function InlineTimeReport({ taskId, depth, show, onClose, onLogged }: Pro
             <input value={desc} onChange={e => setDesc(e.target.value)} onKeyDown={e => e.key === "Enter" && submit()}
               placeholder="Description (optional)" className="flex-1 bg-white/5 border border-white/10 rounded-lg text-xs text-white placeholder-white/30 px-3 py-2 outline-none focus:border-[var(--color-work)]" />
             <button onClick={submit} className="px-3 py-2 rounded-lg bg-[var(--color-accent)] text-white text-xs">Log</button>
+            <button onClick={() => { setShowHistory(!showHistory); if (!showHistory) loadHistory(); }} className="text-[10px] text-white/30 hover:text-white/50">
+              {showHistory ? "Hide" : "History"}
+            </button>
             <button onClick={onClose} className="text-white/30 text-xs">✕</button>
           </div>
+          {showHistory && history.length > 0 && (
+            <div className="px-4 pb-2 space-y-0.5">
+              {history.slice(0, 10).map(h => (
+                <div key={h.id} className="text-[10px] text-white/30 flex gap-2">
+                  <span>{h.created_at.slice(0, 10)}</span>
+                  <span className="text-white/50">{h.hours.toFixed(1)}h</span>
+                  <span>{h.username}</span>
+                  {h.note && <span className="text-white/20 truncate">{h.note}</span>}
+                </div>
+              ))}
+            </div>
+          )}
         </motion.div>
       )}
     </AnimatePresence>

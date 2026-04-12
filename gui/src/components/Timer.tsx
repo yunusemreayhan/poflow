@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Play, Pause, Square, SkipForward, Coffee, MessageSquare } from "lucide-react";
 import { useStore } from "../store/store";
 import CommentSection from "./CommentSection";
+import Select from "./Select";
 import { useT } from "../i18n";
 
 const PHASE_COLORS: Record<string, string> = {
@@ -203,12 +204,10 @@ export default function Timer() {
         {isIdle && (
           <div className="flex flex-col items-center gap-3">
             {activeTasks.length > 0 && (
-              <select value={selectedTaskId ?? ""} onChange={e => setSelectedTaskId(e.target.value ? Number(e.target.value) : undefined)}
-                className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white/70 outline-none max-w-[240px] truncate"
-                aria-label="Select task to focus on">
-                <option value="">No task (free focus)</option>
-                {activeTasks.map(t => <option key={t.id} value={t.id}>{t.title}</option>)}
-              </select>
+              <Select value={String(selectedTaskId ?? "")}
+                options={[{ value: "", label: "No task (free focus)" }, ...activeTasks.map(t => ({ value: String(t.id), label: t.title }))]}
+                onChange={v => setSelectedTaskId(v ? Number(v) : undefined)}
+                className="max-w-[240px]" ariaLabel="Select task to focus on" placeholder="Search tasks..." />
             )}
             <motion.button
               whileHover={{ scale: 1.05 }}

@@ -208,6 +208,24 @@ function SprintView({ id, onBack }: { id: number; onBack: () => void }) {
         {s.status === "planning" && <button onClick={start} className="flex items-center gap-1 px-2 py-1 bg-green-600 text-white text-xs rounded"><Play size={12} />Start</button>}
         {s.status === "active" && <button onClick={complete} className="flex items-center gap-1 px-2 py-1 bg-blue-600 text-white text-xs rounded"><CheckCircle size={12} />Complete</button>}
         {s.status === "active" && <button onClick={snapshot} className="px-2 py-1 bg-white/10 text-white/60 text-xs rounded">📸 Snapshot</button>}
+        <button onClick={() => {
+          const tasks = detail?.tasks || [];
+          const done = tasks.filter(t => t.status === "completed" || t.status === "done");
+          const md = [
+            `# Sprint Report: ${s.name}`,
+            s.goal ? `**Goal:** ${s.goal}` : "",
+            `**Status:** ${s.status} | **Period:** ${s.start_date || "?"} → ${s.end_date || "?"}`,
+            `\n## Summary`, `- Tasks: ${done.length}/${tasks.length} completed`,
+            `- Points: ${done.reduce((a, t) => a + t.remaining_points, 0)}/${tasks.reduce((a, t) => a + t.remaining_points, 0)}`,
+            `- Hours: ${done.reduce((a, t) => a + t.estimated_hours, 0).toFixed(1)}/${tasks.reduce((a, t) => a + t.estimated_hours, 0).toFixed(1)}`,
+            `\n## Tasks`, ...tasks.map(t => `- [${t.status === "completed" ? "x" : " "}] ${t.title} (${t.remaining_points}pt, ${t.estimated_hours}h) — ${t.user}`),
+            s.retro_notes ? `\n## Retrospective\n${s.retro_notes}` : "",
+          ].filter(Boolean).join("\n");
+          const blob = new Blob([md], { type: "text/markdown" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a"); a.href = url; a.download = `sprint_${s.name.replace(/\s+/g, "_")}.md`; a.click();
+          URL.revokeObjectURL(url);
+        }} className="px-2 py-1 bg-white/10 text-white/60 text-xs rounded">📄 Export</button>
       </div>
 
       {s.start_date && <div className="text-xs text-white/30">{s.start_date} → {s.end_date || "?"}</div>}
