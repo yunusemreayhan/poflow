@@ -387,7 +387,7 @@ function DetailNode({ detail, depth, onRefresh, hoursMap }: { detail: TaskDetail
 // --- Main View ---
 
 export default function TaskDetailView({ taskId, onBack, onNavigate }: { taskId: number; onBack: () => void; onNavigate?: (id: number) => void }) {
-  const { getTaskDetail, tasks } = useStore();
+  const { getTaskDetail } = useStore();
   const [detail, setDetail] = useState<TaskDetail | null>(null);
   const [hoursMap, setHoursMap] = useState<Map<number, number>>(new Map());
 

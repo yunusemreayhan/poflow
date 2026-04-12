@@ -54,7 +54,7 @@ pub async fn delete_user(pool: &Pool, id: i64) -> Result<()> {
     sqlx::query("DELETE FROM task_assignees WHERE user_id = ?").bind(id).execute(&mut *tx).await?;
     sqlx::query("DELETE FROM room_members WHERE user_id = ?").bind(id).execute(&mut *tx).await?;
     sqlx::query("DELETE FROM room_votes WHERE user_id = ?").bind(id).execute(&mut *tx).await?;
-    sqlx::query("DELETE FROM audit_log WHERE user_id = ?").bind(id).execute(&mut *tx).await?;
+    sqlx::query("UPDATE audit_log SET user_id = (SELECT id FROM users WHERE role = 'root' AND id != ? LIMIT 1) WHERE user_id = ?").bind(id).bind(id).execute(&mut *tx).await?;
     sqlx::query("DELETE FROM webhooks WHERE user_id = ?").bind(id).execute(&mut *tx).await?;
     sqlx::query("DELETE FROM notifications WHERE user_id = ?").bind(id).execute(&mut *tx).await?;
     sqlx::query("DELETE FROM notification_prefs WHERE user_id = ?").bind(id).execute(&mut *tx).await?;

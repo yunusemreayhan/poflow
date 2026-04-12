@@ -20,7 +20,7 @@ export default function AuthScreen() {
     e.preventDefault();
     if (!username.trim() || !password.trim()) return;
     // UX7: Client-side password length validation for registration
-    if (isRegister && password.length < 8) { setError("Password must be at least 8 characters with uppercase + digit"); return; }
+    if (isRegister && (password.length < 8 || !/[A-Z]/.test(password) || !/\d/.test(password))) { setError("Password must be at least 8 characters with uppercase + digit"); return; }
     setLoading(true);
     setError("");
     try {

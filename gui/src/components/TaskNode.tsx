@@ -18,8 +18,8 @@ export default function TaskNode({ node, depth, onView, selectMode, onSelect, se
   selectLabel?: string; selectClassName?: string;
   bulkSelected?: Set<number>; setBulkSelected?: (fn: (prev: Set<number>) => Set<number>) => void;
 }) {
-  const { engine, createTask, updateTask, deleteTask, start, username: currentUser, role, taskSprints, taskSprintsMap, burnTotals, allAssignees, config, tasks } = useStore(
-    useShallow(s => ({ engine: s.engine, createTask: s.createTask, updateTask: s.updateTask, deleteTask: s.deleteTask, start: s.start, username: s.username, role: s.role, taskSprints: s.taskSprints, taskSprintsMap: s.taskSprintsMap, burnTotals: s.burnTotals, allAssignees: s.allAssignees, config: s.config, tasks: s.tasks }))
+  const { engine, createTask, updateTask, deleteTask, start, username: currentUser, role, taskSprints, taskSprintsMap, burnTotals, allAssignees, config } = useStore(
+    useShallow(s => ({ engine: s.engine, createTask: s.createTask, updateTask: s.updateTask, deleteTask: s.deleteTask, start: s.start, username: s.username, role: s.role, taskSprints: s.taskSprints, taskSprintsMap: s.taskSprintsMap, burnTotals: s.burnTotals, allAssignees: s.allAssignees, config: s.config }))
   );
   const searchQuery = useContext(SearchCtx);
   const [expanded, setExpanded] = useState(true);
@@ -99,7 +99,7 @@ export default function TaskNode({ node, depth, onView, selectMode, onSelect, se
           if (!dragId || dragId === t.id) return;
           const isDescendantOf = (nodeId: number, ancestorId: number): boolean => {
             let pid: number | null = nodeId;
-            while (pid) { if (pid === ancestorId) return true; const p = tasks.find(tk => tk.id === pid); pid = p?.parent_id ?? null; }
+            while (pid) { if (pid === ancestorId) return true; const p = useStore.getState().tasks.find(tk => tk.id === pid); pid = p?.parent_id ?? null; }
             return false;
           };
           if (isDescendantOf(t.id, dragId) || t.id === dragId) return;
@@ -107,7 +107,7 @@ export default function TaskNode({ node, depth, onView, selectMode, onSelect, se
             await updateTask(dragId, { parent_id: t.id, sort_order: 0 });
           } else {
             const newParent = t.parent_id;
-            const siblings = tasks.filter(s => s.parent_id === newParent && s.id !== dragId).sort((a, b) => a.sort_order - b.sort_order);
+            const siblings = useStore.getState().tasks.filter(s => s.parent_id === newParent && s.id !== dragId).sort((a, b) => a.sort_order - b.sort_order);
             const idx = siblings.findIndex(s => s.id === t.id);
             const insertAt = dropZone === "above" ? idx : idx + 1;
             const before = insertAt > 0 ? siblings[insertAt - 1].sort_order : 0;
@@ -162,7 +162,7 @@ export default function TaskNode({ node, depth, onView, selectMode, onSelect, se
             updateTask(t.id, { status: next });
           }
           if (e.altKey) {
-            const siblings = tasks.filter(s => s.parent_id === t.parent_id).sort((a, b) => a.sort_order - b.sort_order);
+            const siblings = useStore.getState().tasks.filter(s => s.parent_id === t.parent_id).sort((a, b) => a.sort_order - b.sort_order);
             const idx = siblings.findIndex(s => s.id === t.id);
             if (e.key === "ArrowUp" && idx > 0) { e.preventDefault(); updateTask(t.id, { sort_order: siblings[idx - 1].sort_order - 1 }); }
             else if (e.key === "ArrowDown" && idx < siblings.length - 1) { e.preventDefault(); updateTask(t.id, { sort_order: siblings[idx + 1].sort_order + 1 }); }

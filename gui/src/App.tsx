@@ -94,7 +94,7 @@ function Sidebar() {
             )}
             <Icon size={22} className="relative z-10" />
             {/* U7: Active timer indicator */}
-            {tab.id === "timer" && useStore.getState().engine?.status === "Running" && (
+            {tab.id === "timer" && timerRunning && (
               <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-[var(--color-work)] animate-pulse z-20" />
             )}
           </motion.button>
@@ -152,6 +152,7 @@ function Sidebar() {
 
 export default function App() {
   const { activeTab, poll, loadTasks, connected, token, toasts, dismissToast, confirmDialog, dismissConfirm, loading, focusMode } = useStore();
+  const timerRunning = useStore(s => s.engine?.status === "Running");
   const [showShortcuts, setShowShortcuts] = useState(false);
   const t = useT();
 
@@ -173,8 +174,7 @@ export default function App() {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       const store = useStore.getState();
       if (e.key === "Escape" && store.engine?.status === "Running") { store.stop(); }
-      if (e.key === " " && store.engine?.status === "Running") { e.preventDefault(); store.pause(); }
-      if (e.key === " " && store.engine?.status === "Paused") { e.preventDefault(); store.resume(); }
+      // Space handled by Timer.tsx to avoid double-toggle
       // Tab navigation and shortcuts: only when not in an input/select
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag !== "INPUT" && tag !== "TEXTAREA" && tag !== "SELECT" && !(e.target as HTMLElement)?.isContentEditable && !e.ctrlKey && !e.metaKey) {
@@ -208,17 +208,6 @@ export default function App() {
       if (Date.now() - lastLoad > 10000) loadTasks();
     }
   }, [activeTab, token]);
-
-  const [showShortcuts, setShowShortcuts] = useState(false);
-
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      if (e.key === "?") setShowShortcuts(s => !s);
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, []);
 
   if (!token) return <AuthScreen />;
 
@@ -301,21 +290,6 @@ export default function App() {
 
         {/* Confirm dialog */}
         <AnimatePresence>
-          {/* F2: Keyboard shortcuts overlay */}
-          {showShortcuts && (
-            <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center" onClick={() => setShowShortcuts(false)} onKeyDown={e => { if (e.key === "Escape") setShowShortcuts(false); }} tabIndex={-1}>
-              <div className="glass p-6 rounded-2xl max-w-sm w-full" onClick={e => e.stopPropagation()}>
-                <div className="text-sm font-medium text-white/80 mb-3">Keyboard Shortcuts</div>
-                <div className="space-y-1 text-xs">
-                  {[["0-7","Switch tabs"],["Space","Pause/Resume timer"],["Esc","Stop timer"],["n","New task (on tasks tab)"],["r","Refresh"],["s","Cycle task status"],["/ ","Search tasks"],["F11","Focus mode"],["?","This help"]].map(([k,d]) => (
-                    <div key={k} className="flex justify-between"><kbd className="bg-white/10 px-1.5 py-0.5 rounded text-white/60 font-mono">{k}</kbd><span className="text-white/40">{d}</span></div>
-                  ))}
-                </div>
-                <button onClick={() => setShowShortcuts(false)} className="mt-4 w-full py-1.5 text-xs rounded-lg bg-white/5 text-white/40 hover:text-white/60">Close</button>
-              </div>
-            </div>
-          )}
-
           {confirmDialog && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="absolute inset-0 bg-black/50 flex items-center justify-center z-50"
