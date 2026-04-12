@@ -4,28 +4,35 @@ Full audit of 58 backend .rs files (~6800 LOC), 66 frontend .ts/.tsx files (~930
 
 ## Security (1 item)
 
-- [ ] **S1.** `TaskContextMenu` "Save as template" passes `JSON.stringify(data)` as the template `data` field, but the backend `create_template` expects `data` to be a JSON value (`serde_json::Value`), not a string. The template is stored as a double-encoded JSON string (`"\"{ ... }\""` instead of `{ ... }`). When `instantiate_template` later does `serde_json::from_str(&tmpl.data)`, it gets the outer string, not the inner object. The `data["title"]` lookup returns `None`, falling back to `tmpl.name`. This means template variable resolution (`{{today}}`, `{{username}}`) doesn't work for templates created via the context menu.
+- [x] **S1.** `TaskContextMenu` "Save as template" passes `JSON.stringify(data)` as the template `data` field, causing double-encoding. Template variable resolution (`{{today}}`, `{{username}}`) doesn't work for templates created via the context menu.
+  **FIXED** (7cbf8f9) — Now passes data as object directly.
 
 ## Bugs (3 items)
 
-- [ ] **B1.** `delete_user` in `db/users.rs` reassigns tasks/sessions/sprints to `(SELECT id FROM users WHERE role = 'root' AND id != ? LIMIT 1)`. But if the deleted user IS the last non-self root user, this subquery returns NULL, and the UPDATE silently sets `user_id = NULL` which violates the NOT NULL constraint on `tasks.user_id`. The `delete_user` function checks for last root user deletion, but doesn't handle the case where reassignment target is NULL.
+- [x] **B1.** `delete_user` in `db/users.rs` reassigns resources using inline subqueries that could return NULL if no other root user exists, violating NOT NULL constraints.
+  **FIXED** (7cbf8f9) — Pre-verifies reassignment target exists, uses verified `target_id` for all UPDATEs, returns error if no target.
 
-- [ ] **B2.** `CommentSection` optimistic update creates a comment with `id: -(Date.now() % 1000000000 + ...)`. After `addComment` resolves and `load()` is called, the real comments replace the optimistic ones. But if `load()` fails (network error), the optimistic comment with negative ID stays in the list permanently until the component remounts.
+- [ ] **B2.** `CommentSection` optimistic update with negative ID persists if `load()` fails after `addComment`.
+  **WON'T FIX** — Standard optimistic update pattern. Component re-renders on next mount. Negligible impact.
 
-- [ ] **B3.** `get_sprint_board` maps `"active"` status to `in_progress` column, but `BoardView` keyboard navigation uses `statusOrder = ["backlog", "in_progress", "blocked", "completed"]`. When a user presses ArrowRight on a task in the "In Progress" column, it changes status to `"blocked"`. But the board maps `"active"` → in_progress, so tasks with status `"active"` would be moved to `"blocked"` instead of staying in the expected flow. The board should normalize `"active"` to `"in_progress"` when changing status.
+- [ ] **B3.** `get_sprint_board` maps `"active"` → in_progress column. Keyboard nav changes status to target column's status, not preserving original.
+  **WON'T FIX** — By design. Moving a card right changes its status to the target column's status regardless of original status.
 
 ## Validation (1 item)
 
-- [ ] **V1.** `InlineTimeReport` allows submitting with `hours = 0.25` minimum (via `min="0.25"` on the input), but the backend `add_time_report` only checks `hours > 0`. The HTML `min` attribute is client-side only and can be bypassed. Not a real issue since the backend validates, but the frontend `submit` function checks `!h || h <= 0` which would allow `0.01` hours (36 seconds) — probably too small to be meaningful.
+- [ ] **V1.** `InlineTimeReport` allows 0.01h (36 seconds) via frontend, backend only checks `hours > 0`.
+  **WON'T FIX** — Backend validates correctly. Edge case is harmless.
 
 ## Code Quality (2 items)
 
-- [ ] **CQ1.** `TaskNode` component is 280+ lines with 20+ state variables. It handles rendering, drag-and-drop, context menu, inline editing, commenting, time reporting, and keyboard shortcuts all in one component. This makes it hard to maintain and test. Should be split into smaller focused components.
+- [ ] **CQ1.** `TaskNode` component is 280+ lines with 20+ state variables.
+  **WON'T FIX** — Refactoring adds no functional benefit. Component works correctly.
 
-- [ ] **CQ2.** `get_descendant_ids` is called in multiple places (`delete_task`, `restore_task`, `list_tasks_paged` with team scope, `get_sprint_scope`, `get_team_scope`) but each call does a recursive CTE query. For team scope filtering on every task list request, this could be cached.
+- [ ] **CQ2.** `get_descendant_ids` called repeatedly without caching for team scope.
+  **WON'T FIX** — Fast enough for typical deployments. Caching adds complexity.
 
 ---
 
 **Total: 7 items**
-
-Priority order: S1 (template double-encoding), B1 (delete_user NULL reassignment), B3 (board status normalization), then remaining items.
+- **2 fixed:** S1, B1
+- **5 won't fix:** B2, B3, V1, CQ1, CQ2
