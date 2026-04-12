@@ -152,9 +152,9 @@ export function BurndownView({ stats }: { stats: SprintDailyStat[] }) {
       </div>
       <ResponsiveContainer width="100%" height={200}>
         <AreaChart data={data}>
-          <XAxis dataKey="date" tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 10 }} axisLine={false} tickLine={false} />
-          <YAxis tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 10 }} axisLine={false} tickLine={false} width={30} />
-          <Tooltip contentStyle={{ background: "#1A1A2E", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#fff", fontSize: 12 }} />
+          <XAxis dataKey="date" tick={{ fill: "var(--color-chart-axis)", fontSize: 10 }} axisLine={false} tickLine={false} />
+          <YAxis tick={{ fill: "var(--color-chart-axis)", fontSize: 10 }} axisLine={false} tickLine={false} width={30} />
+          <Tooltip contentStyle={{ background: "var(--color-chart-tooltip-bg)", border: "1px solid var(--color-chart-tooltip-border)", borderRadius: 8, color: "var(--color-chart-tooltip-text)", fontSize: 12 }} />
           <Area type="monotone" dataKey="ideal" stroke="rgba(255,255,255,0.15)" fill="none" strokeDasharray="4 4" />
           <Area type="monotone" dataKey="remaining" stroke="#7C3AED" fill="rgba(124,58,237,0.15)" strokeWidth={2} />
         </AreaChart>
@@ -185,9 +185,9 @@ export function VelocityChart() {
       <div className="text-xs text-white/50 font-medium mb-2">Velocity Trend</div>
       <ResponsiveContainer width="100%" height={120}>
         <AreaChart data={data}>
-          <XAxis dataKey="sprint" tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 9 }} axisLine={false} tickLine={false} />
-          <YAxis tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 9 }} axisLine={false} tickLine={false} width={25} />
-          <Tooltip contentStyle={{ background: "#1A1A2E", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#fff", fontSize: 11 }} />
+          <XAxis dataKey="sprint" tick={{ fill: "var(--color-chart-axis)", fontSize: 9 }} axisLine={false} tickLine={false} />
+          <YAxis tick={{ fill: "var(--color-chart-axis)", fontSize: 9 }} axisLine={false} tickLine={false} width={25} />
+          <Tooltip contentStyle={{ background: "var(--color-chart-tooltip-bg)", border: "1px solid var(--color-chart-tooltip-border)", borderRadius: 8, color: "var(--color-chart-tooltip-text)", fontSize: 11 }} />
           <Area type="monotone" dataKey="points" stroke="#7C3AED" fill="rgba(124,58,237,0.15)" strokeWidth={2} />
         </AreaChart>
       </ResponsiveContainer>

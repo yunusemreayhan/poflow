@@ -138,9 +138,9 @@ export default function EpicBurndown() {
               <div className="h-32">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={chartData}>
-                    <XAxis dataKey="date" tick={{ fontSize: 10, fill: "rgba(255,255,255,0.3)" }} />
-                    <YAxis tick={{ fontSize: 10, fill: "rgba(255,255,255,0.3)" }} width={30} />
-                    <Tooltip contentStyle={{ background: "#1A1A2E", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, fontSize: 12 }} />
+                    <XAxis dataKey="date" tick={{ fontSize: 10, fill: "var(--color-chart-axis)" }} />
+                    <YAxis tick={{ fontSize: 10, fill: "var(--color-chart-axis)" }} width={30} />
+                    <Tooltip contentStyle={{ background: "var(--color-chart-tooltip-bg)", border: "1px solid var(--color-chart-tooltip-border)", borderRadius: 8, fontSize: 12, color: "var(--color-chart-tooltip-text)" }} />
                     <Area type="monotone" dataKey="remaining" stroke="var(--color-accent)" fill="var(--color-accent)" fillOpacity={0.15} name="Remaining" />
                     <Area type="monotone" dataKey="done" stroke="#22c55e" fill="#22c55e" fillOpacity={0.1} name="Done" />
                   </AreaChart>

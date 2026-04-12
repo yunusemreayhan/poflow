@@ -14,6 +14,10 @@
   --color-success: #10B981;
   --color-warning: #F59E0B;
   --color-danger: #EF4444;
+  --color-chart-tooltip-bg: #1A1A2E;
+  --color-chart-tooltip-border: rgba(255,255,255,0.1);
+  --color-chart-tooltip-text: #fff;
+  --color-chart-axis: rgba(255,255,255,0.3);
 }
 
 [data-theme="light"] {
@@ -22,6 +26,10 @@
   --color-surface-2: #E8E8ED;
   --color-text: #1A1A2E;
   --color-text-dim: #6B6B80;
+  --color-chart-tooltip-bg: #FFFFFF;
+  --color-chart-tooltip-border: rgba(0,0,0,0.1);
+  --color-chart-tooltip-text: #1A1A2E;
+  --color-chart-axis: rgba(0,0,0,0.3);
 }
 
 * { box-sizing: border-box; }

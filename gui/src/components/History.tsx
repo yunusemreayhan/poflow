@@ -167,7 +167,7 @@ export default function History() {
             <XAxis dataKey="day" tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 12 }} axisLine={false} tickLine={false} />
             <YAxis hide />
             <Tooltip
-              contentStyle={{ background: "#1A1A2E", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#fff" }}
+              contentStyle={{ background: "var(--color-chart-tooltip-bg)", border: "1px solid var(--color-chart-tooltip-border)", borderRadius: 8, color: "var(--color-chart-tooltip-text)" }}
               formatter={(v: unknown) => [`${v} sessions`, "Completed"]}
             />
             <Bar dataKey="count" radius={[6, 6, 0, 0]}>
