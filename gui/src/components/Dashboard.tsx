@@ -10,9 +10,15 @@ export default function Dashboard() {
   const [today, setToday] = useState(() => new Date().toISOString().slice(0, 10));
   useEffect(() => { const id = setInterval(() => setToday(new Date().toISOString().slice(0, 10)), 60000); return () => clearInterval(id); }, []);
   useEffect(() => { apiCall<typeof activity>("GET", "/api/audit?limit=10").then(d => d && setActivity(d)).catch(() => {}); }, []);
+  // B6: Refresh activity when tasks change
+  useEffect(() => {
+    const handler = () => apiCall<typeof activity>("GET", "/api/audit?limit=10").then(d => d && setActivity(d)).catch(() => {});
+    window.addEventListener("sse-sprints", handler);
+    return () => window.removeEventListener("sse-sprints", handler);
+  }, []);
   const todayStats = stats.find(s => s.date === today);
   const activeSprint = sprints.find(s => s.status === "active");
-  const overdue = useMemo(() => tasks.filter(t => t.due_date && t.due_date < today && t.status !== "completed" && t.status !== "archived"), [tasks, today]);
+  const overdue = useMemo(() => tasks.filter(t => t.due_date && t.due_date < today && t.status !== "completed" && t.status !== "archived").sort((a, b) => (a.due_date || "").localeCompare(b.due_date || "")), [tasks, today]);
   const recentlyUpdated = useMemo(() => [...tasks].sort((a, b) => b.updated_at.localeCompare(a.updated_at)).slice(0, 5), [tasks]);
   const activeCount = useMemo(() => tasks.filter(t => t.status === "active").length, [tasks]);
   const completedToday = useMemo(() => tasks.filter(t => t.status === "completed" && t.updated_at.startsWith(today)).length, [tasks, today]);

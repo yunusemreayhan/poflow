@@ -119,6 +119,7 @@ export default function TaskList({ selectMode, onSelect, selectedTaskId, votedTa
             if (lines.length > 1) {
               e.preventDefault();
               lines.forEach(l => createTask(l));
+              useStore.getState().toast(`Created ${lines.length} tasks from clipboard`);
             }
           }}
           placeholder="New project or top-level task..."

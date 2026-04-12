@@ -25,4 +25,25 @@ pub async fn delete_comment(State(engine): State<AppState>, claims: Claims, Path
     Ok(StatusCode::NO_CONTENT)
 }
 
+// F8: Edit comment (owner only, within 15 minutes)
+#[derive(Deserialize, utoipa::ToSchema)]
+pub struct EditCommentRequest { pub content: String }
+
+#[utoipa::path(put, path = "/api/comments/{id}", request_body = EditCommentRequest, responses((status = 200, body = db::Comment)), security(("bearer" = [])))]
+pub async fn edit_comment(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>, Json(req): Json<EditCommentRequest>) -> ApiResult<db::Comment> {
+    if req.content.trim().is_empty() { return Err(err(StatusCode::BAD_REQUEST, "Comment cannot be empty")); }
+    if req.content.len() > 10000 { return Err(err(StatusCode::BAD_REQUEST, "Comment too long (max 10000 chars)")); }
+    let comment = db::get_comment(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Comment not found"))?;
+    if !is_owner_or_root(comment.user_id, &claims) { return Err(err(StatusCode::FORBIDDEN, "Not owner")); }
+    // 15-minute edit window
+    if let Ok(created) = chrono::NaiveDateTime::parse_from_str(&comment.created_at, "%Y-%m-%dT%H:%M:%S%.3f") {
+        let elapsed = chrono::Utc::now().naive_utc() - created;
+        if elapsed.num_minutes() > 15 { return Err(err(StatusCode::BAD_REQUEST, "Edit window expired (15 minutes)")); }
+    }
+    sqlx::query("UPDATE comments SET content = ? WHERE id = ?").bind(&req.content).bind(id).execute(&engine.pool).await.map_err(internal)?;
+    let updated = db::get_comment(&engine.pool, id).await.map_err(internal)?;
+    engine.notify(ChangeEvent::Tasks);
+    Ok(Json(updated))
+}
+
 // --- Task Time/Burns ---

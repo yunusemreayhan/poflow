@@ -81,6 +81,7 @@ function RoomList({ onSelect }: { onSelect: (id: number) => void }) {
       </AnimatePresence>
 
       {loading && rooms.length === 0 && <div className="text-center py-12 text-white/20 text-sm">Loading rooms...</div>}
+      {!loading && rooms.length === 0 && <div className="text-center py-12 text-white/20 text-sm">No estimation rooms yet. Create one above to start planning poker!</div>}
       {!loading && active.length === 0 && !showCreate && <div className="text-center py-12"><div className="text-4xl mb-2">🃏</div><p className="text-sm text-white/30">No active rooms</p><p className="text-xs text-white/20 mt-1">Create one to start estimating</p></div>}
 
       <div className="space-y-2">

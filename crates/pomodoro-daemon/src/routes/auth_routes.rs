@@ -55,6 +55,23 @@ pub async fn logout(headers: axum::http::HeaderMap) -> Result<StatusCode, ApiErr
 #[derive(Deserialize, utoipa::ToSchema)]
 pub struct RefreshRequest { pub refresh_token: String }
 
+#[derive(Deserialize, utoipa::ToSchema)]
+pub struct ChangePasswordRequest { pub current_password: String, pub new_password: String }
+
+#[utoipa::path(put, path = "/api/auth/password", responses((status = 204)), security(("bearer" = [])))]
+pub async fn change_password(State(engine): State<AppState>, claims: Claims, Json(req): Json<ChangePasswordRequest>) -> Result<StatusCode, ApiError> {
+    validate_password(&req.new_password)?;
+    let user = db::get_user(&engine.pool, claims.user_id).await.map_err(|_| err(StatusCode::NOT_FOUND, "User not found"))?;
+    let hash = user.password_hash.clone();
+    let pw = req.current_password.clone();
+    let valid = tokio::task::spawn_blocking(move || bcrypt::verify(&pw, &hash).unwrap_or(false)).await.map_err(internal)?;
+    if !valid { return Err(err(StatusCode::UNAUTHORIZED, "Current password is incorrect")); }
+    let new_pw = req.new_password.clone();
+    let new_hash = tokio::task::spawn_blocking(move || bcrypt::hash(&new_pw, 12)).await.map_err(internal)?.map_err(internal)?;
+    db::update_user_password(&engine.pool, claims.user_id, &new_hash).await.map_err(internal)?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
 #[utoipa::path(post, path = "/api/auth/refresh", responses((status = 200)), security(()))]
 pub async fn refresh_token(State(engine): State<AppState>, headers: axum::http::HeaderMap, Json(req): Json<RefreshRequest>) -> ApiResult<AuthResponse> {
     check_auth_rate_limit(&headers)?;
