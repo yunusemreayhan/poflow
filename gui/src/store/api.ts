@@ -11,7 +11,7 @@ export async function apiCall<T = unknown>(method: string, path: string, body?: 
     if (msg.includes("401") || msg.includes("expired") || msg.includes("Unauthorized")) {
       const refreshed = await tryRefreshToken();
       if (refreshed) {
-        try { return await invoke<T>("api_call", { method, path, body: body ?? null }); } catch {}
+        try { return await invoke<T>("api_call", { method, path, body: body ?? null }); } catch { /* retry failed — fall through to original error */ }
       } else {
         // Refresh failed — force logout so user gets a clean login screen
         // instead of staying in a broken "logged in but disconnected" state

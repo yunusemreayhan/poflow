@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useStore } from "../store/store";
 import type { Task } from "../store/api";
@@ -8,6 +8,8 @@ const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 export default function CalendarView() {
   const tasks = useStore(s => s.tasks);
   const stats = useStore(s => s.stats);
+  const loadStats = useStore(s => s.loadStats);
+  useEffect(() => { loadStats(); }, []);
   const [offset, setOffset] = useState(0); // months from current
   const [selected, setSelected] = useState<string | null>(null);
 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useDeferredValue } from "react";
 import { ChevronRight } from "lucide-react";
 import { useStore } from "../store/store";
 import { apiCall } from "../store/api";
@@ -38,6 +38,7 @@ export default function TaskContextMenu(p: CtxMenuProps) {
   const tl = useT();
   const [ctxSub, setCtxSub] = useState<string | null>(null);
   const [reparentSearch, setReparentSearch] = useState<string | null>(null);
+  const deferredReparent = useDeferredValue(reparentSearch ?? "");
   const { task: t, pos, node, isOwner, assignees, ctxSprints, ctxUsers, ctxBurnUsers, taskSprints, config } = p;
   const close = p.onClose;
   const allTasks = useStore(s => s.tasks);
@@ -188,7 +189,7 @@ export default function TaskContextMenu(p: CtxMenuProps) {
             <input autoFocus value={reparentSearch} onChange={e => setReparentSearch(e.target.value)} placeholder="Search parent..."
               className="w-full bg-white/5 border border-white/10 rounded px-2 py-1 text-xs text-white outline-none" onClick={e => e.stopPropagation()} />
             <div className="max-h-24 overflow-y-auto mt-1">
-              {allTasks.filter(c => c.id !== t.id && !isDescendant(c.id, t.id, allTasks) && c.title.toLowerCase().includes(reparentSearch.toLowerCase())).slice(0, 8).map(c => (
+              {allTasks.filter(c => c.id !== t.id && !isDescendant(c.id, t.id, allTasks) && c.title.toLowerCase().includes(deferredReparent.toLowerCase())).slice(0, 8).map(c => (
                 <button key={c.id} role="menuitem" onClick={async () => { await p.updateTask(t.id, { parent_id: c.id }); close(); }}
                   className="w-full text-left text-xs text-white/50 hover:text-white/80 py-0.5 truncate">→ {c.title}</button>
               ))}

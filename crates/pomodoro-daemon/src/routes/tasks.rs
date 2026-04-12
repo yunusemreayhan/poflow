@@ -37,9 +37,9 @@ pub async fn duplicate_task(State(engine): State<AppState>, claims: Claims, Path
         task.priority as i64, task.estimated as i64,
         task.estimated_hours, task.remaining_points, task.due_date.as_deref())
         .await.map_err(internal)?;
-    // Copy work_duration_minutes and PERT estimates if set
-    if task.work_duration_minutes.is_some() || task.estimate_optimistic.is_some() || task.estimate_pessimistic.is_some() {
-        db::update_task(&engine.pool, t.id, None, None, None, None, None, None, None, None, None, None, None, None,
+    // Copy work_duration_minutes, PERT estimates, and sort_order if set
+    if task.work_duration_minutes.is_some() || task.estimate_optimistic.is_some() || task.estimate_pessimistic.is_some() || task.sort_order != 0 {
+        db::update_task(&engine.pool, t.id, None, None, None, None, None, None, None, None, None, None, Some(task.sort_order as i64), None,
             task.work_duration_minutes.map(Some),
             task.estimate_optimistic.map(Some),
             task.estimate_pessimistic.map(Some)).await.ok();

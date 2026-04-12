@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.0.1 — Stability & Hardening (2026-04-13)
+
+### Behavior Notes
+- **Bulk status changes** (`PUT /api/tasks/bulk-status`) emit a single webhook event with `{"ids": [...], "bulk": true}` instead of per-task events.
+- **Sprint carry-over** now excludes tasks with status "done" (previously only excluded "completed" and "archived").
+
 ## v2.0.0 — Feature Release (2026-04-12)
 
 ### New API Endpoints

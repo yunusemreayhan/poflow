@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 // Inline rate limiter (no external module dependency)
 // Sliding window counter rate limiter with non-blocking mutex
-pub(crate) struct RateLimiter {
+pub struct RateLimiter {
     pub(crate) buckets: parking_lot::Mutex<std::collections::HashMap<String, (u32, u32, u64)>>, // (prev_count, curr_count, curr_window_start)
     pub(crate) max_requests: u32,
     pub(crate) window_secs: u64,
@@ -50,8 +50,15 @@ impl RateLimiter {
     }
 }
 
+impl RateLimiter {
+    /// Clear all rate limit state (for testing)
+    pub fn reset(&self) {
+        self.buckets.lock().clear();
+    }
+}
+
 static AUTH_LIMITER: std::sync::OnceLock<RateLimiter> = std::sync::OnceLock::new();
-fn auth_limiter() -> &'static RateLimiter {
+pub fn auth_limiter() -> &'static RateLimiter {
     AUTH_LIMITER.get_or_init(|| RateLimiter::new(10, 60))
 }
 

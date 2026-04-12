@@ -415,9 +415,10 @@ impl Engine {
 
     pub async fn get_state(&self, user_id: i64) -> EngineState {
         let config = self.config.lock().await.clone();
-        let states = self.states.lock().await;
-        let mut state = states.get(&user_id).cloned().unwrap_or_else(|| Self::idle_state(user_id, &config));
-        drop(states);
+        let mut state = {
+            let states = self.states.lock().await;
+            states.get(&user_id).cloned().unwrap_or_else(|| Self::idle_state(user_id, &config))
+        };
         // B2: Always refresh daily_completed from DB (get_state is called infrequently: SSE init + explicit poll)
         state.daily_completed = db::get_today_completed_for_user(&self.pool, Some(user_id)).await.unwrap_or(state.daily_completed);
         state

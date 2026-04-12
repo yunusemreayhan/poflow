@@ -32,7 +32,11 @@ pub fn notify_session_complete(phase: TimerPhase, session_count: u32, play_sound
         ),
         TimerPhase::Idle => return,
     };
-    tokio::task::spawn_blocking(move || { send_notification(&title, &body, phase, play_sound).ok(); });
+    tokio::task::spawn_blocking(move || {
+        if std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| send_notification(&title, &body, phase, play_sound).ok())).is_err() {
+            tracing::debug!("Desktop notification unavailable (no D-Bus?)");
+        }
+    });
 }
 
 pub fn notify_due_task(title: &str, urgency: &str) {

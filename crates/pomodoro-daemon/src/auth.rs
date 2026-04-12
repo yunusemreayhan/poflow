@@ -140,13 +140,14 @@ fn token_hash(data: &[u8]) -> String {
     hash.iter().map(|b| format!("{:02x}", b)).collect()
 }
 
-impl<S: Send + Sync> FromRequestParts<S> for Claims {
+impl FromRequestParts<std::sync::Arc<crate::engine::Engine>> for Claims {
     type Rejection = axum::http::StatusCode;
 
     fn from_request_parts(
         parts: &mut Parts,
-        _state: &S,
+        state: &std::sync::Arc<crate::engine::Engine>,
     ) -> impl std::future::Future<Output = Result<Self, Self::Rejection>> + Send {
+        let pool = state.pool.clone();
         async move {
             // CSRF: require x-requested-with header on state-changing requests
             let method = &parts.method;
@@ -164,14 +165,14 @@ impl<S: Send + Sync> FromRequestParts<S> for Claims {
             // Reject refresh tokens used as access tokens
             if claims.typ == "refresh" { return Err(axum::http::StatusCode::UNAUTHORIZED); }
             // Reject tokens from deleted users (cached for 60s)
-            if let Some(pool) = AUTH_POOL.get() {
+            {
                 let cached = {
                     let cache = user_cache().read().await;
                     cache.get(&claims.user_id).map(|t| t.elapsed().as_secs() < 60).unwrap_or(false)
                 };
                 if !cached {
                     let row: Option<(i64, Option<String>)> = sqlx::query_as("SELECT id, password_changed_at FROM users WHERE id = ?")
-                        .bind(claims.user_id).fetch_optional(pool).await.unwrap_or(None);
+                        .bind(claims.user_id).fetch_optional(&pool).await.unwrap_or(None);
                     match row {
                         None => return Err(axum::http::StatusCode::UNAUTHORIZED),
                         Some((_, Some(changed_at))) => {

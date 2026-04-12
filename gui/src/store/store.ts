@@ -320,7 +320,7 @@ export const useStore = create<Store>((set, get) => ({
       }
       // Only update tasks if data actually changed (avoid unnecessary tree rebuilds)
       const prev = get().tasks;
-      const tasksChanged = prev.length !== resp.tasks.length || resp.tasks.some((t, i) => t.id !== prev[i]?.id || t.updated_at !== prev[i]?.updated_at);
+      const tasksChanged = prev.length !== resp.tasks.length || resp.tasks.some((t) => { const p = prev.find(p => p.id === t.id); return !p || p.updated_at !== t.updated_at; });
       // F10: Detect status changes on tasks assigned to current user
       if (tasksChanged && prev.length > 0) {
         const me = get().username;

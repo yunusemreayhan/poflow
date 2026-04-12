@@ -100,9 +100,13 @@ export default function KanbanBoard() {
 
 function KanbanCard({ task, onDragStart }: { task: Task; onDragStart: (e: React.DragEvent, id: number) => void }) {
   const labels = useStore(s => s.taskLabelsMap.get(task.id));
+  const updateTask = useStore(s => s.updateTask);
+  const nextStatus = task.status === "backlog" ? "in_progress" : task.status === "in_progress" ? "completed" : task.status === "active" ? "in_progress" : null;
   return (
-    <div draggable onDragStart={e => onDragStart(e, task.id)}
-      className="bg-[var(--color-surface)] p-2 rounded-lg border border-white/5 cursor-grab active:cursor-grabbing hover:border-white/10 transition-colors">
+    <div draggable onDragStart={e => onDragStart(e, task.id)} tabIndex={0}
+      onKeyDown={e => { if (e.key === "Enter" && nextStatus) { e.preventDefault(); updateTask(task.id, { status: nextStatus }); } }}
+      role="listitem" aria-label={`${task.title}, ${task.status}${nextStatus ? `. Press Enter to move to ${nextStatus}` : ""}`}
+      className="bg-[var(--color-surface)] p-2 rounded-lg border border-white/5 cursor-grab active:cursor-grabbing hover:border-white/10 focus:ring-2 focus:ring-[var(--color-accent)] focus:outline-none transition-colors">
       <div className="text-xs text-white/80 leading-tight">{task.title}</div>
       <div className="flex items-center gap-1.5 mt-1 flex-wrap">
         {task.project && <span className="text-[9px] bg-white/5 px-1 py-0.5 rounded text-white/30">{task.project}</span>}

@@ -2099,6 +2099,7 @@ async fn test_optimistic_locking_sprint_conflict() {
 #[tokio::test]
 async fn test_auth_rate_limiting() {
     if std::env::var("POMODORO_NO_RATE_LIMIT").is_ok() { eprintln!("SKIP: rate limiter disabled"); return; }
+    pomodoro_daemon::routes::auth_limiter().reset();
     let app = app().await;
     // Send 11 login attempts (limit is 10 per 60s)
     // Note: rate limiter uses x-forwarded-for header, which our test doesn't set,
@@ -4074,6 +4075,7 @@ async fn test_webhook_ssrf_additional_patterns() {
 #[tokio::test]
 async fn test_auth_rate_limit_threshold() {
     if std::env::var("POMODORO_NO_RATE_LIMIT").is_ok() { eprintln!("SKIP: rate limiter disabled"); return; }
+    pomodoro_daemon::routes::auth_limiter().reset();
     let app = app().await;
 
     // Send 11 login attempts from same IP (limit is 10/60s)
@@ -4245,6 +4247,7 @@ async fn test_rate_limit_get_not_limited() {
 #[tokio::test]
 async fn test_auth_rate_limit_blocks_after_threshold() {
     if std::env::var("POMODORO_NO_RATE_LIMIT").is_ok() { eprintln!("SKIP: rate limiter disabled"); return; }
+    pomodoro_daemon::routes::auth_limiter().reset();
     let app = app().await;
     // Use a fixed IP for all requests to trigger rate limit
     let fixed_ip = "10.99.99.1";
