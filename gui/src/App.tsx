@@ -148,6 +148,7 @@ function Sidebar() {
 
 export default function App() {
   const { activeTab, poll, loadTasks, connected, token, toasts, dismissToast, confirmDialog, dismissConfirm, loading, focusMode } = useStore();
+  const [showShortcuts, setShowShortcuts] = useState(false);
   const t = useT();
 
   useEffect(() => {
@@ -189,6 +190,7 @@ export default function App() {
           e.preventDefault();
           store.toggleFocusMode();
         }
+        if (e.key === "?") { setShowShortcuts(s => !s); }
       }
     };
     window.addEventListener("keydown", handler);
@@ -295,6 +297,21 @@ export default function App() {
 
         {/* Confirm dialog */}
         <AnimatePresence>
+          {/* F2: Keyboard shortcuts overlay */}
+          {showShortcuts && (
+            <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center" onClick={() => setShowShortcuts(false)}>
+              <div className="glass p-6 rounded-2xl max-w-sm w-full" onClick={e => e.stopPropagation()}>
+                <div className="text-sm font-medium text-white/80 mb-3">Keyboard Shortcuts</div>
+                <div className="space-y-1 text-xs">
+                  {[["0-7","Switch tabs"],["Space","Pause/Resume timer"],["Esc","Stop timer"],["n","New task (on tasks tab)"],["r","Refresh"],["s","Cycle task status"],["/ ","Search tasks"],["F11","Focus mode"],["?","This help"]].map(([k,d]) => (
+                    <div key={k} className="flex justify-between"><kbd className="bg-white/10 px-1.5 py-0.5 rounded text-white/60 font-mono">{k}</kbd><span className="text-white/40">{d}</span></div>
+                  ))}
+                </div>
+                <button onClick={() => setShowShortcuts(false)} className="mt-4 w-full py-1.5 text-xs rounded-lg bg-white/5 text-white/40 hover:text-white/60">Close</button>
+              </div>
+            </div>
+          )}
+
           {confirmDialog && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="absolute inset-0 bg-black/50 flex items-center justify-center z-50"

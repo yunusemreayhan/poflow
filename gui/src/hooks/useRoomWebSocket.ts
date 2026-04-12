@@ -24,9 +24,14 @@ export function useRoomWebSocket(roomId: number, onState: (s: RoomState) => void
         wsRef.current = ws;
         ws.onmessage = (e) => {
           try { onStateRef.current(JSON.parse(e.data)); } catch { /* ignore */ }
+          lastMsg = Date.now();
         };
+        let lastMsg = Date.now();
+        // F12: Heartbeat check — force reconnect if no data in 60s
+        const hb = setInterval(() => { if (Date.now() - lastMsg > 60000) ws?.close(); }, 15000);
         ws.onopen = () => { attempts = 0; };
         ws.onclose = () => {
+          clearInterval(hb);
           if (unmountedRef.current) return;
           const delay = Math.min(1000 * Math.pow(2, attempts), 15000);
           attempts++;

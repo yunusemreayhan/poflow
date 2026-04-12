@@ -25,12 +25,15 @@ pub struct Config {
     pub theme: String,
     #[serde(default)]
     pub cors_origins: Vec<String>,
+    #[serde(default = "default_auto_archive_days")]
+    pub auto_archive_days: u32,
 }
 
 fn default_bind_address() -> String { "127.0.0.1".to_string() }
 fn default_bind_port() -> u16 { 9090 }
 fn default_estimation_mode() -> String { "hours".to_string() }
 fn default_theme() -> String { "dark".to_string() }
+fn default_auto_archive_days() -> u32 { 90 }
 
 impl Default for Config {
     fn default() -> Self {
@@ -50,6 +53,7 @@ impl Default for Config {
             leaf_only_mode: false,
             theme: "dark".to_string(),
             cors_origins: vec![],
+            auto_archive_days: 90,
         }
     }
 }
