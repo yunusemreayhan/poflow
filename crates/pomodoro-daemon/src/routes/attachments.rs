@@ -62,7 +62,8 @@ pub async fn upload_attachment(
 pub async fn download_attachment(State(engine): State<AppState>, _claims: Claims, Path(id): Path<i64>) -> Result<axum::response::Response, ApiError> {
     let att = db::get_attachment(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Attachment not found"))?;
     let path = db::attachments_dir().join(&att.storage_key);
-    let data = tokio::fs::read(&path).await.map_err(|_| err(StatusCode::NOT_FOUND, "File not found on disk"))?;
+    let file = tokio::fs::File::open(&path).await.map_err(|_| err(StatusCode::NOT_FOUND, "File not found on disk"))?;
+    let stream = tokio_util::io::ReaderStream::new(file);
 
     // S3: Force safe content-type to prevent XSS via uploaded HTML/SVG
     let safe_mime = if att.mime_type.starts_with("image/") || att.mime_type == "application/pdf" || att.mime_type.starts_with("text/plain") {
@@ -77,7 +78,7 @@ pub async fn download_attachment(State(engine): State<AppState>, _claims: Claims
         .header("content-disposition", format!("attachment; filename=\"{}\"", att.filename.replace('"', "_")))
         .header("content-security-policy", "default-src 'none'")
         .header("x-content-type-options", "nosniff")
-        .body(axum::body::Body::from(data))
+        .body(axum::body::Body::from_stream(stream))
         .map_err(|e| internal(e.to_string()))?)
 }
 

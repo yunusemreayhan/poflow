@@ -98,8 +98,9 @@ export default function TaskNode({ node, depth, onView, selectMode, onSelect, se
           const dragId = Number(e.dataTransfer?.getData("text/plain"));
           if (!dragId || dragId === t.id) return;
           const isDescendantOf = (nodeId: number, ancestorId: number): boolean => {
+            const taskMap = new Map(useStore.getState().tasks.map(tk => [tk.id, tk.parent_id]));
             let pid: number | null = nodeId;
-            while (pid) { if (pid === ancestorId) return true; const p = useStore.getState().tasks.find(tk => tk.id === pid); pid = p?.parent_id ?? null; }
+            while (pid) { if (pid === ancestorId) return true; pid = taskMap.get(pid) ?? null; }
             return false;
           };
           if (isDescendantOf(t.id, dragId) || t.id === dragId) return;

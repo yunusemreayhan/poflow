@@ -215,21 +215,8 @@ async fn api_rate_limit(
     }
     let ip = routes::extract_ip(req.headers());
     let limiter = routes::api_limiter();
-    let now = std::time::Instant::now();
-    {
-        let mut map = limiter.attempts.lock().unwrap();
-        if map.len() > 500 {
-            map.retain(|_, entries| {
-                entries.retain(|t| now.duration_since(*t).as_secs() < limiter.window_secs);
-                !entries.is_empty()
-            });
-        }
-        let entries = map.entry(ip).or_default();
-        entries.retain(|t| now.duration_since(*t).as_secs() < limiter.window_secs);
-        if entries.len() >= limiter.max_requests {
-            return (axum::http::StatusCode::TOO_MANY_REQUESTS, "Rate limit exceeded").into_response();
-        }
-        entries.push(now);
+    if !limiter.check_and_record(&ip) {
+        return (axum::http::StatusCode::TOO_MANY_REQUESTS, "Rate limit exceeded").into_response();
     }
     next.run(req).await.into_response()
 }

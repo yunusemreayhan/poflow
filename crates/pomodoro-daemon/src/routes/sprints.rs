@@ -41,6 +41,7 @@ pub async fn update_sprint(State(engine): State<AppState>, claims: Claims, Path(
     let sprint = get_owned_sprint(&engine.pool, id, &claims).await?;
     if req.goal.as_ref().and_then(|o| o.as_ref()).map_or(false, |g| g.len() > 1000) { return Err(err(StatusCode::BAD_REQUEST, "Goal too long (max 1000)")); }
     if let Some(ref name) = req.name { if name.trim().is_empty() { return Err(err(StatusCode::BAD_REQUEST, "Sprint name cannot be empty")); } if name.len() > 200 { return Err(err(StatusCode::BAD_REQUEST, "Sprint name too long (max 200)")); } }
+    if req.project.as_ref().and_then(|o| o.as_ref()).map_or(false, |p| p.len() > 200) { return Err(err(StatusCode::BAD_REQUEST, "Project too long (max 200)")); }
     if req.retro_notes.as_ref().and_then(|o| o.as_ref()).map_or(false, |r| r.len() > 10000) { return Err(err(StatusCode::BAD_REQUEST, "Retro notes too long (max 10000)")); }
     if req.status.is_some() { return Err(err(StatusCode::BAD_REQUEST, "Use /start or /complete endpoints to change sprint status")); }
     if let Some(Some(cap)) = req.capacity_hours { if cap < 0.0 || cap > 10000.0 { return Err(err(StatusCode::BAD_REQUEST, "capacity_hours must be 0-10000")); } }
@@ -129,7 +130,15 @@ pub async fn carryover_sprint(State(engine): State<AppState>, claims: Claims, Pa
     if incomplete.is_empty() { return Err(err(StatusCode::BAD_REQUEST, "No incomplete tasks to carry over")); }
     let new_name = format!("{} (carry-over)", sprint.name);
     let new_sprint = db::create_sprint(&engine.pool, claims.user_id, &new_name, sprint.project.as_deref(), None, None, None, sprint.capacity_hours).await.map_err(internal)?;
-    db::add_sprint_tasks(&engine.pool, new_sprint.id, &incomplete, claims.user_id).await.map_err(internal)?;
+    // BL6: Filter out tasks already in an active sprint
+    let ph = incomplete.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+    let q = format!("SELECT DISTINCT st.task_id FROM sprint_tasks st JOIN sprints s ON s.id = st.sprint_id WHERE s.status = 'active' AND st.task_id IN ({})", ph);
+    let mut query = sqlx::query_as::<_, (i64,)>(&q);
+    for tid in &incomplete { query = query.bind(tid); }
+    let already_active: std::collections::HashSet<i64> = query.fetch_all(&engine.pool).await.map_err(internal)?.into_iter().map(|(id,)| id).collect();
+    let to_add: Vec<i64> = incomplete.into_iter().filter(|id| !already_active.contains(id)).collect();
+    if to_add.is_empty() { return Err(err(StatusCode::BAD_REQUEST, "All incomplete tasks are already in an active sprint")); }
+    db::add_sprint_tasks(&engine.pool, new_sprint.id, &to_add, claims.user_id).await.map_err(internal)?;
     engine.notify(ChangeEvent::Sprints);
     Ok(Json(new_sprint))
 }

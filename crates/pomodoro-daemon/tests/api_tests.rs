@@ -5264,9 +5264,9 @@ async fn flow_assignee_cannot_unassign_self() {
     let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &root_token, Some(json!({"title":"Task X"})))).await.unwrap();
     let tid = body_json(resp).await["id"].as_i64().unwrap();
     app.clone().oneshot(auth_req("POST", &format!("/api/tasks/{}/assignees", tid), &root_token, Some(json!({"username":"dev2"})))).await.unwrap();
-    // dev2 tries to unassign self → 403
+    // BL1: dev2 can unassign self → 204
     let resp = app.clone().oneshot(auth_req("DELETE", &format!("/api/tasks/{}/assignees/dev2", tid), &_user_token, None)).await.unwrap();
-    assert_eq!(resp.status(), 403);
+    assert_eq!(resp.status(), 204);
 }
 
 #[tokio::test]

@@ -29,7 +29,9 @@ pub async fn get_team(State(engine): State<AppState>, _claims: Claims, Path(id):
 
 #[utoipa::path(delete, path = "/api/teams/{id}", responses((status = 204)), security(("bearer" = [])))]
 pub async fn delete_team(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>) -> Result<StatusCode, ApiError> {
-    if claims.role != "root" { return Err(err(StatusCode::FORBIDDEN, "Only root can delete teams")); }
+    if claims.role != "root" && !db::is_team_admin(&engine.pool, id, claims.user_id).await.map_err(internal)? {
+        return Err(err(StatusCode::FORBIDDEN, "Only root or team admin can delete teams"));
+    }
     db::delete_team(&engine.pool, id).await.map_err(internal)?;
     Ok(StatusCode::NO_CONTENT)
 }
