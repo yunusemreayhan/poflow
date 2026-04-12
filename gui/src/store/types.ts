@@ -105,7 +105,7 @@ export interface AuthResponse { token: string; refresh_token: string; user_id: n
 export interface User { id: number; username: string; role: string; created_at: string; }
 
 export interface Room { id: number; name: string; room_type: string; estimation_unit: string; project: string | null; creator: string; status: string; current_task_id: number | null; created_at: string; }
-export interface RoomMember { room_id: number; username: string; role: string; joined_at: string; }
+export interface RoomMember { room_id: number; user_id: number; username: string; role: string; joined_at: string; }
 export interface RoomVoteView { username: string; voted: boolean; value: number | null; }
 export interface RoomVote { id: number; room_id: number; task_id: number; username: string; value: number | null; created_at: string; }
 export interface VoteResult { task_id: number; task_title: string; votes: { id: number; room_id: number; task_id: number; user_id: number; username: string; value: number | null; created_at: string }[]; average: number; consensus: boolean; }

@@ -253,6 +253,7 @@ export default function TaskList({ selectMode, onSelect, selectedTaskId, votedTa
       {viewMode === "table" ? (
         <div className="flex-1 overflow-y-auto text-xs">
           <table className="w-full">
+            <caption className="sr-only">Task list sorted by {tableSort}</caption>
             <thead className="sticky top-0 bg-[var(--color-bg)]">
               <tr className="text-white/30 text-left">
                 <th scope="col" className="py-1 px-1 w-6"></th>

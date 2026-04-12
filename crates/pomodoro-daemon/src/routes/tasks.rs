@@ -305,6 +305,8 @@ pub async fn bulk_update_status(State(engine): State<AppState>, claims: Claims, 
             }
         }
     }
+    // B4: Fire webhooks for bulk status updates
+    crate::webhook::dispatch(engine.pool.clone(), "task.updated", serde_json::json!({"ids": &req.task_ids, "status": &req.status, "bulk": true}));
     engine.notify(ChangeEvent::Tasks);
     Ok(StatusCode::NO_CONTENT)
 }

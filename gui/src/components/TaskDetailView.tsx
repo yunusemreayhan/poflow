@@ -454,5 +454,3 @@ export default function TaskDetailView({ taskId, onBack, onNavigate }: { taskId:
     </div>
   );
 }
-
-export { ExportButton };
