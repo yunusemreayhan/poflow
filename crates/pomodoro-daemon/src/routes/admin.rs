@@ -25,3 +25,25 @@ pub async fn delete_user(State(engine): State<AppState>, claims: Claims, Path(id
 }
 
 // --- Task votes ---
+
+#[utoipa::path(post, path = "/api/admin/backup", responses((status = 200)), security(("bearer" = [])))]
+pub async fn create_backup(State(engine): State<AppState>, claims: Claims) -> Result<axum::response::Response, ApiError> {
+    if claims.role != "root" { return Err(err(StatusCode::FORBIDDEN, "Root only")); }
+    let db_path = db::db_path();
+    let backup_dir = db_path.parent().unwrap_or(std::path::Path::new("/tmp")).join("backups");
+    std::fs::create_dir_all(&backup_dir).map_err(|e| internal(format!("Failed to create backup dir: {}", e)))?;
+    let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S");
+    let backup_path = backup_dir.join(format!("pomodoro_{}.db", timestamp));
+    // Use SQLite VACUUM INTO for a consistent backup
+    sqlx::query(&format!("VACUUM INTO '{}'", backup_path.display()))
+        .execute(&engine.pool).await.map_err(|e| internal(format!("Backup failed: {}", e)))?;
+    let size = std::fs::metadata(&backup_path).map(|m| m.len()).unwrap_or(0);
+    Ok(axum::response::Response::builder()
+        .status(StatusCode::OK)
+        .header("content-type", "application/json")
+        .body(axum::body::Body::from(serde_json::to_vec(&serde_json::json!({
+            "path": backup_path.display().to_string(),
+            "size_bytes": size,
+        })).unwrap()))
+        .map_err(|e| internal(e.to_string()))?)
+}

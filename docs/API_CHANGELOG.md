@@ -1,6 +1,42 @@
 # API Changelog
 
-## v8 (Current)
+## v9 (Current)
+
+### New Endpoints
+- `GET /api/tasks/{id}/sessions` — List sessions for a task (max 200).
+
+### Security Fixes
+- Rate limiter now prunes stale IPs (prevents unbounded memory growth).
+- Claims extractor caches verified user IDs for 60s (reduces per-request DB load).
+- Attachment download forces safe MIME types (HTML/SVG → application/octet-stream).
+- WebSocket room endpoint verifies room membership before allowing connection.
+
+### Bug Fixes
+- Sprint/epic burndown snapshots now use `remaining_points` (story points) instead of `estimated` (pomodoro count).
+- Break sessions created by auto-start no longer associate with the previous work task.
+- `daily_completed` always refreshed from DB on `get_state` (was stale when status != Idle).
+- Room tasks scoped to room members when no project set (was fetching all global tasks).
+- CSV export formula-prefixed fields now properly quoted.
+- Sprint update defensively passes None for status to DB.
+
+### Validation Improvements
+- `PUT /api/profile` — Password change requires `current_password` field.
+- `POST /api/tasks/{id}/time` — Rejects soft-deleted tasks.
+- `POST /api/teams` — Limited to 50 teams.
+- `POST /api/epics` — Limited to 100 epic groups.
+
+### Cleanup
+- `is_owner_or_root` wrapper replaced with re-export.
+- `UserConfig` struct moved from burns.rs to types.rs.
+- Dead `get_today_completed` function removed.
+
+### DevOps
+- `/api/health` now includes background task heartbeats.
+- Daily orphaned attachment file cleanup.
+
+---
+
+## v8
 
 ### Security Fixes
 - `POST /api/sprints/{id}/roots` — Requires sprint ownership (was unauthenticated).

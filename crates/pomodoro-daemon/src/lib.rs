@@ -74,6 +74,7 @@ pub fn build_router(engine: Arc<engine::Engine>) -> Router {
         .route("/api/admin/users", get(routes::list_users))
         .route("/api/admin/users/{id}/role", put(routes::update_user_role))
         .route("/api/admin/users/{id}", delete(routes::delete_user))
+        .route("/api/admin/backup", post(routes::create_backup))
         .route("/api/rooms", get(routes::list_rooms).post(routes::create_room))
         .route("/api/rooms/{id}", get(routes::get_room_state).delete(routes::delete_room))
         .route("/api/rooms/{id}/join", post(routes::join_room))

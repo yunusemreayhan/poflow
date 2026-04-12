@@ -1,62 +1,93 @@
-# Contributing
+# Contributing to pomodoroLinux
 
-## Development Setup
+## Prerequisites
 
-### Prerequisites
-- Rust 1.75+ with `cargo`
-- Node.js 18+ with `npm`
-- SQLite 3.35+ (for WAL mode and RETURNING)
-
-### Backend
-```bash
-cd crates/pomodoro-daemon
-cargo build
-cargo test
-```
-
-### Frontend
-```bash
-cd gui
-npm install
-npx tsc --noEmit   # type check
-npm test            # run tests
-npm run dev         # dev server (Tauri)
-```
-
-### Running
-```bash
-cargo run -p pomodoro-daemon   # starts on :3030
-cd gui && npm run tauri dev    # starts Tauri app
-```
-
-## Code Style
-
-- Rust: `cargo fmt` + `cargo clippy`
-- TypeScript: strict mode, no `any` (except test mocks)
-- Minimal code — only what's needed to solve the problem
-- Comments for non-obvious logic only
-
-## Testing
-
-- Backend: integration tests in `tests/api_tests.rs` (186 tests)
-- Frontend: unit tests in `gui/src/__tests__/` (134 tests)
-- Run both before submitting: `cargo test -p pomodoro-daemon && cd gui && npm test`
+- Rust 1.75+ (with cargo)
+- Node.js 18+ (with npm)
+- SQLite 3.35+ (bundled via sqlx)
 
 ## Project Structure
 
 ```
-crates/pomodoro-daemon/
+crates/pomodoro-daemon/   # Backend (Rust, axum, SQLite)
   src/
-    routes/     # HTTP route handlers (24 files)
-    db/         # Database queries (19 files)
-    engine.rs   # Timer state machine
-    auth.rs     # JWT auth + token blocklist
-    config.rs   # Config file management
-    webhook.rs  # Webhook dispatch
-gui/
+    auth.rs               # JWT auth, token blocklist
+    config.rs             # Server config (TOML)
+    engine.rs             # Timer engine (per-user state)
+    db/                   # Database layer (sqlx, SQLite)
+    routes/               # HTTP route handlers
+  tests/api_tests.rs      # Integration tests (211 tests)
+
+gui/                      # Frontend (React, TypeScript, Tauri v2)
   src/
-    components/ # React components
-    store/      # Zustand store + API layer
-    __tests__/  # Frontend tests
-docs/           # Documentation
+    store/                # Zustand store + API client
+    components/           # React components
+    hooks/                # Custom hooks (SSE, debounce)
+    locales/              # i18n translations (en, tr)
+  src/__tests__/          # Frontend tests (154 tests)
 ```
+
+## Development Setup
+
+### Backend
+
+```bash
+# Run the daemon (auto-creates SQLite DB)
+cargo run -p pomodoro-daemon
+
+# Run tests
+cargo test -p pomodoro-daemon
+
+# Check compilation
+cargo check -p pomodoro-daemon
+```
+
+The daemon starts on `http://127.0.0.1:9090` by default.
+Swagger UI available at `http://127.0.0.1:9090/swagger-ui/`.
+
+### Frontend
+
+```bash
+cd gui
+
+# Install dependencies
+npm install
+
+# Type check
+npx tsc --noEmit
+
+# Run tests
+npm test
+
+# Dev server (Tauri)
+npm run tauri dev
+```
+
+## Testing
+
+Always verify before committing:
+
+```bash
+# Backend (should show 211+ passed)
+cargo test -p pomodoro-daemon
+
+# Frontend (should show 154+ passed, TS clean)
+cd gui && npx tsc --noEmit && npm test
+```
+
+## Environment Variables
+
+See `docs/ENV_VARS.md` for all supported environment variables.
+
+Key ones:
+- `POMODORO_JWT_SECRET` — JWT signing secret (auto-generated if not set)
+- `POMODORO_ROOT_PASSWORD` — Initial root user password (default: "root")
+- `POMODORO_CORS_ORIGINS` — Comma-separated allowed origins
+- `POMODORO_LOG_JSON=1` — Enable JSON structured logging
+
+## Code Style
+
+- Rust: standard `rustfmt` formatting
+- TypeScript: strict mode, no `any` types
+- Minimal code — only what's needed to solve the problem
+- All endpoints need `#[utoipa::path]` annotations for Swagger
