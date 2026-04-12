@@ -4215,3 +4215,294 @@ async fn test_config_theme_validation() {
     let resp = app.clone().oneshot(auth_req("PUT", "/api/config", &tok, Some(cfg))).await.unwrap();
     assert_eq!(resp.status(), 200);
 }
+
+// ============================================================
+// T1: Rate limiting middleware tests
+// ============================================================
+
+#[tokio::test]
+async fn test_rate_limit_get_not_limited() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    // GET requests should never be rate limited
+    for _ in 0..10 {
+        let resp = app.clone().oneshot(auth_req("GET", "/api/tasks", &tok, None)).await.unwrap();
+        assert_eq!(resp.status(), 200);
+    }
+}
+
+#[tokio::test]
+async fn test_auth_rate_limit_blocks_after_threshold() {
+    let app = app().await;
+    // Use a fixed IP for all requests to trigger rate limit
+    let fixed_ip = "10.99.99.1";
+    for i in 0..12 {
+        let req = Request::builder().method("POST").uri("/api/auth/login")
+            .header("content-type", "application/json")
+            .header("x-forwarded-for", fixed_ip)
+            .body(Body::from(serde_json::to_vec(&json!({"username":"root","password":"wrong"})).unwrap())).unwrap();
+        let resp = app.clone().oneshot(req).await.unwrap();
+        if i >= 10 {
+            assert_eq!(resp.status(), 429, "Should be rate limited after 10 attempts");
+        }
+    }
+}
+
+// ============================================================
+// T2: Attachment upload/download tests
+// ============================================================
+
+#[tokio::test]
+async fn test_attachment_upload_download_delete() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    // Create a task
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"AttachTask"})))).await.unwrap();
+    let tid = body_json(resp).await["id"].as_i64().unwrap();
+
+    // Upload attachment
+    let req = Request::builder().method("POST").uri(&format!("/api/tasks/{}/attachments", tid))
+        .header("authorization", format!("Bearer {}", tok))
+        .header("x-requested-with", "test")
+        .header("x-filename", "test.txt")
+        .header("content-type", "text/plain")
+        .body(Body::from("hello world")).unwrap();
+    let resp = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), 201);
+    let att = body_json(resp).await;
+    assert_eq!(att["filename"], "test.txt");
+    let att_id = att["id"].as_i64().unwrap();
+
+    // List attachments
+    let resp = app.clone().oneshot(auth_req("GET", &format!("/api/tasks/{}/attachments", tid), &tok, None)).await.unwrap();
+    let list = body_json(resp).await;
+    assert_eq!(list.as_array().unwrap().len(), 1);
+
+    // Download
+    let resp = app.clone().oneshot(auth_req("GET", &format!("/api/attachments/{}/download", att_id), &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    // S3: text/plain should be served as-is
+    assert_eq!(resp.headers().get("content-type").unwrap(), "text/plain");
+
+    // Delete
+    let resp = app.clone().oneshot(auth_req("DELETE", &format!("/api/attachments/{}", att_id), &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 204);
+}
+
+#[tokio::test]
+async fn test_attachment_empty_file_rejected() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"T"})))).await.unwrap();
+    let tid = body_json(resp).await["id"].as_i64().unwrap();
+    let req = Request::builder().method("POST").uri(&format!("/api/tasks/{}/attachments", tid))
+        .header("authorization", format!("Bearer {}", tok))
+        .header("x-requested-with", "test")
+        .header("x-filename", "empty.txt")
+        .body(Body::empty()).unwrap();
+    let resp = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), 400);
+}
+
+#[tokio::test]
+async fn test_attachment_unsafe_mime_forced_octet_stream() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"T"})))).await.unwrap();
+    let tid = body_json(resp).await["id"].as_i64().unwrap();
+    // Upload with HTML content-type
+    let req = Request::builder().method("POST").uri(&format!("/api/tasks/{}/attachments", tid))
+        .header("authorization", format!("Bearer {}", tok))
+        .header("x-requested-with", "test")
+        .header("x-filename", "evil.html")
+        .header("content-type", "text/html")
+        .body(Body::from("<script>alert(1)</script>")).unwrap();
+    let resp = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), 201);
+    let att_id = body_json(resp).await["id"].as_i64().unwrap();
+    // Download should force application/octet-stream
+    let resp = app.clone().oneshot(auth_req("GET", &format!("/api/attachments/{}/download", att_id), &tok, None)).await.unwrap();
+    assert_eq!(resp.headers().get("content-type").unwrap(), "application/octet-stream");
+}
+
+// ============================================================
+// T3: Recurring task tests
+// ============================================================
+
+#[tokio::test]
+async fn test_recurrence_crud_and_patterns() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"Recurring"})))).await.unwrap();
+    let tid = body_json(resp).await["id"].as_i64().unwrap();
+
+    // Set daily recurrence
+    let resp = app.clone().oneshot(auth_req("PUT", &format!("/api/tasks/{}/recurrence", tid), &tok,
+        Some(json!({"pattern":"daily","next_due":"2026-04-15"})))).await.unwrap();
+    assert_eq!(resp.status(), 200);
+
+    // Get recurrence
+    let resp = app.clone().oneshot(auth_req("GET", &format!("/api/tasks/{}/recurrence", tid), &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let rec = body_json(resp).await;
+    assert_eq!(rec["pattern"], "daily");
+    assert_eq!(rec["next_due"], "2026-04-15");
+
+    // Update to weekly
+    let resp = app.clone().oneshot(auth_req("PUT", &format!("/api/tasks/{}/recurrence", tid), &tok,
+        Some(json!({"pattern":"weekly","next_due":"2026-04-20"})))).await.unwrap();
+    assert_eq!(resp.status(), 200);
+
+    // Delete recurrence
+    let resp = app.clone().oneshot(auth_req("DELETE", &format!("/api/tasks/{}/recurrence", tid), &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 204);
+
+    // Get should return empty/null
+    let resp = app.clone().oneshot(auth_req("GET", &format!("/api/tasks/{}/recurrence", tid), &tok, None)).await.unwrap();
+    let rec = body_json(resp).await;
+    assert!(rec.is_null() || rec.as_object().map_or(true, |o| o.is_empty()));
+}
+
+// ============================================================
+// T4: Webhook SSRF protection tests
+// ============================================================
+
+#[tokio::test]
+async fn test_webhook_rejects_private_ips() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let private_urls = [
+        "http://localhost:8080/hook",
+        "http://127.0.0.1:8080/hook",
+        "http://10.0.0.1/hook",
+        "http://192.168.1.1/hook",
+        "http://172.16.0.1/hook",
+    ];
+    for url in private_urls {
+        let resp = app.clone().oneshot(auth_req("POST", "/api/webhooks", &tok, Some(json!({"url": url})))).await.unwrap();
+        assert_eq!(resp.status(), 400, "Should reject private URL: {}", url);
+    }
+}
+
+#[tokio::test]
+async fn test_webhook_rejects_credentials_in_url() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("POST", "/api/webhooks", &tok,
+        Some(json!({"url":"http://user:pass@example.com/hook"})))).await.unwrap();
+    assert_eq!(resp.status(), 400);
+}
+
+// ============================================================
+// T5: CSV import edge cases
+// ============================================================
+
+#[tokio::test]
+async fn test_csv_import_quoted_fields_with_commas() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let csv = "title,priority,estimated,project\n\"Task with, comma\",3,2,\"My Project\"\n\"Task \"\"quoted\"\"\",1,1,\n";
+    let resp = app.clone().oneshot(auth_req("POST", "/api/import/tasks", &tok, Some(json!({"csv": csv})))).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let result = body_json(resp).await;
+    assert_eq!(result["created"], 2);
+}
+
+#[tokio::test]
+async fn test_csv_import_empty_lines_skipped() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let csv = "title,priority\n\n\nActual Task,3\n\n";
+    let resp = app.clone().oneshot(auth_req("POST", "/api/import/tasks", &tok, Some(json!({"csv": csv})))).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let result = body_json(resp).await;
+    assert_eq!(result["created"], 1);
+}
+
+#[tokio::test]
+async fn test_csv_import_size_limit() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let csv = "a".repeat(1_048_577); // > 1MB
+    let resp = app.clone().oneshot(auth_req("POST", "/api/import/tasks", &tok, Some(json!({"csv": csv})))).await.unwrap();
+    assert_eq!(resp.status(), 400);
+}
+
+// ============================================================
+// T6: Sprint burndown snapshot accuracy
+// ============================================================
+
+#[tokio::test]
+async fn test_burndown_snapshot_uses_remaining_points() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+
+    // Create tasks with different remaining_points and estimated
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok,
+        Some(json!({"title":"T1","remaining_points":8.0,"estimated":3,"estimated_hours":4.0})))).await.unwrap();
+    let t1 = body_json(resp).await["id"].as_i64().unwrap();
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok,
+        Some(json!({"title":"T2","remaining_points":5.0,"estimated":2,"estimated_hours":2.0,"status":"completed"})))).await.unwrap();
+    let t2 = body_json(resp).await["id"].as_i64().unwrap();
+    // Mark T2 as completed
+    app.clone().oneshot(auth_req("PUT", &format!("/api/tasks/{}", t2), &tok, Some(json!({"status":"completed"})))).await.unwrap();
+
+    // Create sprint and add tasks
+    let resp = app.clone().oneshot(auth_req("POST", "/api/sprints", &tok, Some(json!({"name":"BurndownTest"})))).await.unwrap();
+    let sid = body_json(resp).await["id"].as_i64().unwrap();
+    app.clone().oneshot(auth_req("POST", &format!("/api/sprints/{}/tasks", sid), &tok, Some(json!({"task_ids":[t1, t2]})))).await.unwrap();
+
+    // Snapshot
+    let resp = app.clone().oneshot(auth_req("POST", &format!("/api/sprints/{}/snapshot", sid), &tok, None)).await.unwrap();
+    let stat = body_json(resp).await;
+    // total_points should be remaining_points sum (8+5=13), not estimated (3+2=5)
+    assert_eq!(stat["total_points"], 13.0);
+    assert_eq!(stat["done_points"], 5.0);
+    assert_eq!(stat["total_hours"], 6.0);
+    assert_eq!(stat["done_hours"], 2.0);
+    assert_eq!(stat["total_tasks"], 2);
+    assert_eq!(stat["done_tasks"], 1);
+}
+
+// ============================================================
+// T7: Task sessions endpoint
+// ============================================================
+
+#[tokio::test]
+async fn test_task_sessions_endpoint() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"SessionTask"})))).await.unwrap();
+    let tid = body_json(resp).await["id"].as_i64().unwrap();
+
+    // No sessions initially
+    let resp = app.clone().oneshot(auth_req("GET", &format!("/api/tasks/{}/sessions", tid), &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let sessions = body_json(resp).await;
+    assert_eq!(sessions.as_array().unwrap().len(), 0);
+}
+
+// ============================================================
+// T8: Password change requires current password
+// ============================================================
+
+#[tokio::test]
+async fn test_password_change_requires_current() {
+    let app = app().await;
+    let tok = register_user(&app, "pwReqUser").await;
+
+    // Missing current_password → 400
+    let resp = app.clone().oneshot(auth_req("PUT", "/api/profile", &tok,
+        Some(json!({"password":"NewPass99"})))).await.unwrap();
+    assert_eq!(resp.status(), 400);
+
+    // Wrong current_password → 403
+    let resp = app.clone().oneshot(auth_req("PUT", "/api/profile", &tok,
+        Some(json!({"password":"NewPass99","current_password":"WrongPass1"})))).await.unwrap();
+    assert_eq!(resp.status(), 403);
+
+    // Correct current_password → 200
+    let resp = app.clone().oneshot(auth_req("PUT", "/api/profile", &tok,
+        Some(json!({"password":"NewPass99","current_password":"Pass1234"})))).await.unwrap();
+    assert_eq!(resp.status(), 200);
+}
