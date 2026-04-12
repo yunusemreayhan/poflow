@@ -13,6 +13,7 @@ pub async fn list_webhooks(State(engine): State<AppState>, claims: Claims) -> Ap
 #[utoipa::path(post, path = "/api/webhooks", responses((status = 201)), security(("bearer" = [])))]
 pub async fn create_webhook(State(engine): State<AppState>, claims: Claims, Json(req): Json<CreateWebhookRequest>) -> Result<(StatusCode, Json<db::Webhook>), ApiError> {
     if req.url.trim().is_empty() { return Err(err(StatusCode::BAD_REQUEST, "URL cannot be empty")); }
+    if req.url.len() > 2000 { return Err(err(StatusCode::BAD_REQUEST, "URL too long (max 2000 chars)")); }
     if !req.url.starts_with("http://") && !req.url.starts_with("https://") {
         return Err(err(StatusCode::BAD_REQUEST, "URL must start with http:// or https://"));
     }

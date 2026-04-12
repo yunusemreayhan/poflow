@@ -33,7 +33,7 @@ pub fn dispatch(pool: Pool, event: &str, payload: serde_json::Value) {
     tokio::spawn(async move {
         let hooks = match db::get_active_webhooks(&pool, &event).await {
             Ok(h) => h,
-            Err(e) => { tracing::warn!("Failed to load webhooks: {}", e); return; }
+            Err(e) => { tracing::warn!("Failed to load webhooks: {}", e.to_string().chars().take(200).collect::<String>()); return; }
         };
         let client = webhook_client();
         for hook in hooks {

@@ -174,7 +174,12 @@ impl<S: Send + Sync> FromRequestParts<S> for Claims {
                     let exists: Option<(i64,)> = sqlx::query_as("SELECT id FROM users WHERE id = ?")
                         .bind(claims.user_id).fetch_optional(pool).await.unwrap_or(None);
                     if exists.is_none() { return Err(axum::http::StatusCode::UNAUTHORIZED); }
-                    user_cache().write().await.insert(claims.user_id, std::time::Instant::now());
+                    let mut cache = user_cache().write().await;
+                    // S2: Prune expired entries when cache grows large
+                    if cache.len() > 200 {
+                        cache.retain(|_, t| t.elapsed().as_secs() < 60);
+                    }
+                    cache.insert(claims.user_id, std::time::Instant::now());
                 }
             }
             Ok(claims)
