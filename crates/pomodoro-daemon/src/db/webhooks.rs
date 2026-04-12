@@ -25,8 +25,10 @@ fn derive_key() -> Vec<u8> {
             std::fs::read(&path).ok()
                 .filter(|d| d.len() >= 32)
                 .unwrap_or_else(|| {
-                    tracing::error!("SECURITY: No JWT secret available for webhook key derivation");
-                    b"default-key".to_vec()
+                    tracing::error!("SECURITY: No JWT secret available for webhook key derivation — using data_dir hash as fallback");
+                    // Fallback: hash the data_dir path as a machine-specific but weak key
+                    use sha2::{Sha256, Digest};
+                    Sha256::digest(crate::db::data_dir().to_string_lossy().as_bytes()).to_vec()
                 })
         });
     let mut mac = Hmac::<Sha256>::new_from_slice(&secret_bytes).unwrap();

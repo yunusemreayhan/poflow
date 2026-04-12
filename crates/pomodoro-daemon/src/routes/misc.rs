@@ -22,7 +22,7 @@ pub async fn health(State(engine): State<AppState>) -> Json<serde_json::Value> {
     drop(heartbeats);
     // O2: Database size
     let db_size = std::fs::metadata(db::db_path()).map(|m| m.len()).unwrap_or(0);
-    Json(serde_json::json!({ "status": if db_ok { "ok" } else { "degraded" }, "db": db_ok, "db_size_bytes": db_size, "schema_version": migration_version, "active_timers": active_timers, "background_tasks": tasks }))
+    Json(serde_json::json!({ "status": if db_ok { "ok" } else { "degraded" }, "db": db_ok }))
 }
 
 #[utoipa::path(get, path = "/api/tasks/{id}/votes", responses((status = 200, body = Vec<db::RoomVote>)), security(("bearer" = [])))]

@@ -78,13 +78,14 @@ pub async fn refresh_token(State(engine): State<AppState>, headers: axum::http::
     if auth::is_revoked(&req.refresh_token).await {
         return Err(err(StatusCode::UNAUTHORIZED, "Token revoked"));
     }
+    // Revoke old token BEFORE issuing new ones to prevent replay
+    auth::revoke_token(&req.refresh_token).await;
     let claims = auth::verify_token(&req.refresh_token).map_err(|_| err(StatusCode::UNAUTHORIZED, "Invalid refresh token"))?;
     if claims.typ != "refresh" { return Err(err(StatusCode::UNAUTHORIZED, "Not a refresh token")); }
     // Re-fetch user from DB to get current role/username (not stale claims)
     let user = db::get_user(&engine.pool, claims.user_id).await.map_err(|_| err(StatusCode::UNAUTHORIZED, "User not found"))?;
     let token = auth::create_token(user.id, &user.username, &user.role).map_err(internal)?;
     let refresh_token = auth::create_refresh_token(user.id, &user.username, &user.role).map_err(internal)?;
-    auth::revoke_token(&req.refresh_token).await;
     Ok(Json(AuthResponse { token, refresh_token, user_id: user.id, username: user.username, role: user.role }))
 }
 

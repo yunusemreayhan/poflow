@@ -116,6 +116,8 @@ pub async fn restore_backup(State(engine): State<AppState>, claims: Claims, Json
     sqlx::query("PRAGMA wal_checkpoint(TRUNCATE)").execute(&engine.pool).await.map_err(|e| internal(format!("WAL checkpoint failed: {}", e)))?;
     // Restore: copy backup over current DB
     let db_path = db::db_path();
+    // Close all pool connections before overwriting to prevent corruption
+    engine.pool.close().await;
     std::fs::copy(&backup_path, &db_path).map_err(|e| internal(format!("Restore failed: {}", e)))?;
     Ok(axum::response::Response::builder()
         .status(StatusCode::OK)
