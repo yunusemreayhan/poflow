@@ -177,6 +177,29 @@ pub async fn update_task(State(engine): State<AppState>, claims: Claims, Path(id
         req.work_duration_minutes.as_ref().map(|o| *o))
         .await.map_err(internal)?;
     if let Err(e) = db::audit(&engine.pool, claims.user_id, "update", "task", Some(id), None).await { tracing::warn!("Audit log failed: {}", e); }
+    // BL3: Auto-unblock dependents when task is completed
+    if req.status.as_deref() == Some("completed") {
+        if let Ok(dependents) = db::get_dependents(&engine.pool, id).await {
+            for dep_id in dependents {
+                if let Ok(dep_task) = db::get_task(&engine.pool, dep_id).await {
+                    if dep_task.status == "blocked" {
+                        // Check if ALL dependencies are now completed
+                        if let Ok(deps) = db::get_dependencies(&engine.pool, dep_id).await {
+                            let mut all_done = true;
+                            for d in &deps {
+                                if let Ok(dt) = db::get_task(&engine.pool, *d).await {
+                                    if dt.status != "completed" { all_done = false; break; }
+                                }
+                            }
+                            if all_done {
+                                db::update_task(&engine.pool, dep_id, None, None, None, None, None, None, None, None, None, Some("backlog"), None, None, None).await.ok();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
     crate::webhook::dispatch(engine.pool.clone(), "task.updated", serde_json::json!({"id": id}));
     engine.notify(ChangeEvent::Tasks);
     Ok(Json(t))

@@ -152,6 +152,15 @@ pub async fn add_sprint_tasks(State(engine): State<AppState>, claims: Claims, Pa
     let result = db::add_sprint_tasks(&engine.pool, id, &task_ids, claims.user_id).await.map_err(internal)?;
     // BL8: Audit sprint scope changes
     db::audit(&engine.pool, claims.user_id, "add_tasks", "sprint", Some(id), Some(&format!("{} tasks added", task_ids.len()))).await.ok();
+    // BL7: Notify task owners about sprint scope change
+    let sprint_name = db::get_sprint(&engine.pool, id).await.map(|s| s.name.clone()).unwrap_or_default();
+    for tid in &task_ids {
+        if let Ok(task) = db::get_task(&engine.pool, *tid).await {
+            if task.user_id != claims.user_id {
+                db::create_notification(&engine.pool, task.user_id, "sprint_started", &format!("Your task '{}' was added to sprint '{}'", task.title, sprint_name), Some("sprint"), Some(id)).await.ok();
+            }
+        }
+    }
     if db::get_sprint(&engine.pool, id).await.map(|s| s.status == "active").unwrap_or(false) {
         if let Err(e) = db::snapshot_sprint(&engine.pool, id).await { tracing::warn!("Snapshot failed: {}", e); }
     }

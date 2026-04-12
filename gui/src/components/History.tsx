@@ -194,7 +194,15 @@ export default function History() {
         const color = (d: number) => d > 0 ? "text-green-400" : d < 0 ? "text-red-400" : "text-white/30";
         return (
           <div className="glass p-3">
-            <div className="text-xs text-white/40 mb-1 font-medium">This Week vs Last Week</div>
+            <div className="flex justify-between items-center mb-1">
+              <div className="text-xs text-white/40 font-medium">This Week vs Last Week</div>
+              {/* BL20: Export weekly report */}
+              <button onClick={() => {
+                const csv = "date,focus_hours,sessions\n" + filteredStats.slice(-7).map(s => `${s.date},${(s.total_focus_s / 3600).toFixed(2)},${s.completed}`).join("\n");
+                const blob = new Blob([csv], { type: "text/csv" });
+                const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "weekly_report.csv"; a.click();
+              }} className="text-[10px] text-white/20 hover:text-white/50">📥 CSV</button>
+            </div>
             <div className="grid grid-cols-2 gap-3 text-center text-xs">
               <div>Focus: {twFocus.toFixed(1)}h <span className={color(fDelta)}>{arrow(fDelta)}</span></div>
               <div>Sessions: {twSessions} <span className={color(sDelta)}>{arrow(sDelta)}</span></div>
