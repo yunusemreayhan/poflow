@@ -77,6 +77,8 @@ pub fn build_router(engine: Arc<engine::Engine>) -> Router {
         .route("/api/automations", get(routes::list_automations).post(routes::create_automation))
         .route("/api/automations/{id}", delete(routes::delete_automation))
         .route("/api/automations/{id}/toggle", put(routes::toggle_automation))
+        .route("/api/users/presence", get(routes::user_presence))
+        .route("/api/integrations/slack", post(routes::create_slack_integration))
         .route("/api/tasks/{id}/sessions", get(routes::get_task_sessions))
         .route("/api/sessions/{id}/note", put(routes::update_session_note))
         .route("/api/tasks/{id}/burn-total", get(routes::get_task_burn_total))

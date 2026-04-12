@@ -309,3 +309,38 @@ pub async fn toggle_automation(State(engine): State<AppState>, claims: Claims, P
         .bind(id).execute(&engine.pool).await.map_err(internal)?;
     Ok(StatusCode::OK)
 }
+
+// F12: User presence — track last activity
+#[utoipa::path(get, path = "/api/users/presence", responses((status = 200)), security(("bearer" = [])))]
+pub async fn user_presence(State(engine): State<AppState>, _claims: Claims) -> ApiResult<Vec<serde_json::Value>> {
+    // Get all users with their last session activity
+    let rows: Vec<(i64, String, Option<String>)> = sqlx::query_as(
+        "SELECT u.id, u.username, (SELECT MAX(s.started_at) FROM sessions s WHERE s.user_id = u.id) as last_active FROM users u ORDER BY last_active DESC NULLS LAST")
+        .fetch_all(&engine.pool).await.map_err(internal)?;
+
+    // Check who has an active timer
+    let active_users: std::collections::HashSet<i64> = {
+        let states = engine.states.lock().await;
+        states.iter().filter(|(_, s)| s.status != crate::engine::TimerStatus::Idle).map(|(uid, _)| *uid).collect()
+    };
+
+    Ok(Json(rows.into_iter().map(|(id, username, last_active)| {
+        let online = active_users.contains(&id);
+        serde_json::json!({"user_id": id, "username": username, "online": online, "last_active": last_active})
+    }).collect()))
+}
+
+// F14: Slack webhook integration — format payload for Slack incoming webhooks
+#[derive(Deserialize, utoipa::ToSchema)]
+pub struct SlackIntegrationRequest { pub webhook_url: String, pub events: Option<String> }
+
+#[utoipa::path(post, path = "/api/integrations/slack", responses((status = 201)), security(("bearer" = [])))]
+pub async fn create_slack_integration(State(engine): State<AppState>, claims: Claims, Json(req): Json<SlackIntegrationRequest>) -> Result<StatusCode, ApiError> {
+    if !req.webhook_url.starts_with("https://hooks.slack.com/") && !req.webhook_url.starts_with("https://discord.com/api/webhooks/") {
+        return Err(err(StatusCode::BAD_REQUEST, "URL must be a Slack or Discord webhook URL"));
+    }
+    let events = req.events.as_deref().unwrap_or("sprint.started,sprint.completed");
+    // Store as a regular webhook with a special "slack" marker in the events field
+    db::create_webhook(&engine.pool, claims.user_id, &req.webhook_url, &format!("slack:{}", events), None).await.map_err(internal)?;
+    Ok(StatusCode::CREATED)
+}

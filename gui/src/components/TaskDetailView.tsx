@@ -13,6 +13,53 @@ import { computeRollup } from "../rollup";
 import CommentSection from "./CommentSection";
 import { formatDuration, EditField, ProgressBar, ExportButton, EstimateVsActual } from "./TaskDetailHelpers";
 
+// F27: Render description with interactive checklists (- [ ] / - [x])
+function DescriptionWithChecklists({ taskId, description }: { taskId: number; description: string }) {
+  const { updateTask } = useStore();
+  const hasChecklist = /^- \[[ x]\]/m.test(description);
+  if (!hasChecklist) return <p className="text-xs text-white/50 mb-3 whitespace-pre-wrap">{description}</p>;
+
+  const lines = description.split("\n");
+  const total = lines.filter(l => /^- \[[ x]\]/.test(l)).length;
+  const checked = lines.filter(l => /^- \[x\]/i.test(l)).length;
+
+  const toggle = (idx: number) => {
+    const updated = lines.map((l, i) => {
+      if (i !== idx) return l;
+      if (/^- \[ \]/.test(l)) return l.replace("- [ ]", "- [x]");
+      if (/^- \[x\]/i.test(l)) return l.replace(/^- \[x\]/i, "- [ ]");
+      return l;
+    }).join("\n");
+    updateTask(taskId, { description: updated });
+  };
+
+  return (
+    <div className="text-xs text-white/50 mb-3 space-y-0.5">
+      {total > 0 && (
+        <div className="flex items-center gap-2 mb-1">
+          <div className="flex-1 h-1 bg-white/5 rounded-full overflow-hidden">
+            <div className="h-full bg-green-500 rounded-full transition-all" style={{ width: `${total > 0 ? (checked / total) * 100 : 0}%` }} />
+          </div>
+          <span className="text-[10px] text-white/20">{checked}/{total}</span>
+        </div>
+      )}
+      {lines.map((line, i) => {
+        const checkMatch = /^- \[([ x])\]\s*(.*)/.exec(line);
+        if (checkMatch) {
+          const done = checkMatch[1] === "x";
+          return (
+            <label key={i} className="flex items-center gap-2 cursor-pointer hover:text-white/70">
+              <input type="checkbox" checked={done} onChange={() => toggle(i)} className="accent-[var(--color-accent)]" />
+              <span className={done ? "line-through text-white/30" : ""}>{checkMatch[2]}</span>
+            </label>
+          );
+        }
+        return <div key={i} className="whitespace-pre-wrap">{line}</div>;
+      })}
+    </div>
+  );
+}
+
 function DetailNode({ detail, depth, onRefresh, hoursMap }: { detail: TaskDetail; depth: number; onRefresh: () => void; hoursMap: Map<number, number> }) {
   const { updateTask, username: currentUser, role, taskSprints } = useStore();
   const [showComments, setShowComments] = useState(false);
@@ -87,8 +134,8 @@ function DetailNode({ detail, depth, onRefresh, hoursMap }: { detail: TaskDetail
           <span className="text-xs text-white/30">👤 {t.user}</span>
         </div>
 
-        {/* Description */}
-        {t.description && <p className="text-xs text-white/50 mb-3 whitespace-pre-wrap">{t.description}</p>}
+        {/* Description with F27 checklist support */}
+        {t.description && <DescriptionWithChecklists taskId={t.id} description={t.description} />}
 
         {/* Progress bars */}
         {rollup.progressHours !== null && <ProgressBar label="Hours" pct={rollup.progressHours} />}
