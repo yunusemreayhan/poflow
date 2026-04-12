@@ -11,7 +11,7 @@ pub async fn add_assignee(State(engine): State<AppState>, claims: Claims, Path(i
     // S1: Verify task exists and user owns it (or is root)
     let task = db::get_task(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Task not found"))?;
     if task.user_id != claims.user_id && claims.role != "root" { return Err(err(StatusCode::FORBIDDEN, "Not your task")); }
-    let uid = db::get_user_id_by_username(&engine.pool, &req.username).await.map_err(|_| err(StatusCode::NOT_FOUND, "User not found"))?;
+    let uid = db::get_user_id_by_username(&engine.pool, &req.username).await.map_err(|e| if e.to_string() == "not_found" { err(StatusCode::NOT_FOUND, "User not found") } else { internal(e) })?;
     db::add_assignee(&engine.pool, id, uid).await.map_err(internal)?;
     // BL21: Notify assigned user
     db::create_notification(&engine.pool, uid, "task_assigned", &format!("You were assigned to: {}", task.title), Some("task"), Some(id)).await.ok();
@@ -23,7 +23,7 @@ pub async fn add_assignee(State(engine): State<AppState>, claims: Claims, Path(i
 pub async fn remove_assignee(State(engine): State<AppState>, claims: Claims, Path((id, username)): Path<(i64, String)>) -> Result<StatusCode, ApiError> {
     let task = db::get_task(&engine.pool, id).await.map_err(internal)?;
     if !is_owner_or_root(task.user_id, &claims) { return Err(err(StatusCode::FORBIDDEN, "Not owner")); }
-    let uid = db::get_user_id_by_username(&engine.pool, &username).await.map_err(|_| err(StatusCode::NOT_FOUND, "User not found"))?;
+    let uid = db::get_user_id_by_username(&engine.pool, &username).await.map_err(|e| if e.to_string() == "not_found" { err(StatusCode::NOT_FOUND, "User not found") } else { internal(e) })?;
     db::remove_assignee(&engine.pool, id, uid).await.map_err(internal)?;
     engine.notify(ChangeEvent::Tasks);
     Ok(StatusCode::NO_CONTENT)

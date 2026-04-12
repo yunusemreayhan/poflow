@@ -82,7 +82,7 @@ export function BoardView({ board, reload, wipLimit: wipLimitProp }: { board: Sp
         ))}
       </div>
     </div>
-  ), [changeStatus]);
+  ), [changeStatus, touchDrag, taskLabels, blockedBy, wipLimitProp]);
 
   const total = board.todo.length + board.in_progress.length + board.blocked.length + board.done.length;
   const pct = total > 0 ? Math.round((board.done.length / total) * 100) : 0;
