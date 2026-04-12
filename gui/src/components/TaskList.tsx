@@ -23,6 +23,7 @@ export default function TaskList({ selectMode, onSelect, selectedTaskId, votedTa
   const [bulkSelected, setBulkSelected] = useState<Set<number>>(new Set());
   const [viewMode, setViewMode] = useState<"tree" | "table">("tree");
   const [treeKey, setTreeKey] = useState(0);
+  const [tableSort, setTableSort] = useState<"title" | "status" | "priority" | "estimated" | "due" | "user">("title");
   const [bulkSprints, setBulkSprints] = useState<{ id: number; name: string }[]>([]);
 
   useEffect(() => {
@@ -32,6 +33,7 @@ export default function TaskList({ selectMode, onSelect, selectedTaskId, votedTa
     }
   }, [bulkSelected.size]);
 
+  const loading = useStore(s => s.loading.tasks);
   const tree = useMemo(() => {
     let t = tasks;
     if (teamScope) t = t.filter(task => teamScope.has(task.id));
@@ -185,12 +187,23 @@ export default function TaskList({ selectMode, onSelect, selectedTaskId, votedTa
           <table className="w-full">
             <thead className="sticky top-0 bg-[var(--color-bg)]">
               <tr className="text-white/30 text-left">
-                <th scope="col" className="py-1 px-1 w-6"></th><th scope="col" className="py-1 px-2">Title</th><th scope="col" className="py-1 px-1">Status</th><th scope="col" className="py-1 px-1">Priority</th>
-                <th scope="col" className="py-1 px-1">Est</th><th scope="col" className="py-1 px-1">Due</th><th scope="col" className="py-1 px-1">Owner</th>
+                <th scope="col" className="py-1 px-1 w-6"></th>
+                {([["title","Title"],["status","Status"],["priority","Priority"],["estimated","Est"],["due","Due"],["user","Owner"]] as const).map(([k,label]) => (
+                  <th key={k} scope="col" className={`py-1 px-1 cursor-pointer hover:text-white/50 ${tableSort === k ? "text-white/60" : ""}`}
+                    onClick={() => setTableSort(k as any)}>{label}{tableSort === k ? " ▾" : ""}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {sorted.flatMap(function flat(n: TreeNode): TreeNode[] { return [n, ...n.children.flatMap(flat)]; }).map(n => (
+              {sorted.flatMap(function flat(n: TreeNode): TreeNode[] { return [n, ...n.children.flatMap(flat)]; }).sort((a, b) => {
+                const ta = a.task, tb = b.task;
+                if (tableSort === "priority") return ta.priority - tb.priority;
+                if (tableSort === "status") return ta.status.localeCompare(tb.status);
+                if (tableSort === "estimated") return tb.estimated - ta.estimated;
+                if (tableSort === "due") return (ta.due_date || "9999").localeCompare(tb.due_date || "9999");
+                if (tableSort === "user") return ta.user.localeCompare(tb.user);
+                return ta.title.localeCompare(tb.title);
+              }).map(n => (
                 <tr key={n.task.id} onClick={() => setViewStack([n.task.id])} className="hover:bg-white/5 cursor-pointer border-t border-white/5">
                   <td className="py-1 px-1 w-6">
                     {!selectMode && <input type="checkbox" checked={bulkSelected.has(n.task.id)}
@@ -240,9 +253,14 @@ export default function TaskList({ selectMode, onSelect, selectedTaskId, votedTa
           ))}
         </AnimatePresence>
 
-        {sorted.length === 0 && (
+        {sorted.length === 0 && !loading && (
           <div className="text-center text-white/20 text-sm py-16">
             {search ? "No matching tasks" : "No projects yet. Create one above!"}
+          </div>
+        )}
+        {sorted.length === 0 && loading && (
+          <div className="space-y-2 py-4">
+            {[1,2,3].map(i => <div key={i} className="h-10 rounded-lg bg-white/5 animate-pulse" />)}
           </div>
         )}
       </div>

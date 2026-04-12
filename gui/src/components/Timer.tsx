@@ -112,6 +112,7 @@ export default function Timer() {
         </motion.div>
       </AnimatePresence>
       {currentTask && isActive && <div className="text-xs text-white/40 truncate max-w-[200px] text-center">{currentTask.title}</div>}
+      {!isActive && selectedTaskId && (() => { const t2 = activeTasks.find(t => t.id === selectedTaskId); return t2 ? <div className="text-xs text-white/20 truncate max-w-[200px] text-center">▸ {t2.title}</div> : null; })()}
       </div>
 
       {/* Ring timer */}

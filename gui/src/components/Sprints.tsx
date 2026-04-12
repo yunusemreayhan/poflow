@@ -141,7 +141,11 @@ export default function Sprints() {
               {s.start_date && <span>{s.start_date} → {s.end_date || "?"}</span>}
             </div>
           </div>
-          <button onClick={e => { e.stopPropagation(); useStore.getState().showConfirm(`Delete sprint "${s.name}"?`, () => del(s.id)); }} className="p-1 text-white/20 hover:text-red-400"><Trash2 size={14} /></button>
+          <button onClick={async e => { e.stopPropagation();
+            const tasks = await apiCall<unknown[]>("GET", `/api/sprints/${s.id}/tasks`).catch(() => []);
+            const msg = tasks && tasks.length > 0 ? `Delete sprint "${s.name}"? (${tasks.length} tasks will be unlinked)` : `Delete sprint "${s.name}"?`;
+            useStore.getState().showConfirm(msg, () => del(s.id));
+          }} className="p-1 text-white/20 hover:text-red-400"><Trash2 size={14} /></button>
         </div>
       ))}
       {loading && sprints.length === 0 && <div className="text-center py-12 text-white/20 text-sm">Loading sprints...</div>}

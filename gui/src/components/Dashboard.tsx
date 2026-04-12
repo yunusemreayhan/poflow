@@ -23,6 +23,23 @@ export default function Dashboard() {
         <Stat label="Completed today" value={String(completedToday)} />
       </dl>
 
+      {/* U4: Weekly focus sparkline */}
+      {stats.length > 1 && (() => {
+        const last7 = stats.slice(-7);
+        const max = Math.max(...last7.map(s => s.total_focus_s), 1);
+        return (
+          <div className="glass p-3 rounded-lg">
+            <div className="text-xs text-white/40 mb-2">Last {last7.length} days</div>
+            <div className="flex items-end gap-1 h-8">
+              {last7.map(s => (
+                <div key={s.date} className="flex-1 bg-[var(--color-accent)]/30 rounded-t" title={`${s.date}: ${Math.round(s.total_focus_s / 60)}m`}
+                  style={{ height: `${(s.total_focus_s / max) * 100}%`, minHeight: s.total_focus_s > 0 ? 2 : 0 }} />
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
       {activeSprint && (
         <div className="glass p-3 rounded-lg">
           <div className="text-xs text-white/40 mb-1">Active Sprint</div>
