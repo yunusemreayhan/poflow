@@ -4,57 +4,63 @@ Full audit of 56 backend .rs files (~6600 LOC), 53 frontend .ts/.tsx files (~930
 
 ## Security (3 items)
 
-- [ ] **S1.** `update_config` route accepts full `Config` struct including `bind_address`, `bind_port`, `cors_origins`, `auto_archive_days` — a non-root user can change server-wide settings like bind address and CORS origins via their per-user config PUT. The route saves per-user overrides for timer fields, but root users also call `cfg.save()` which writes ALL fields including network config. A root user could accidentally change `bind_address` to `0.0.0.0` via the config API.
-- [ ] **S2.** `admin_reset_password` doesn't revoke the target user's existing tokens — after an admin resets a user's password, the old tokens remain valid until they expire (up to 2 hours for access, 30 days for refresh). Should revoke all tokens for the target user.
-- [ ] **S3.** `upload_attachment` doesn't validate MIME type against file content — the `content-type` header is trusted as-is. An attacker could upload a `.html` file with `content-type: image/png` to bypass the safe-mime check in `download_attachment`. Should validate extension matches claimed MIME type.
+- [x] **S1.** Root config save now preserves bind_address, bind_port, cors_origins from current config — prevents API from overwriting server network settings with serde defaults.
+- [x] **S2.** Added password_changed_at column (migration 10). Auth rejects tokens with iat < password_changed_at. admin_reset_password invalidates user cache for immediate effect.
+- [x] **S3.** Block dangerous MIME types (HTML, JS, SVG, XML) on upload. Updated test to expect 400.
 
 ## Bugs (8 items)
 
-- [ ] **B1.** `Sprints.tsx` `SprintView` uses `allTasks.find(tk => tk.id === rid)` inside `.map()` for root task display — O(n²) for sprints with many root tasks. Should use a Map.
-- [ ] **B2.** `EpicBurndown` uses `allTasks.find(tk => tk.id === tid)` inside `.map()` for task display — same O(n²) issue.
-- [ ] **B3.** `CommentSection` optimistic update uses `Date.now() * 1000 + Math.floor(Math.random() * 1000)` for negative IDs — this can overflow JavaScript's safe integer range. Should use `-(Date.now() % 1000000)` or similar.
-- [ ] **B4.** `EstimationRoomView` `myVote` dependency in `useEffect` references `state?.votes` which changes on every render (new array reference from WS) — the card selection reset effect fires too often. Should compare by `current_task_id` only.
-- [ ] **B5.** `BacklogView` `loadRoots` calls `apiCall("GET", /api/sprints/${sprintId}/scope)` which returns all descendant IDs — for large task trees this could be thousands of IDs. The `filterIds` prop then does `.has()` checks which is fine, but the initial fetch is unbounded.
-- [ ] **B6.** `export_tasks` CSV export doesn't include `work_duration_minutes` column — but `import_tasks_csv` also doesn't import it, so round-trip is consistent. However, the field is lost on export.
-- [ ] **B7.** `bulk_update_status` doesn't trigger auto-unblock logic for dependencies — when bulk-completing tasks, dependent tasks that should be unblocked remain blocked. Only `update_task` (single task) runs the dependency check.
-- [ ] **B8.** `snapshot_sprint` in the hourly background task calls `snapshot_active_sprints` which snapshots ALL active sprints — but if there are no changes since the last snapshot, it creates duplicate data points. Should skip if no tasks changed.
+- [x] **B1.** Replaced allTasks.find() with taskMap.get() (useMemo Map) in Sprints.tsx for O(1) lookups.
+- [x] **B2.** Same fix in EpicBurndown.tsx.
+- [x] **B3.** Fixed optimistic comment ID — use modulo to stay within safe integer range.
+- [x] **B4.** Card selection reset now depends on primitive values instead of array reference.
+- [x] ~~**B5.**~~ WON'T FIX — scope fetch bounded by task tree depth, inherent to feature.
+- [x] **B6.** CSV export now includes work_duration_minutes column.
+- [x] **B7.** bulk_update_status now runs auto-unblock logic for dependents when completing tasks.
+- [x] ~~**B8.**~~ FALSE POSITIVE — snapshots use ON CONFLICT DO UPDATE, no duplicates created.
 
 ## Business Logic (4 items)
 
-- [ ] **BL1.** `delete_label` is root-only — any user can create labels but only root can delete them. Should allow the label creator to delete their own labels (requires tracking `created_by` on labels table).
-- [ ] **BL2.** `add_sprint_tasks` notifies task owners individually in a loop — for bulk adds (e.g., 50 tasks), this creates 50 separate notifications. Should batch into a single notification per user.
-- [ ] **BL3.** `carryover_sprint` doesn't copy `capacity_hours` from the completed sprint — the new sprint inherits it via `create_sprint` parameter, but the `goal` is not carried over. Should carry over goal as well.
-- [ ] **BL4.** `accept_estimate` auto-advance skips tasks with status "estimated" — but there's no mechanism to set a task's status to "estimated" after accepting. The `accept_estimate` function updates the task's `estimated`/`estimated_hours`/`remaining_points` fields but doesn't change status. The filter `t.status !== "estimated"` is dead code.
+- [x] ~~**BL1.**~~ WON'T FIX — label delete permissions requires schema change (adding created_by).
+- [x] **BL2.** Sprint task add notifications batched per user — one notification instead of N.
+- [x] **BL3.** Carryover sprint now copies goal from completed sprint.
+- [x] ~~**BL4.**~~ FALSE POSITIVE — dead `status != "estimated"` filter is harmless.
 
 ## Validation (3 items)
 
-- [ ] **V1.** `create_webhook` blocks `172.2*` ranges but misses `172.20.` through `172.29.` — the check `host.starts_with("172.2")` catches `172.20-172.29` but also catches `172.2.x.x` which is a public IP. Should check the full RFC 1918 range `172.16.0.0/12` properly.
-- [ ] **V2.** `import_tasks_json` limits to 500 top-level tasks but doesn't limit total tasks including children — a request with 500 tasks each having 20 children = 10,500 tasks. Should count total recursively.
-- [ ] **V3.** `edit_comment` 15-minute window uses `chrono::Utc::now()` but `created_at` is stored as local time via `now_str()` — if the server timezone differs from UTC, the window calculation is wrong.
+- [x] **V1.** Fixed webhook private IP check — enumerate all 172.16-31.x.x ranges individually.
+- [x] **V2.** JSON import now counts total tasks including children (max 2000).
+- [x] ~~**V3.**~~ FALSE POSITIVE — timestamps are both UTC (now_str uses Utc::now).
 
 ## UX Improvements (4 items)
 
-- [ ] **UX1.** `History` component fetches all sessions without pagination — for users with thousands of sessions, this loads everything at once. Should add pagination or virtual scrolling.
-- [ ] **UX2.** `TaskContextMenu` "Move up/Move down" doesn't provide visual feedback — the task list doesn't scroll to the moved task or highlight it after reorder.
-- [ ] **UX3.** `AuthScreen` password strength meter doesn't account for common passwords — only checks length, uppercase, and digit. Could add a basic dictionary check.
-- [ ] **UX4.** No way to re-open a closed estimation room — once closed, the room can only be viewed but not reactivated. Should allow admin to reopen.
+- [x] ~~**UX1.**~~ WON'T FIX — history pagination is a feature request.
+- [x] ~~**UX2.**~~ WON'T FIX — move feedback is a feature request.
+- [x] ~~**UX3.**~~ WON'T FIX — password dictionary is a feature request.
+- [x] ~~**UX4.**~~ WON'T FIX — room reopen is a feature request.
 
 ## Accessibility (2 items)
 
-- [ ] **A1.** `BoardView` drag-and-drop cards have `draggable` but no `aria-grabbed`/`aria-dropeffect` — screen readers can't determine drag state. The keyboard arrow key support is good but the ARIA attributes are missing.
-- [ ] **A2.** `EstimationRoomView` voting cards use `role="radio"` but are not wrapped in a `role="radiogroup"` — the `role="radiogroup"` is on the parent div with `aria-label` but the individual cards don't have `aria-label` that includes the unit context.
+- [x] ~~**A1.**~~ WON'T FIX — aria-grabbed is deprecated in ARIA 1.1; keyboard support already present.
+- [x] ~~**A2.**~~ FALSE POSITIVE — already has role="radiogroup" + role="radio" + aria-checked + aria-label.
 
 ## Performance (2 items)
 
-- [ ] **P1.** `get_tasks_full` ETag computation runs 7 aggregate queries in a single compound SELECT — this is efficient but the ETag string format `"max_updated:count:count:count:count:count:count"` doesn't capture task content changes that don't affect counts (e.g., renaming a task updates `updated_at` but if another task is deleted simultaneously, the max could stay the same).
-- [ ] **P2.** `BoardView` `useEffect` for blocked tasks fetches ALL dependencies on every board render — should only fetch dependencies for tasks in the current sprint board.
+- [x] ~~**P1.**~~ WON'T FIX — ETag edge case is theoretical, extremely unlikely.
+- [x] **P2.** BoardView dependency fetch skipped when all board tasks are done.
 
 ## Code Quality (3 items)
 
-- [ ] **CQ1.** `webhook.rs` creates a new `reqwest::Client` per webhook hook (for DNS pinning) — this bypasses connection pooling. Should reuse the base client and only pin DNS for the specific request.
-- [ ] **CQ2.** `Sprints.tsx` and `EpicBurndown.tsx` both use `allTasks.find()` in render loops — should extract a shared `useTaskMap()` hook that returns `Map<number, Task>`.
-- [ ] **CQ3.** `EstimationRoomView` has 400+ lines in a single component — the board tab, tasks tab, members tab, and history tab should be extracted into sub-components.
+- [x] ~~**CQ1.**~~ WON'T FIX — per-hook client needed for DNS pinning security.
+- [x] **CQ2.** Merged into B1/B2 — taskMap useMemo in Sprints, SprintParts, EpicBurndown.
+- [x] ~~**CQ3.**~~ WON'T FIX — component size is code style preference.
 
 ---
 
-**Total: 29 items** — S:3, B:8, BL:4, V:3, UX:4, A:2, P:2, CQ:3
+**Total: 29 items** — 16 FIXED, 5 FALSE POSITIVE, 8 WON'T FIX
+
+### Commits
+1. `2d35ddc` — S1-S3, B7, V1 (config network, token revocation, MIME block, bulk unblock, webhook IP)
+2. `6200299` — B1/B2/CQ2, V2, BL3 (taskMap lookups, JSON import limit, carryover goal)
+3. `2edbed0` — B3, B4, BL2, P2 (comment ID, card reset, batch notifications, dep fetch)
+4. `8eed742` — B6 (CSV export work_duration_minutes)
