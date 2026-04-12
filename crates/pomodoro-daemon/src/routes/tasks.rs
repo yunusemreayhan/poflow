@@ -4,6 +4,8 @@ use super::*;
 pub async fn duplicate_task(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>) -> Result<(StatusCode, Json<db::Task>), ApiError> {
     let task = db::get_task(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Task not found"))?;
     if task.deleted_at.is_some() { return Err(err(StatusCode::BAD_REQUEST, "Cannot duplicate deleted task")); }
+    // BL7: Only owner or root can duplicate
+    if task.user_id != claims.user_id && claims.role != "root" { return Err(err(StatusCode::FORBIDDEN, "Not your task")); }
     let t = db::create_task(&engine.pool, claims.user_id, task.parent_id,
         &format!("{} (copy)", task.title), task.description.as_deref(),
         task.project.as_deref(), task.tags.as_deref(),
@@ -110,6 +112,11 @@ pub async fn create_task(State(engine): State<AppState>, claims: Claims, Json(re
     if estimated < 0 { return Err(err(StatusCode::BAD_REQUEST, "Estimated cannot be negative")); }
     if req.estimated_hours.map_or(false, |h| h < 0.0) { return Err(err(StatusCode::BAD_REQUEST, "Estimated hours cannot be negative")); }
     if let Some(ref d) = req.due_date { if !valid_date(d) { return Err(err(StatusCode::BAD_REQUEST, "due_date must be YYYY-MM-DD")); } }
+    // BL6: Validate parent_id exists and belongs to user (or is root)
+    if let Some(pid) = req.parent_id {
+        let parent = db::get_task(&engine.pool, pid).await.map_err(|_| err(StatusCode::NOT_FOUND, "Parent task not found"))?;
+        if parent.user_id != claims.user_id && claims.role != "root" { return Err(err(StatusCode::FORBIDDEN, "Parent task not owned by you")); }
+    }
     let t = db::create_task(&engine.pool, claims.user_id, req.parent_id, req.title.trim(), req.description.as_deref(), req.project.as_deref(), req.tags.as_deref(), priority, estimated, req.estimated_hours.unwrap_or(0.0), req.remaining_points.unwrap_or(0.0), req.due_date.as_deref())
         .await.map_err(internal)?;
     if let Err(e) = db::audit(&engine.pool, claims.user_id, "create", "task", Some(t.id), Some(&t.title)).await { tracing::warn!("Audit log failed: {}", e); }

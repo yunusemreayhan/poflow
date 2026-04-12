@@ -194,6 +194,8 @@ async fn main() -> Result<()> {
             if let Err(e) = db::cleanup_notifications(&engine_snap.pool).await {
                 tracing::error!("Notification cleanup error: {}", e);
             }
+            // BL4: Cleanup expired token blocklist entries
+            sqlx::query("DELETE FROM token_blocklist WHERE expires_at < datetime('now')").execute(&engine_snap.pool).await.ok();
             engine_snap.heartbeat("snapshot").await;
         }
     });

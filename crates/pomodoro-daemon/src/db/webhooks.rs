@@ -51,7 +51,8 @@ pub async fn create_webhook(pool: &Pool, user_id: i64, url: &str, events: &str, 
 }
 
 pub async fn delete_webhook(pool: &Pool, id: i64, user_id: i64) -> Result<()> {
-    sqlx::query("DELETE FROM webhooks WHERE id = ? AND user_id = ?").bind(id).bind(user_id).execute(pool).await?;
+    let r = sqlx::query("DELETE FROM webhooks WHERE id = ? AND user_id = ?").bind(id).bind(user_id).execute(pool).await?;
+    if r.rows_affected() == 0 { return Err(anyhow::anyhow!("Webhook not found")); }
     Ok(())
 }
 
