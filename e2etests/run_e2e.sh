@@ -46,4 +46,4 @@ fi
 
 # Run tests
 cd "$SCRIPT_DIR"
-exec "$VENV/bin/python" -m pytest test_flows.py -v "$@"
+exec "$VENV/bin/python" -m pytest -v "$@"

@@ -302,6 +302,20 @@ open http://localhost:9090/swagger-ui/
 
 ## Testing
 
+### ⚠️ Run tests before pushing
+
+```bash
+# 1. Unit/integration tests (fast, no GUI needed)
+cargo test -p pomodoro-daemon
+
+# 2. E2E GUI tests (requires built binaries + display)
+./e2etests/run_e2e.sh
+```
+
+Both must pass before pushing to main.
+
+### Unit & Integration Tests
+
 40 integration tests run automatically before every build (configured in `tauri.conf.json`):
 
 ```bash
@@ -310,7 +324,43 @@ cargo test -p pomodoro-daemon
 
 Tests use in-memory SQLite — no disk I/O, fully isolated, no port conflicts.
 
-### Test Coverage
+### E2E GUI Tests
+
+End-to-end tests drive the real Tauri GUI via WebDriver against an isolated daemon.
+Each run gets a **random port** and **fresh temp directory** — multiple instances can run in parallel.
+
+```bash
+# Run all E2E tests
+./e2etests/run_e2e.sh
+
+# Run a specific test class
+./e2etests/run_e2e.sh -k TestLogin
+
+# Run a specific test file
+./e2etests/run_e2e.sh test_flows.py
+```
+
+**Prerequisites:**
+- `cargo install tauri-driver` (WebDriver bridge for Tauri)
+- `sudo apt install webkit2gtk-driver` (WebKitWebDriver)
+- Built daemon: `cargo build --release -p pomodoro-daemon`
+- Built GUI: `cargo tauri build` (or set `POMODORO_GUI_BINARY`)
+
+**Test isolation:**
+- Fresh SQLite DB per run (0 tasks, 0 sprints, 0 rooms)
+- Random port (no conflicts with production daemon on :9090)
+- Temp dir cleaned up after tests
+- Flaky test retry: `--reruns=1 --reruns-delay=2`
+
+**E2E test files:**
+| File | Coverage |
+|------|----------|
+| `test_flows.py` | Auth (login, register, logout), timer, tasks, sprints, rooms, history, settings, theme, API tab, DOM integrity, multi-user, password validation, session expiry |
+| `test_sprint_lifecycle.py` | Sprint display, start, board columns, complete |
+| `test_room_voting.py` | Room creation, voting task display, vote + reveal, members |
+| `test_task_crud.py` | Task create, rename, status change, soft delete, restore, purge, bulk update |
+
+### Unit Test Coverage
 - Auth: seed root, register, login, wrong password, unauthenticated rejection
 - Tasks: CRUD, update fields, subtask cascade delete
 - Comments: add, list, delete
