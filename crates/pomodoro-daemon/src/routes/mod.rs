@@ -86,7 +86,7 @@ pub use burns_task::*;
 mod assignees;
 pub use assignees::*;
 mod watchers;
-pub use watchers::{watch_task, unwatch_task, get_task_watchers, get_watched_tasks, add_task_dependency, remove_task_dependency, get_task_blocking};
+pub use watchers::{watch_task, unwatch_task, get_task_watchers, get_watched_tasks};
 mod history;
 pub use history::*;
 mod config;

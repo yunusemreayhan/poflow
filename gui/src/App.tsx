@@ -299,7 +299,7 @@ export default function App() {
         <AnimatePresence>
           {/* F2: Keyboard shortcuts overlay */}
           {showShortcuts && (
-            <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center" onClick={() => setShowShortcuts(false)}>
+            <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center" onClick={() => setShowShortcuts(false)} onKeyDown={e => { if (e.key === "Escape") setShowShortcuts(false); }} tabIndex={-1}>
               <div className="glass p-6 rounded-2xl max-w-sm w-full" onClick={e => e.stopPropagation()}>
                 <div className="text-sm font-medium text-white/80 mb-3">Keyboard Shortcuts</div>
                 <div className="space-y-1 text-xs">

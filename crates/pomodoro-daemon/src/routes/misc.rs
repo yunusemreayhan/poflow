@@ -106,7 +106,7 @@ pub async fn get_tasks_full(State(engine): State<AppState>, _claims: Claims, hea
 }
 
 #[derive(Deserialize)]
-pub struct SseQuery { pub token: Option<String>, pub ticket: Option<String> }
+pub struct SseQuery { pub ticket: Option<String> }
 
 // Short-lived opaque tickets for SSE (avoids JWT in query string / logs)
 static SSE_TICKETS: std::sync::OnceLock<tokio::sync::Mutex<HashMap<String, (i64, std::time::Instant)>>> = std::sync::OnceLock::new();

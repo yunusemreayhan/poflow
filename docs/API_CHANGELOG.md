@@ -2,14 +2,20 @@
 
 ## v11 (Current)
 
-### Bug Fixes
-- Timer start now uses per-task `work_duration_minutes` override.
-- Attachment download verifies task ownership (owner/assignee/root).
-- SSE timer handler uses in-memory state instead of DB query per tick.
-- Sprint update validates `end_date >= start_date`.
+### New Endpoints
+- `GET /api/admin/backups` — List available database backups.
+- `POST /api/admin/restore` — Restore from a named backup file.
+- `GET /api/reports/user-hours` — User hours report (root only).
 
-### Security
-- SSE/WS ticket creation limited to 5 active tickets per user.
+### Improvements
+- FTS5 full-text search index on tasks (with LIKE fallback).
+- Timer start uses per-task `work_duration_minutes` override.
+- Attachment download verifies task ownership.
+- SSE timer uses in-memory state instead of DB query per tick.
+- Sprint update validates `end_date >= start_date`.
+- SSE/WS ticket creation limited to 5 per user.
+- Configurable `auto_archive_days` in config.
+- WebSocket heartbeat monitoring (60s timeout).
 
 ## v10
 

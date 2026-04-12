@@ -30,7 +30,7 @@ pub async fn get_epic_group(State(engine): State<AppState>, _claims: Claims, Pat
 #[utoipa::path(delete, path = "/api/epics/{id}", responses((status = 204)), security(("bearer" = [])))]
 pub async fn delete_epic_group(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>) -> Result<StatusCode, ApiError> {
     let detail = db::get_epic_group_detail(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Epic group not found"))?;
-    if detail.group.created_by != claims.user_id as i64 && claims.role != "root" {
+    if detail.group.created_by != claims.user_id && claims.role != "root" {
         return Err(err(StatusCode::FORBIDDEN, "Not owner"));
     }
     db::delete_epic_group(&engine.pool, id).await.map_err(internal)?;
@@ -40,7 +40,7 @@ pub async fn delete_epic_group(State(engine): State<AppState>, claims: Claims, P
 #[utoipa::path(post, path = "/api/epics/{id}/tasks", responses((status = 204)), security(("bearer" = [])))]
 pub async fn add_epic_group_tasks(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>, Json(req): Json<EpicGroupTasksRequest>) -> Result<StatusCode, ApiError> {
     let detail = db::get_epic_group_detail(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Epic group not found"))?;
-    if detail.group.created_by != claims.user_id as i64 && claims.role != "root" {
+    if detail.group.created_by != claims.user_id && claims.role != "root" {
         return Err(err(StatusCode::FORBIDDEN, "Not owner"));
     }
     if req.task_ids.is_empty() { return Ok(StatusCode::NO_CONTENT); }
@@ -60,7 +60,7 @@ pub async fn add_epic_group_tasks(State(engine): State<AppState>, claims: Claims
 #[utoipa::path(delete, path = "/api/epics/{id}/tasks/{task_id}", responses((status = 204)), security(("bearer" = [])))]
 pub async fn remove_epic_group_task(State(engine): State<AppState>, claims: Claims, Path((id, task_id)): Path<(i64, i64)>) -> Result<StatusCode, ApiError> {
     let detail = db::get_epic_group_detail(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Epic group not found"))?;
-    if detail.group.created_by != claims.user_id as i64 && claims.role != "root" {
+    if detail.group.created_by != claims.user_id && claims.role != "root" {
         return Err(err(StatusCode::FORBIDDEN, "Not owner"));
     }
     db::remove_epic_group_task(&engine.pool, id, task_id).await.map_err(internal)?;
@@ -70,7 +70,7 @@ pub async fn remove_epic_group_task(State(engine): State<AppState>, claims: Clai
 #[utoipa::path(post, path = "/api/epics/{id}/snapshot", responses((status = 204)), security(("bearer" = [])))]
 pub async fn snapshot_epic_group(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>) -> Result<StatusCode, ApiError> {
     let detail = db::get_epic_group_detail(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Epic group not found"))?;
-    if detail.group.created_by != claims.user_id as i64 && claims.role != "root" {
+    if detail.group.created_by != claims.user_id && claims.role != "root" {
         return Err(err(StatusCode::FORBIDDEN, "Not owner"));
     }
     db::snapshot_epic_group(&engine.pool, id).await.map_err(internal)?;

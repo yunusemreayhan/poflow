@@ -62,7 +62,7 @@ pub async fn create_backup(State(engine): State<AppState>, claims: Claims) -> Re
 
 // O3: List available backups
 #[utoipa::path(get, path = "/api/admin/backups", responses((status = 200)), security(("bearer" = [])))]
-pub async fn list_backups(_state: State<AppState>, claims: Claims) -> ApiResult<Vec<serde_json::Value>> {
+pub async fn list_backups(claims: Claims) -> ApiResult<Vec<serde_json::Value>> {
     if claims.role != "root" { return Err(err(StatusCode::FORBIDDEN, "Root only")); }
     let backup_dir = db::db_path().parent().unwrap_or(std::path::Path::new("/tmp")).join("backups");
     let mut backups = Vec::new();
