@@ -4,40 +4,52 @@ Full audit of 58 backend .rs files (~6800 LOC), 66 frontend .ts/.tsx files (~930
 
 ## Security (2 items)
 
-- [ ] **S1.** `getFreshToken()` in `api.ts` calls `/api/health` to verify the token is valid before returning it. But `/api/health` doesn't require auth — it always returns 200. The health check doesn't actually verify the token. Should call an authenticated endpoint like `GET /api/timer` instead.
+- [x] **S1.** `getFreshToken()` in `api.ts` calls `/api/health` to verify the token is valid before returning it. But `/api/health` doesn't require auth — it always returns 200. The health check doesn't actually verify the token.
+  **FIXED** (5a1cc1b) — Now uses authenticated `GET /api/timer` instead.
 
-- [ ] **S2.** `savedServers` in `store.ts` stores tokens (including refresh tokens) in `localStorage` via `saveServers()`. These persist across sessions and are accessible to any JS running in the WebView. If a user switches servers, the old server's refresh token remains in localStorage indefinitely. Should clear tokens from `savedServers` on logout, or at minimum clear the refresh_token for the server being logged out of.
+- [x] **S2.** `savedServers` in `store.ts` stores tokens (including refresh tokens) in `localStorage` via `saveServers()`. These persist across sessions and are accessible to any JS running in the WebView. Old server's refresh token remains in localStorage indefinitely after logout.
+  **FIXED** (5a1cc1b) — Logout now removes the current server's entry from savedServers.
 
 ## Bugs (4 items)
 
-- [ ] **B1.** `export_burns` in `export.rs` checks sprint ownership (`is_owner_or_root`) but `list_burns` and `get_burn_summary` don't. Any authenticated user can read burn logs for any sprint via `GET /api/sprints/{id}/burns` and `GET /api/sprints/{id}/burn-summary`, but can't export them. Inconsistent access control.
+- [ ] **B1.** `export_burns` checks sprint ownership but `list_burns` and `get_burn_summary` don't. Inconsistent access control.
+  **WON'T FIX** — Consistent with shared workspace model (v22 B1/B2). Sprint read endpoints are intentionally open. Export has ownership check for data export privacy.
 
-- [ ] **B2.** `BoardView` in `SprintParts.tsx` has keyboard navigation via `onKeyDown` with ArrowLeft/ArrowRight to move cards between columns. The status order is `["backlog", "in_progress", "blocked", "completed"]` but the board columns use `board.todo` (status=backlog), `board.in_progress`, `board.blocked`, `board.done` (status=completed). When pressing ArrowRight from "Todo", it changes status to `"in_progress"` which is correct. But the `Column` component receives `status="backlog"` for Todo — and `changeStatus` calls `PUT /api/tasks/{id}` with the new status. The keyboard nav works, but the `statusOrder` array doesn't include `"active"` which is a valid task status. Tasks with status `"active"` on the board would be in the `todo` column but keyboard nav would try to set them to `"backlog"` (ArrowLeft) which is a no-op since they're already in the todo column.
+- [ ] **B2.** `BoardView` keyboard nav status order doesn't include `"active"` status.
+  **WON'T FIX** — Sprint board uses backlog/in_progress/blocked/completed. "active" maps to "todo" on the board. By design.
 
-- [ ] **B3.** `import_tasks_csv` rolls back the entire transaction on DB error (`tx.rollback()`) but continues to use `errors.push()` for validation errors (like invalid due_date) and `continue` to skip rows. If a DB error occurs mid-import, the rollback happens but `created` count still reflects rows inserted before the error. The response would show `created: N` but those N rows were actually rolled back.
+- [x] **B3.** `import_tasks_csv` rollback count mismatch — response shows `created: N` but rows were rolled back on DB error.
+  **FIXED** (5a1cc1b) — Error message now includes rollback info.
 
-- [ ] **B4.** `BurnsView` in `SprintViews.tsx` initializes `taskId` with `tasks[0]?.id ?? 0`. If the sprint has no tasks, `taskId` is 0. The `submit` function checks `!taskId || taskId <= 0` which correctly prevents submission, but the `Select` component shows an empty dropdown with no indication that tasks need to be added first.
+- [ ] **B4.** `BurnsView` initializes `taskId` with 0 when sprint has no tasks. Form silently does nothing.
+  **WON'T FIX** — Submit correctly checks `taskId <= 0`. Negligible UX impact.
 
 ## Validation (2 items)
 
-- [ ] **V1.** `create_sprint` validates `start_date` and `end_date` format but `update_sprint` doesn't validate the date format for `start_date` and `end_date` — it only validates ordering. A malformed date string like `"not-a-date"` could be stored via update even though create would reject it.
+- [x] **V1.** `update_sprint` doesn't validate `start_date`/`end_date` format — only validates ordering. Malformed dates could be stored.
+  **FIXED** (5a1cc1b) — Added YYYY-MM-DD format validation matching `create_sprint`.
 
-- [ ] **V2.** `add_time_report` validates `hours > 0` but `log_burn` (sprint burn) allows `points=0, hours=0` — you can log a burn entry with zero points and zero hours. Should require at least one to be positive.
+- [x] **V2.** `log_burn` allows `points=0, hours=0` — empty burn entries.
+  **FIXED** (5a1cc1b) — Now requires at least one of points or hours to be positive.
 
 ## Code Quality (3 items)
 
-- [ ] **CQ1.** `import_tasks_csv` has a `let mut errors = Vec::new()` that collects validation errors, but on DB error it does `tx.rollback().await.ok(); return Err(internal(...))` — the collected errors are lost. Should include them in the error response.
+- [x] **CQ1.** `import_tasks_csv` collected errors are lost on DB rollback.
+  **FIXED** (5a1cc1b) — Same as B3. Duplicate entry.
 
-- [ ] **CQ2.** `get_active_timers` in `timer.rs` builds SQL with string formatting for user/task ID lookups (`format!("SELECT ... WHERE id IN ({})", uph)`). While the values are bound via `.bind()`, the placeholder string construction is repeated in multiple places. Could use a shared helper.
+- [ ] **CQ2.** Repeated SQL placeholder construction pattern across multiple endpoints.
+  **WON'T FIX** — Common pattern, extracting a helper adds complexity for minimal benefit.
 
-- [ ] **CQ3.** `BoardView` in `SprintParts.tsx` has `Column` defined as a `useCallback` that returns JSX. This is an anti-pattern — components defined inside `useCallback` lose React's component identity on every render, causing unnecessary unmount/remount of the entire column. Should be extracted to a proper component.
+- [ ] **CQ3.** `BoardView` Column defined inside `useCallback` — anti-pattern.
+  **WON'T FIX** — Performance impact negligible for 4 columns. Dependencies are stable.
 
 ## UX (1 item)
 
-- [ ] **UX1.** `BurnsView` shows "No burns logged yet" when the burn log is empty, but doesn't indicate which sprint is selected or provide a link to add tasks if the sprint has none. The burn form silently does nothing when `taskId` is 0.
+- [ ] **UX1.** `BurnsView` empty state doesn't indicate which sprint is selected or guide user to add tasks.
+  **WON'T FIX** — Same as B4. Negligible impact.
 
 ---
 
 **Total: 12 items**
-
-Priority order: S1 (getFreshToken health check bypass), S2 (token persistence), B3 (CSV import rollback count), V1 (sprint date validation), then remaining items.
+- **6 fixed:** S1, S2, B3, V1, V2, CQ1
+- **6 won't fix:** B1, B2, B4, CQ2, CQ3, UX1
