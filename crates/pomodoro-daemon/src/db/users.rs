@@ -85,6 +85,13 @@ pub async fn update_user_password(pool: &Pool, id: i64, password_hash: &str) -> 
     Ok(())
 }
 
+/// S2: Rehash password without updating password_changed_at (for bcrypt cost upgrades on login)
+pub async fn rehash_user_password(pool: &Pool, id: i64, password_hash: &str) -> Result<()> {
+    sqlx::query("UPDATE users SET password_hash = ? WHERE id = ?")
+        .bind(password_hash).bind(id).execute(pool).await?;
+    Ok(())
+}
+
 pub async fn update_username(pool: &Pool, id: i64, username: &str) -> Result<()> {
     let existing: Option<(i64,)> = sqlx::query_as("SELECT id FROM users WHERE username = ? AND id != ?")
         .bind(username).bind(id).fetch_optional(pool).await?;

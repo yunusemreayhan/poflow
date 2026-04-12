@@ -34,7 +34,8 @@ pub async fn login(headers: axum::http::HeaderMap, State(engine): State<AppState
     if current_cost < 12 {
         let pw2 = req.password.clone();
         if let Ok(new_hash) = tokio::task::spawn_blocking(move || bcrypt::hash(&pw2, 12)).await.map_err(internal)? {
-            db::update_user_password(&engine.pool, user.id, &new_hash).await.ok();
+            // S2: Use rehash (no password_changed_at update) to avoid invalidating the fresh token
+            db::rehash_user_password(&engine.pool, user.id, &new_hash).await.ok();
         }
     }
     let token = auth::create_token(user.id, &user.username, &user.role).map_err(internal)?;
@@ -69,6 +70,8 @@ pub async fn change_password(State(engine): State<AppState>, claims: Claims, Jso
     let new_pw = req.new_password.clone();
     let new_hash = tokio::task::spawn_blocking(move || bcrypt::hash(&new_pw, 12)).await.map_err(internal)?.map_err(internal)?;
     db::update_user_password(&engine.pool, claims.user_id, &new_hash).await.map_err(internal)?;
+    // S1: Invalidate user cache so existing tokens are re-validated against password_changed_at
+    auth::invalidate_user_cache(claims.user_id).await;
     Ok(StatusCode::NO_CONTENT)
 }
 
