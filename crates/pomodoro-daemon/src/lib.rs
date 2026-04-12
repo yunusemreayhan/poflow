@@ -83,6 +83,7 @@ pub fn build_router(engine: Arc<engine::Engine>) -> Router {
         .route("/api/profile/notifications", get(routes::get_notif_prefs).put(routes::update_notif_prefs))
         .route("/api/admin/users", get(routes::list_users))
         .route("/api/admin/users/{id}/role", put(routes::update_user_role))
+        .route("/api/admin/users/{id}/password", put(routes::admin_reset_password))
         .route("/api/admin/users/{id}", delete(routes::delete_user))
         .route("/api/admin/backup", post(routes::create_backup))
         .route("/api/admin/backups", get(routes::list_backups))

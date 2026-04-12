@@ -24,6 +24,21 @@ pub async fn delete_user(State(engine): State<AppState>, claims: Claims, Path(id
     Ok(StatusCode::NO_CONTENT)
 }
 
+#[derive(Deserialize, utoipa::ToSchema)]
+pub struct AdminResetPasswordRequest { pub password: String }
+
+#[utoipa::path(put, path = "/api/admin/users/{id}/password", request_body = AdminResetPasswordRequest, responses((status = 204)), security(("bearer" = [])))]
+pub async fn admin_reset_password(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>, Json(req): Json<AdminResetPasswordRequest>) -> Result<StatusCode, ApiError> {
+    if claims.role != "root" { return Err(err(StatusCode::FORBIDDEN, "Root only")); }
+    validate_password(&req.password)?;
+    let pw = req.password.clone();
+    let hash = tokio::task::spawn_blocking(move || bcrypt::hash(&pw, 12))
+        .await.map_err(internal)?.map_err(internal)?;
+    db::update_user_password(&engine.pool, id, &hash).await.map_err(internal)?;
+    if let Err(e) = db::audit(&engine.pool, claims.user_id, "admin_reset_password", "user", Some(id), None).await { tracing::warn!("Audit log failed: {}", e); }
+    Ok(StatusCode::NO_CONTENT)
+}
+
 // --- Task votes ---
 
 #[utoipa::path(post, path = "/api/admin/backup", responses((status = 200)), security(("bearer" = [])))]
@@ -56,7 +71,7 @@ pub async fn create_backup(State(engine): State<AppState>, claims: Claims) -> Re
         .body(axum::body::Body::from(serde_json::to_vec(&serde_json::json!({
             "path": backup_path.display().to_string(),
             "size_bytes": size,
-        })).unwrap()))
+        })).map_err(|e| internal(e.to_string()))?))
         .map_err(|e| internal(e.to_string()))?)
 }
 
@@ -109,6 +124,6 @@ pub async fn restore_backup(State(engine): State<AppState>, claims: Claims, Json
             "restored_from": req.filename,
             "safety_backup": safety.display().to_string(),
             "note": "Restart the server to use the restored database"
-        })).unwrap()))
+        })).map_err(|e| internal(e.to_string()))?))
         .map_err(|e| internal(e.to_string()))?)
 }

@@ -12,6 +12,12 @@ export async function apiCall<T = unknown>(method: string, path: string, body?: 
       const refreshed = await tryRefreshToken();
       if (refreshed) {
         try { return await invoke<T>("api_call", { method, path, body: body ?? null }); } catch {}
+      } else {
+        // Refresh failed — force logout so user gets a clean login screen
+        // instead of staying in a broken "logged in but disconnected" state
+        import("./store").then(({ useStore }) => {
+          if (useStore.getState().token) useStore.getState().logout();
+        }).catch(() => {});
       }
     }
     if (method !== "GET") {
