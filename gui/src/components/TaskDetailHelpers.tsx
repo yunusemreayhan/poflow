@@ -61,41 +61,55 @@ export function ProgressBar({ label, pct }: { label: string; pct: number }) {
 
 export function ExportButton({ detail }: { detail: TaskDetail }) {
   const t = detail.task;
-  const exportMarkdown = async () => {
-    const lines = [
-      `# ${t.title}`, "",
-      `**Status:** ${t.status} | **Priority:** ${t.priority} | **Project:** ${t.project || "—"}`,
-      `**Estimated:** ${t.estimated} 🍅 (${t.estimated_hours}h) | **Actual:** ${t.actual} 🍅`,
-      `**Remaining Points:** ${t.remaining_points} | **Due:** ${t.due_date || "—"}`,
-    ];
-    if (t.description) lines.push("", "## Description", t.description);
-    if (detail.comments?.length) {
-      lines.push("", "## Comments");
-      for (const c of detail.comments) lines.push(`- **${c.username}** (${c.created_at.slice(0, 10)}): ${c.content}`);
+
+  const doExport = async (fmt: string) => {
+    let content: string, ext: string;
+    if (fmt === "json") {
+      content = JSON.stringify(detail, null, 2); ext = "json";
+    } else {
+      const lines = [
+        `# ${t.title}`, "",
+        `**Status:** ${t.status} | **Priority:** ${t.priority} | **Project:** ${t.project || "—"}`,
+        `**Estimated:** ${t.estimated} 🍅 (${t.estimated_hours}h) | **Actual:** ${t.actual} 🍅`,
+        `**Remaining Points:** ${t.remaining_points} | **Due:** ${t.due_date || "—"}`,
+      ];
+      if (t.description) lines.push("", "## Description", t.description);
+      if (detail.comments?.length) {
+        lines.push("", "## Comments");
+        for (const c of detail.comments) lines.push(`- **${c.username}** (${c.created_at.slice(0, 10)}): ${c.content}`);
+      }
+      if (detail.time_reports?.length) {
+        lines.push("", "## Time Reports");
+        for (const r of detail.time_reports) lines.push(`- ${r.hours}h by ${r.username} on ${r.created_at.slice(0, 10)}${r.note ? ` — ${r.note}` : ""}`);
+      }
+      if (detail.children?.length) {
+        lines.push("", "## Subtasks");
+        for (const c of detail.children) lines.push(`- [${c.task.status === "completed" ? "x" : " "}] ${c.task.title}`);
+      }
+      content = lines.join("\n"); ext = "md";
     }
-    if (detail.time_reports?.length) {
-      lines.push("", "## Time Reports");
-      for (const r of detail.time_reports) lines.push(`- ${r.hours}h by ${r.username} on ${r.created_at.slice(0, 10)}${r.note ? ` — ${r.note}` : ""}`);
-    }
-    if (detail.children?.length) {
-      lines.push("", "## Subtasks");
-      for (const c of detail.children) lines.push(`- [${c.task.status === "completed" ? "x" : " "}] ${c.task.title}`);
-    }
-    const md = lines.join("\n");
+    const filename = `${t.title.replace(/[^a-zA-Z0-9]/g, "_")}.${ext}`;
     try {
-      const path = await saveDialog({ defaultPath: `${t.title.replace(/[^a-zA-Z0-9]/g, "_")}.md`, filters: [{ name: "Markdown", extensions: ["md"] }] });
-      if (path) await invoke("plugin:fs|write_text_file", { path, contents: md });
+      const path = await saveDialog({ defaultPath: filename, filters: [{ name: ext.toUpperCase(), extensions: [ext] }] });
+      if (path) await invoke("plugin:fs|write_text_file", { path, contents: content });
     } catch {
-      const blob = new Blob([md], { type: "text/markdown" });
+      const blob = new Blob([content], { type: ext === "json" ? "application/json" : "text/markdown" });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement("a"); a.href = url; a.download = `${t.title.replace(/[^a-zA-Z0-9]/g, "_")}.md`; a.click();
+      const a = document.createElement("a"); a.href = url; a.download = filename; a.click();
       URL.revokeObjectURL(url);
     }
   };
 
   return (
-    <button onClick={exportMarkdown} className="w-9 h-9 flex items-center justify-center rounded-lg glass text-white/60 hover:text-white transition-all" title="Export as Markdown">
-      <Download size={16} />
-    </button>
+    <div className="relative group">
+      <button onClick={() => doExport("md")} className="w-9 h-9 flex items-center justify-center rounded-lg glass text-white/60 hover:text-white transition-all" title="Export">
+        <Download size={16} />
+      </button>
+      <div className="absolute right-0 top-full mt-1 hidden group-hover:flex gap-1 glass p-1 z-30 rounded">
+        {["md", "json"].map(f => (
+          <button key={f} onClick={() => doExport(f)} className="px-2 py-1 text-[10px] text-white/60 hover:text-white hover:bg-white/5 rounded uppercase font-mono">{f}</button>
+        ))}
+      </div>
+    </div>
   );
 }

@@ -122,7 +122,9 @@ pub async fn accept_estimate(State(engine): State<AppState>, claims: Claims, Pat
     let state = db::get_room_state(&engine.pool, id).await.map_err(internal)?;
     let all_tasks = &state.tasks;
     let voted_task_ids: std::collections::HashSet<i64> = state.vote_history.iter().map(|v| v.task_id).collect();
-    let has_children: std::collections::HashSet<i64> = all_tasks.iter().filter_map(|t| t.parent_id).collect();
+    // B9: Build has_children only from tasks within the room scope
+    let room_task_ids: std::collections::HashSet<i64> = all_tasks.iter().map(|t| t.id).collect();
+    let has_children: std::collections::HashSet<i64> = all_tasks.iter().filter_map(|t| t.parent_id).filter(|pid| room_task_ids.contains(pid)).collect();
     let next = all_tasks.iter()
         .filter(|t| t.id != task_id && t.status != "estimated" && !voted_task_ids.contains(&t.id))
         .filter(|t| !has_children.contains(&t.id)) // leaf only

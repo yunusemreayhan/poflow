@@ -54,11 +54,11 @@ pub struct TasksFullResponse {
 
 #[utoipa::path(get, path = "/api/tasks/full", responses((status = 200, body = Vec<db::Task>)), security(("bearer" = [])))]
 pub async fn get_tasks_full(State(engine): State<AppState>, _claims: Claims, headers: axum::http::HeaderMap) -> Result<axum::response::Response, ApiError> {
-    // ETag: single query combining all change indicators
-    let (max_updated, task_count, sprint_task_count, burn_count, assignee_count): (String, i64, i64, i64, i64) =
-        sqlx::query_as("SELECT COALESCE((SELECT MAX(updated_at) FROM tasks), ''), (SELECT COUNT(*) FROM tasks), (SELECT COUNT(*) FROM sprint_tasks), (SELECT COUNT(*) FROM burn_log WHERE cancelled = 0), (SELECT COUNT(*) FROM task_assignees)")
+    // B8: ETag includes labels and attachments to avoid stale data
+    let (max_updated, task_count, sprint_task_count, burn_count, assignee_count, label_count, att_count): (String, i64, i64, i64, i64, i64, i64) =
+        sqlx::query_as("SELECT COALESCE((SELECT MAX(updated_at) FROM tasks), ''), (SELECT COUNT(*) FROM tasks), (SELECT COUNT(*) FROM sprint_tasks), (SELECT COUNT(*) FROM burn_log WHERE cancelled = 0), (SELECT COUNT(*) FROM task_assignees), (SELECT COUNT(*) FROM task_labels), (SELECT COUNT(*) FROM task_attachments)")
         .fetch_one(&engine.pool).await.map_err(internal)?;
-    let etag = format!("\"{}:{}:{}:{}:{}\"", max_updated, task_count, sprint_task_count, burn_count, assignee_count);
+    let etag = format!("\"{}:{}:{}:{}:{}:{}:{}\"", max_updated, task_count, sprint_task_count, burn_count, assignee_count, label_count, att_count);
 
     if let Some(if_none_match) = headers.get("if-none-match").and_then(|v| v.to_str().ok()) {
         if if_none_match == etag {
@@ -159,8 +159,8 @@ pub async fn sse_timer(State(engine): State<AppState>, Query(q): Query<SseQuery>
             tokio::select! {
                 Ok(()) = timer_rx.changed() => {
                     let state = timer_rx.borrow().clone();
-                    // Only send events for this user; re-fetch to avoid stale watch value
-                    if state.current_user_id == user_id || state.current_user_id == 0 {
+                    // B5: Only send events for this user (removed == 0 check that leaked idle states)
+                    if state.current_user_id == user_id {
                         let fresh = engine.get_state(user_id).await;
                         if let Ok(json) = serde_json::to_string(&fresh) {
                             yield Ok(axum::response::sse::Event::default().event("timer").data(json));

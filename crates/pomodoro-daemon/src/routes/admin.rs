@@ -34,9 +34,15 @@ pub async fn create_backup(State(engine): State<AppState>, claims: Claims) -> Re
     std::fs::create_dir_all(&backup_dir).map_err(|e| internal(format!("Failed to create backup dir: {}", e)))?;
     let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S");
     let backup_path = backup_dir.join(format!("pomodoro_{}.db", timestamp));
-    // Use SQLite VACUUM INTO for a consistent backup
-    sqlx::query(&format!("VACUUM INTO '{}'", backup_path.display()))
+    // B1: Sanitize path to prevent SQL injection — escape single quotes
+    let path_str = backup_path.display().to_string().replace('\'', "''");
+    sqlx::query(&format!("VACUUM INTO '{}'", path_str))
         .execute(&engine.pool).await.map_err(|e| internal(format!("Backup failed: {}", e)))?;
+    // S1: Restrict backup file permissions
+    #[cfg(unix)] {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&backup_path, std::fs::Permissions::from_mode(0o600)).ok();
+    }
     let size = std::fs::metadata(&backup_path).map(|m| m.len()).unwrap_or(0);
     Ok(axum::response::Response::builder()
         .status(StatusCode::OK)

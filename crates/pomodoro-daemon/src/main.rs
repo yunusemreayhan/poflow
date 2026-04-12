@@ -210,9 +210,14 @@ async fn main() -> Result<()> {
                                 let original_day = task.due_date.as_ref()
                                     .and_then(|dd| chrono::NaiveDate::parse_from_str(dd, "%Y-%m-%d").ok())
                                     .map(|dd| dd.day()).unwrap_or(d.day());
-                                let max_day = chrono::NaiveDate::from_ymd_opt(y, m + if m < 12 { 1 } else { 0 }, 1)
-                                    .unwrap_or_else(|| chrono::NaiveDate::from_ymd_opt(y + 1, 1, 1).unwrap())
-                                    .pred_opt().map(|d| d.day()).unwrap_or(28);
+                                // B4: Get last day of target month correctly
+                                let next_month_first = if m < 12 {
+                                    chrono::NaiveDate::from_ymd_opt(y, m + 1, 1)
+                                } else {
+                                    chrono::NaiveDate::from_ymd_opt(y + 1, 1, 1)
+                                };
+                                let max_day = next_month_first
+                                    .and_then(|d| d.pred_opt()).map(|d| d.day()).unwrap_or(28);
                                 chrono::NaiveDate::from_ymd_opt(y, m, original_day.min(max_day)).unwrap_or(d + chrono::Duration::days(30))
                             }),
                             _ => None,

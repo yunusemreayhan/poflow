@@ -43,26 +43,27 @@ pub fn dispatch(pool: Pool, event: &str, payload: serde_json::Value) {
             }
             let body = serde_json::json!({ "event": &event, "data": &payload });
             let body_str = serde_json::to_string(&body).unwrap_or_default();
-            let mut req = client.post(&hook.url)
-                .header("content-type", "application/json")
-                .header("x-pomodoro-event", &event)
-                .body(body_str.clone());
-            if let Some(ref encrypted_secret) = hook.secret {
-                // S5: Decrypt the secret before signing
+            // B10: Compute signature once, reuse on retries
+            let signature = if let Some(ref encrypted_secret) = hook.secret {
                 let secret = db::webhooks::decrypt_secret(encrypted_secret).unwrap_or_default();
                 if !secret.is_empty() {
                     use hmac::{Hmac, Mac, KeyInit};
                     use sha2::Sha256;
                     let mut mac = <Hmac<Sha256>>::new_from_slice(secret.as_bytes()).unwrap();
                     mac.update(body_str.as_bytes());
-                    let sig = mac.finalize().into_bytes().iter().map(|b| format!("{:02x}", b)).collect::<String>();
-                    req = req.header("x-pomodoro-signature", format!("sha256={}", sig));
-                }
-            }
+                    Some(format!("sha256={}", mac.finalize().into_bytes().iter().map(|b| format!("{:02x}", b)).collect::<String>()))
+                } else { None }
+            } else { None };
             let mut attempts = 0;
             loop {
                 attempts += 1;
-                match req.try_clone().unwrap_or_else(|| client.post(&hook.url).body(body_str.clone())).send().await {
+                // B10: Rebuild full request each attempt to avoid lost headers on try_clone failure
+                let mut retry_req = client.post(&hook.url)
+                    .header("content-type", "application/json")
+                    .header("x-pomodoro-event", &event)
+                    .body(body_str.clone());
+                if let Some(ref sig) = signature { retry_req = retry_req.header("x-pomodoro-signature", sig.as_str()); }
+                match retry_req.send().await {
                     Ok(resp) if resp.status().is_success() => break,
                     Ok(resp) => {
                         tracing::warn!("Webhook {} returned {}", hook.url, resp.status());
