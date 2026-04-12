@@ -1,91 +1,64 @@
 # Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        Tauri v2 Desktop App                     │
-│  ┌───────────────────────────────────────────────────────────┐  │
-│  │                    React + TypeScript GUI                  │  │
-│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌─────────────┐  │  │
-│  │  │ TaskList  │ │  Timer   │ │  Rooms   │ │  Sprints    │  │  │
-│  │  │ TaskNode  │ │          │ │ RoomView │ │  Board      │  │  │
-│  │  │ Detail    │ │          │ │          │ │  Burndown   │  │  │
-│  │  └────┬─────┘ └────┬─────┘ └────┬─────┘ └──────┬──────┘  │  │
-│  │       │             │            │              │          │  │
-│  │  ┌────▼─────────────▼────────────▼──────────────▼──────┐  │  │
-│  │  │              Zustand Store + API Layer               │  │  │
-│  │  │   store.ts (state)  │  api.ts (HTTP + SSE client)   │  │  │
-│  │  └─────────────────────┼───────────────────────────────┘  │  │
-│  └────────────────────────┼──────────────────────────────────┘  │
-│                           │ HTTP / SSE / WebSocket               │
-│  ┌────────────────────────┼──────────────────────────────────┐  │
-│  │              Tauri Bridge (src-tauri/lib.rs)               │  │
-│  │         write_file (safe dirs only) + shell open           │  │
-│  └────────────────────────┼──────────────────────────────────┘  │
-└───────────────────────────┼─────────────────────────────────────┘
-                            │
-                   HTTP :9090 (localhost)
-                            │
-┌───────────────────────────▼─────────────────────────────────────┐
-│                    pomodoro-daemon (Rust/axum)                   │
-│                                                                  │
-│  ┌──────────────┐  ┌──────────────┐  ┌────────────────────────┐ │
-│  │   auth.rs    │  │  engine.rs   │  │   routes/ (22+ mods)   │ │
-│  │  JWT + HMAC  │  │  Per-user    │  │  auth, tasks, rooms,   │ │
-│  │  Blocklist   │  │  timer FSM   │  │  sprints, burns, teams │ │
-│  │  (persisted) │  │  tick loop   │  │  epics, labels, deps,  │ │
-│  │  Rate limit  │  │  auto-start  │  │  webhooks, audit,      │ │
-│  └──────────────┘  │  notify pref │  │  recurrence, export    │ │
-│  ┌──────────────┐  └──────┬───────┘  └───────────┬────────────┘ │
-│  │ webhook.rs   │         │                      │               │
-│  │ HTTP dispatch│         │                      │               │
-│  └──────────────┘         │                      │               │
-│  ┌────────────────────────▼──────────────────────▼────────────┐ │
-│  │                db/ (16 submodules + types.rs)               │ │
-│  │  mod.rs: schema, connect, migrate (28 tables)              │ │
-│  │  users, tasks, sessions, comments, assignees, rooms,       │ │
-│  │  sprints, burns, epics, teams, audit, labels, recurrence,  │ │
-│  │  dependencies, webhooks                                    │ │
-│  └────────────────────────┬───────────────────────────────────┘ │
-│                           │                                      │
-│  ┌────────────────────────▼───────────────────────────────────┐ │
-│  │              SQLite (WAL mode, pool=2)                      │ │
-│  │         ~/.local/share/pomodoro/pomodoro.db                 │ │
-│  └─────────────────────────────────────────────────────────────┘ │
-│                                                                  │
-│  ┌──────────────┐  ┌──────────────┐  ┌────────────────────────┐ │
-│  │  notify.rs   │  │  config.rs   │  │  Swagger UI            │ │
-│  │  libnotify   │  │  TOML file   │  │  /swagger-ui/          │ │
-│  └──────────────┘  └──────────────┘  └────────────────────────┘ │
-└──────────────────────────────────────────────────────────────────┘
+## System Overview
 
-┌──────────────────────────────────────────────────────────────────┐
-│                    pomodoro-cli (Rust/reqwest)                    │
-│  HTTP client → same daemon API                                   │
-│  Env: POMODORO_URL, POMODORO_TOKEN                               │
-└──────────────────────────────────────────────────────────────────┘
+```
+┌─────────────────────────────────────────────────┐
+│  Frontend (Tauri v2 + React + TypeScript)        │
+│  gui/src/                                        │
+│  ├── App.tsx (sidebar, tabs, toasts, shortcuts)  │
+│  ├── store/ (Zustand state + API client)         │
+│  ├── components/ (Timer, TaskList, Sprints, etc) │
+│  └── hooks/ (SSE, WebSocket, debounce)           │
+└──────────────┬──────────────────┬────────────────┘
+               │ REST/SSE         │ WebSocket
+               ▼                  ▼
+┌─────────────────────────────────────────────────┐
+│  Backend (Rust + axum + SQLite)                  │
+│  crates/pomodoro-daemon/src/                     │
+│  ├── main.rs (server, background tasks)          │
+│  ├── lib.rs (router, middleware, CORS)           │
+│  ├── engine.rs (per-user timer state machine)    │
+│  ├── auth.rs (JWT, token blocklist, CSRF)        │
+│  ├── routes/ (HTTP handlers, 20+ modules)        │
+│  ├── db/ (SQLite via sqlx, 19 modules)           │
+│  ├── webhook.rs (outbound webhook dispatch)      │
+│  └── notify.rs (desktop notifications)           │
+└──────────────┬──────────────────────────────────┘
+               │
+               ▼
+         SQLite (WAL mode)
+         ~/.local/share/pomodoro/pomodoro.db
 ```
 
 ## Data Flow
 
-1. **Timer tick**: `main.rs` runs a 1s `tokio::interval` → `engine.tick()` advances all running timers → completed sessions trigger DB writes (outside lock) → `watch::Sender` broadcasts state → SSE streams push to connected clients
+1. Frontend calls `apiCall()` → Tauri `invoke("api_call")` → HTTP to backend
+2. Backend processes request, updates SQLite, returns JSON
+3. Backend broadcasts `ChangeEvent` via `watch`/`broadcast` channels
+4. SSE stream picks up changes, sends to frontend
+5. Frontend debounces and reloads affected data
 
-2. **Task CRUD**: GUI → `apiCall()` → HTTP `POST /api/tasks` → `routes/tasks.rs` validates → `db/tasks.rs` writes → `engine.notify(Tasks)` → `broadcast::Sender` → SSE `change` event → GUI reloads
+## Auth Flow
 
-3. **Estimation rooms**: GUI → HTTP or WebSocket → `routes/rooms.rs` → `db/rooms.rs` → `engine.notify(Rooms)` → WS/SSE push → all room members see updates
+1. `POST /api/auth/login` → bcrypt verify → JWT access + refresh tokens
+2. Access token (2h) sent as `Authorization: Bearer <token>`
+3. CSRF: mutation requests require `x-requested-with` header
+4. Token refresh: `POST /api/auth/refresh` with refresh token (30d)
+5. SSE/WebSocket: short-lived tickets via `POST /api/timer/ticket`
 
-4. **Auth flow**: Register/Login → bcrypt (spawn_blocking) → JWT issued (7d expiry) → stored in Tauri Rust backend (filesystem) → `Authorization: Bearer` header → `Claims` extractor validates + checks blocklist (persisted in SQLite) → Logout revokes token
+## Timer Engine
 
-5. **Webhook dispatch**: Task CRUD → `webhook::dispatch()` spawns async task → queries `get_active_webhooks()` → HTTP POST to each URL with event payload
-
-6. **Recurring tasks**: Background job (5min interval) → `get_due_recurrences()` → clones template task → `advance_recurrence()` → notifies SSE
+- Per-user state machine: Idle → Work → ShortBreak/LongBreak → Idle
+- 1-second tick loop in background task
+- Two-phase tick: advance timers (locked), then DB I/O (unlocked)
+- Auto-start breaks/work based on user config
+- Desktop notifications via `notify-rust`
 
 ## Key Design Decisions
 
-- **Per-user timer state**: `HashMap<user_id, EngineState>` behind `Arc<Mutex<>>` — each user has independent timer
-- **Optimistic locking**: `expected_updated_at` field on task/sprint updates → 409 Conflict on stale writes
-- **SSE tickets**: Short-lived opaque tokens (30s) exchanged via `POST /api/timer/ticket` to avoid JWT in URL query strings
-- **Structured errors**: All error responses return `{"error":"...","code":"..."}` via `ApiError` type
-- **Module split**: `db/` (16 files + types.rs) and `routes/` (22+ files + types.rs) keep each domain under ~170 lines
-- **Token blocklist**: Persisted to SQLite `token_blocklist` table, loaded into memory on startup
-- **Webhook dispatch**: Fire-and-forget via `tokio::spawn`, 10s timeout per hook, SSRF protection on URL validation
-- **Request body limit**: 2MB max via `DefaultBodyLimit` layer
+- SQLite WAL mode for concurrent reads (4 connections)
+- Soft delete for tasks (deleted_at column)
+- Hierarchical tasks via parent_id with recursive CTEs
+- ETag-based caching for `/api/tasks/full` endpoint
+- Webhook secrets encrypted at rest (XOR + HMAC-derived key)
