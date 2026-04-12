@@ -5,7 +5,14 @@ use std::collections::HashMap;
 pub async fn health(State(engine): State<AppState>) -> Json<serde_json::Value> {
     let db_ok = sqlx::query("SELECT 1").execute(&engine.pool).await.is_ok();
     let active_timers = engine.states.lock().await.values().filter(|s| s.status == crate::engine::TimerStatus::Running).count();
-    Json(serde_json::json!({ "status": if db_ok { "ok" } else { "degraded" }, "db": db_ok, "active_timers": active_timers }))
+    // O2: Background task health
+    let heartbeats = engine.heartbeats.lock().await;
+    let tasks: serde_json::Map<String, serde_json::Value> = heartbeats.iter().map(|(name, last)| {
+        let secs_ago = last.elapsed().as_secs();
+        (name.clone(), serde_json::json!({ "last_heartbeat_secs_ago": secs_ago, "healthy": secs_ago < 120 }))
+    }).collect();
+    drop(heartbeats);
+    Json(serde_json::json!({ "status": if db_ok { "ok" } else { "degraded" }, "db": db_ok, "active_timers": active_timers, "background_tasks": tasks }))
 }
 
 #[utoipa::path(get, path = "/api/tasks/{id}/votes", responses((status = 200, body = Vec<db::RoomVote>)), security(("bearer" = [])))]

@@ -136,6 +136,7 @@ async fn main() -> Result<()> {
             }
             match engine_tick.tick().await {
                 Ok(completed) => {
+                    engine_tick.heartbeat("tick").await;
                     for state in completed {
                         // Check user notification preferences
                         let (should_notify, play_sound) = match db::get_user_config(&engine_tick.pool, state.current_user_id).await {
@@ -169,6 +170,7 @@ async fn main() -> Result<()> {
             if let Err(e) = db::snapshot_all_epic_groups(&engine_snap.pool).await {
                 tracing::error!("Epic snapshot error: {}", e);
             }
+            engine_snap.heartbeat("snapshot").await;
         }
     });
 

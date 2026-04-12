@@ -74,6 +74,8 @@ pub struct Engine {
     pub changes: broadcast::Sender<ChangeEvent>,
     /// Cached per-user configs (user_id → (config, fetched_at))
     user_config_cache: Arc<Mutex<HashMap<i64, (Config, std::time::Instant)>>>,
+    /// O2: Background task heartbeats (task_name → last_heartbeat)
+    pub heartbeats: Arc<Mutex<HashMap<String, std::time::Instant>>>,
 }
 
 impl Engine {
@@ -93,6 +95,7 @@ impl Engine {
             tx,
             changes,
             user_config_cache: Arc::new(Mutex::new(HashMap::new())),
+            heartbeats: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
@@ -429,5 +432,9 @@ impl Engine {
 
     pub fn notify(&self, event: ChangeEvent) {
         let _ = self.changes.send(event);
+    }
+
+    pub async fn heartbeat(&self, task_name: &str) {
+        self.heartbeats.lock().await.insert(task_name.to_string(), std::time::Instant::now());
     }
 }
