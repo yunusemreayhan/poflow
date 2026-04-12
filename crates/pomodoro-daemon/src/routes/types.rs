@@ -49,7 +49,7 @@ pub struct UpdateTaskRequest {
 #[derive(Deserialize, utoipa::ToSchema)]
 pub struct StartRequest { pub task_id: Option<i64>, pub phase: Option<String> }
 #[derive(Deserialize, utoipa::ToSchema)]
-pub struct AddCommentRequest { pub content: String, pub session_id: Option<i64> }
+pub struct AddCommentRequest { pub content: String, pub session_id: Option<i64>, pub parent_id: Option<i64> }
 #[derive(Deserialize, utoipa::ToSchema)]
 pub struct HistoryQuery { pub from: Option<String>, pub to: Option<String>, pub user_id: Option<i64> }
 #[derive(Deserialize, utoipa::ToSchema)]

@@ -60,6 +60,7 @@ export interface Comment {
   user: string;
   content: string;
   created_at: string;
+  parent_id: number | null;
 }
 
 export interface TaskDetail {

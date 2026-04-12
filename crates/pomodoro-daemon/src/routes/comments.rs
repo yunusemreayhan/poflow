@@ -16,7 +16,7 @@ pub async fn add_comment(State(engine): State<AppState>, claims: Claims, Path(id
         sqlx::query("SELECT 1 FROM sessions WHERE id = ?").bind(sid).fetch_one(&engine.pool).await
             .map_err(|_| err(StatusCode::NOT_FOUND, "Session not found"))?;
     }
-    db::add_comment(&engine.pool, claims.user_id, id, req.session_id, &req.content)
+    db::add_comment(&engine.pool, claims.user_id, id, req.session_id, &req.content, req.parent_id)
         .await.map(|c| {
             // BL23: Notify @mentioned users
             let pool = engine.pool.clone();

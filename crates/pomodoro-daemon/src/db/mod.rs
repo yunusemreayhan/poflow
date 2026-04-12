@@ -460,6 +460,12 @@ async fn migrate(pool: &Pool) -> Result<()> {
         sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (12, ?)").bind(&now_str()).execute(pool).await.ok();
     }
 
+    // Migration 13: Threaded comments (parent_id for replies)
+    if !applied_set.contains(&13) {
+        if let Err(e) = sqlx::query("ALTER TABLE comments ADD COLUMN parent_id INTEGER REFERENCES comments(id) ON DELETE CASCADE").execute(pool).await { log_migration_err("ALTER TABLE comments ADD COLUMN parent_id", e); }
+        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (13, ?)").bind(&now_str()).execute(pool).await.ok();
+    }
+
     sqlx::query("CREATE TABLE IF NOT EXISTS task_attachments (
         id          INTEGER PRIMARY KEY AUTOINCREMENT,
         task_id     INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,

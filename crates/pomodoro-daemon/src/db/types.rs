@@ -26,6 +26,7 @@ pub struct SessionWithPath { #[serde(flatten)] pub session: Session, pub task_pa
 pub struct Comment {
     pub id: i64, pub task_id: i64, pub session_id: Option<i64>, pub user_id: i64,
     pub user: String, pub content: String, pub created_at: String,
+    pub parent_id: Option<i64>,
 }
 
 #[derive(Debug, Clone, FromRow, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]

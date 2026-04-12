@@ -1,12 +1,12 @@
 use super::*;
 
 
-const COMMENT_SELECT: &str = "SELECT c.id, c.task_id, c.session_id, c.user_id, u.username as user, c.content, c.created_at FROM comments c JOIN users u ON c.user_id = u.id";
+const COMMENT_SELECT: &str = "SELECT c.id, c.task_id, c.session_id, c.user_id, u.username as user, c.content, c.created_at, c.parent_id FROM comments c JOIN users u ON c.user_id = u.id";
 
-pub async fn add_comment(pool: &Pool, user_id: i64, task_id: i64, session_id: Option<i64>, content: &str) -> Result<Comment> {
+pub async fn add_comment(pool: &Pool, user_id: i64, task_id: i64, session_id: Option<i64>, content: &str, parent_id: Option<i64>) -> Result<Comment> {
     let now = now_str();
-    let id = sqlx::query("INSERT INTO comments (task_id, session_id, user_id, content, created_at) VALUES (?, ?, ?, ?, ?)")
-        .bind(task_id).bind(session_id).bind(user_id).bind(content).bind(&now)
+    let id = sqlx::query("INSERT INTO comments (task_id, session_id, user_id, content, created_at, parent_id) VALUES (?, ?, ?, ?, ?, ?)")
+        .bind(task_id).bind(session_id).bind(user_id).bind(content).bind(&now).bind(parent_id)
         .execute(pool).await?.last_insert_rowid();
     Ok(sqlx::query_as::<_, Comment>(&format!("{} WHERE c.id = ?", COMMENT_SELECT)).bind(id).fetch_one(pool).await?)
 }
