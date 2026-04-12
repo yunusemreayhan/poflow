@@ -106,12 +106,20 @@ export function TaskAttachments({ taskId }: { taskId: number }) {
         </label>
       </div>
       {atts.map(a => (
-        <div key={a.id} className="flex items-center gap-2 text-xs text-white/60 py-0.5 group">
-          <span className="truncate flex-1">{a.filename}</span>
-          <span className="text-white/20">{fmt(a.size_bytes)}</span>
-          <button onClick={() => download(a.id, a.filename)}
-            className="text-[var(--color-accent)] hover:underline">↓</button>
-          <button onClick={() => del(a.id)} className="text-white/20 hover:text-[var(--color-danger)] opacity-0 group-hover:opacity-100">✕</button>
+        <div key={a.id} className="py-0.5 group">
+          <div className="flex items-center gap-2 text-xs text-white/60">
+            <span className="truncate flex-1">{a.filename}</span>
+            <span className="text-white/20">{fmt(a.size_bytes)}</span>
+            <button onClick={() => download(a.id, a.filename)}
+              className="text-[var(--color-accent)] hover:underline">↓</button>
+            <button onClick={() => del(a.id)} className="text-white/20 hover:text-[var(--color-danger)] opacity-0 group-hover:opacity-100">✕</button>
+          </div>
+          {/* F7: Inline preview for images */}
+          {a.mime_type.startsWith("image/") && (
+            <img src={`${useStore.getState().serverUrl}/api/attachments/${a.id}/download`}
+              alt={a.filename} className="mt-1 max-h-32 rounded border border-white/10 object-contain"
+              loading="lazy" />
+          )}
         </div>
       ))}
     </div>

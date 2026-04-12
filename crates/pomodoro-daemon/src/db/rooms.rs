@@ -117,7 +117,8 @@ pub async fn get_room_state(pool: &Pool, room_id: i64) -> Result<RoomState> {
         match room.current_task_id { Some(tid) => get_task(pool, tid).await.ok(), None => None }
     };
     let all_room_votes_fut = async {
-        sqlx::query_as::<_, RoomVote>(&format!("{} WHERE rv.room_id = ?", VOTE_SELECT))
+        // P1: Limit to last 500 votes (covers current + recent history)
+        sqlx::query_as::<_, RoomVote>(&format!("{} WHERE rv.room_id = ? ORDER BY rv.created_at DESC LIMIT 500", VOTE_SELECT))
             .bind(room_id).fetch_all(pool).await.unwrap_or_default()
     };
 

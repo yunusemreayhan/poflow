@@ -91,6 +91,10 @@ function Sidebar() {
               />
             )}
             <Icon size={22} className="relative z-10" />
+            {/* U7: Active timer indicator */}
+            {tab.id === "timer" && useStore.getState().engine?.status === "Running" && (
+              <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-[var(--color-work)] animate-pulse z-20" />
+            )}
           </motion.button>
         );
       })}
