@@ -15,6 +15,7 @@ const CARD_PRESETS: Record<string, number[]> = { points: POINT_CARDS, hours: HOU
 
 export default function EstimationRoomView({ roomId, onBack }: { roomId: number; onBack: () => void }) {
   const { username } = useStore();
+  const allTasks = useStore(s => s.tasks);
   const [state, setState] = useState<RoomState | null>(null);
   const [selectedCard, setSelectedCard] = useState<number | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
@@ -194,6 +195,18 @@ export default function EstimationRoomView({ roomId, onBack }: { roomId: number;
                   {current_task.project && <span>📁 {current_task.project}</span>}
                   <span>by {current_task.user}</span>
                 </div>
+                {/* BL17: Show previous estimates for similar tasks */}
+                {vote_history.length > 0 && current_task.project && (() => {
+                  const similar = vote_history.filter(vh => {
+                    const t = allTasks.find(t => t.id === vh.task_id);
+                    return t && t.project === current_task.project && vh.task_id !== current_task.id;
+                  }).slice(0, 3);
+                  return similar.length > 0 ? (
+                    <div className="text-[10px] text-white/20 mt-2">
+                      Similar ({current_task.project}): {similar.map(vh => `${vh.task_title} → ${vh.average.toFixed(1)}`).join(", ")}
+                    </div>
+                  ) : null;
+                })()}
               </div>
             ) : (
               <div className="glass p-8 text-center text-white/30 text-sm">
@@ -394,6 +407,19 @@ export default function EstimationRoomView({ roomId, onBack }: { roomId: number;
                     </span>
                   ))}
                 </div>
+                {/* BL16: Estimation accuracy — compare estimate vs actual */}
+                {(() => {
+                  const task = allTasks.find(t => t.id === vh.task_id);
+                  if (!task || task.actual === 0) return null;
+                  const ratio = task.actual / vh.average;
+                  const color = ratio <= 1.2 ? "text-green-400" : ratio <= 1.5 ? "text-yellow-400" : "text-red-400";
+                  return (
+                    <div className="text-[10px] text-white/30 mt-2">
+                      Actual: {task.actual} pomodoros vs estimated avg {vh.average.toFixed(1)} →{" "}
+                      <span className={color}>{ratio <= 1 ? "on target" : `+${Math.round((ratio - 1) * 100)}% over`}</span>
+                    </div>
+                  );
+                })()}
               </div>
             ))}
           </div>
