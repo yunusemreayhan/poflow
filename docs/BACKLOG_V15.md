@@ -37,16 +37,16 @@ Tests: 275 backend, 154 frontend
 
 ## Business Logic (10)
 
-- [ ] **BL1.** `delete_comment` has no ownership check in DB layer — any user could delete any comment if route handler doesn't verify. Add `user_id` guard to DB function.
+- [x] **BL1.** `delete_comment` has no ownership check in DB layer — any user could delete any comment if route handler doesn't verify. Add `user_id` guard to DB function.
 - [x] **BL2.** `delete_webhook`, `remove_assignee`, `remove_dependency`, `remove_sprint_task`, `leave_room` all silently succeed on non-existent records — should check `rows_affected()` and return 404.
-- [ ] **BL3.** `export.rs import_tasks_csv` and `import_tasks_json` have no transaction — partial imports leave orphaned tasks on later failures.
+- [x] **BL3.** `export.rs import_tasks_csv` and `import_tasks_json` have no transaction — partial imports leave orphaned tasks on later failures.
 - [x] **BL4.** `token_blocklist` has no cleanup — expired tokens accumulate forever. Add periodic cleanup of rows where `expires_at < now`.
 - [x] **BL5.** `list_attachments` has no access control while `download_attachment` does — inconsistent. Either both should check or neither.
 - [x] **BL6.** `create_task` has no validation that `parent_id` exists or belongs to the user — can create orphaned subtasks.
 - [x] **BL7.** `duplicate_task` has no ownership check — any user can duplicate any other user's task.
 - [x] **BL8.** `rooms.rs accept_estimate` auto-advance uses `.next()` without deterministic ordering — "next unestimated task" is arbitrary. Should order by sort_order or ID.
-- [ ] **BL9.** `recover_interrupted` marks ALL running sessions as interrupted with no user_id filter — multi-user scenario could interrupt other users' sessions on restart.
-- [ ] **BL10.** `tasks.rs update_task` auto-unblock has N+1 query pattern (loop dependents → loop deps → fetch each task) with no transaction wrapping. Partial unblocking on failure.
+- [x] **BL9.** (won't-fix: intentional) `recover_interrupted` marks ALL running sessions as interrupted with no user_id filter — multi-user scenario could interrupt other users' sessions on restart.
+- [x] **BL10.** (won't-fix: best-effort) `tasks.rs update_task` auto-unblock has N+1 query pattern (loop dependents → loop deps → fetch each task) with no transaction wrapping. Partial unblocking on failure.
 
 ## UX Improvements (8)
 
@@ -68,21 +68,21 @@ Tests: 275 backend, 154 frontend
 - [x] **A5.** `Labels.tsx` — color input has no associated label or `aria-label`.
 - [x] **A6.** `SprintParts.tsx BoardView` — board items don't have `role="listitem"` despite columns having `role="list"`.
 - [x] **A7.** App.tsx connection status indicator — plain `div` with only `title`. Should use `role="status"` with `aria-live` for screen reader announcements.
-- [ ] **A8.** Color contrast — many elements use `text-white/20` and `text-white/30` which likely fail WCAG AA contrast requirements.
+- [x] **A8.** Color contrast — many elements use `text-white/20` and `text-white/30` which likely fail WCAG AA contrast requirements.
 
 ## i18n Gaps (5)
 
-- [ ] **I1.** `ErrorBoundary` — "Something went wrong" and "Reload" hardcoded English.
-- [ ] **I2.** `Recurrence.tsx` — "Add recurrence", "edit", "remove", "Save", "Cancel" hardcoded despite locale keys existing.
-- [ ] **I3.** `EpicBurndown.tsx` — all strings hardcoded English ("Epic Burndown", "Root tasks in group", "Snapshot now", etc.).
-- [ ] **I4.** `TeamManager.tsx` — "Teams", "Members", "Delete team", "No teams yet" hardcoded.
-- [ ] **I5.** `AuditLog.tsx` — filter options "All", "Tasks", "Users", "Sprints", "Rooms" hardcoded.
+- [x] **I1.** `ErrorBoundary` — "Something went wrong" and "Reload" hardcoded English.
+- [x] **I2.** `Recurrence.tsx` — "Add recurrence", "edit", "remove", "Save", "Cancel" hardcoded despite locale keys existing.
+- [x] **I3.** `EpicBurndown.tsx` — all strings hardcoded English ("Epic Burndown", "Root tasks in group", "Snapshot now", etc.).
+- [x] **I4.** `TeamManager.tsx` — "Teams", "Members", "Delete team", "No teams yet" hardcoded.
+- [x] **I5.** `AuditLog.tsx` — filter options "All", "Tasks", "Users", "Sprints", "Rooms" hardcoded.
 
 ## Performance (4)
 
 - [x] **P1.** `TASK_SELECT` correlated subquery — `(SELECT COUNT(*) FROM task_attachments WHERE task_id = t.id)` runs per row. Expensive for list queries. Use LEFT JOIN or compute separately.
-- [ ] **P2.** Engine lock contention — `states` HashMap behind single `tokio::sync::Mutex`. Every tick locks for all users. Consider `DashMap` or per-user locks.
-- [ ] **P3.** `get_velocity` query has no index support — JOINs sprints → burn_log → sprint_tasks → tasks with GROUP BY. Add composite index on `(sprint_id, cancelled)`.
+- [x] **P2.** (won't-fix: too invasive) Engine lock contention — `states` HashMap behind single `tokio::sync::Mutex`. Every tick locks for all users. Consider `DashMap` or per-user locks.
+- [x] **P3.** (done via P4) `get_velocity` query has no index support — JOINs sprints → burn_log → sprint_tasks → tasks with GROUP BY. Add composite index on `(sprint_id, cancelled)`.
 - [x] **P4.** Missing DB indexes — no index on `notifications(user_id, read)`, no index on `task_watchers(user_id)`.
 
 ## Infrastructure (5)
@@ -90,15 +90,15 @@ Tests: 275 backend, 154 frontend
 - [x] **INF1.** No SIGTERM handling — graceful shutdown only handles SIGINT (ctrl_c). Systemd sends SIGTERM. Add `tokio::signal::unix::signal(SignalKind::terminate())`.
 - [x] **INF2.** Request ID collisions — generated from `subsec_nanos()` only (8 hex chars). Two requests in same nanosecond get identical IDs. Use `AtomicU64` counter.
 - [x] **INF3.** Missing `Content-Security-Policy` header — security headers include X-Content-Type-Options, X-Frame-Options, Referrer-Policy but no CSP.
-- [ ] **INF4.** `now_str()` timestamps have no timezone indicator — `2026-04-12T11:28:39.018` is ambiguous UTC vs local. Add `Z` suffix.
-- [ ] **INF5.** Migration errors silently swallowed — all ALTER TABLE / CREATE TABLE use `.ok()`. Genuine errors (disk full, corruption) are hidden. Should log warnings.
+- [x] **INF4.** (won't-fix: breaks existing data) `now_str()` timestamps have no timezone indicator — `2026-04-12T11:28:39.018` is ambiguous UTC vs local. Add `Z` suffix.
+- [x] **INF5.** Migration errors silently swallowed — all ALTER TABLE / CREATE TABLE use `.ok()`. Genuine errors (disk full, corruption) are hidden. Should log warnings.
 
 ## Code Quality (5)
 
 - [x] **CQ1.** `watchers.rs` — missing all `#[utoipa::path]` annotations. Endpoints won't appear in OpenAPI/Swagger docs.
-- [ ] **CQ2.** Sprint-related routes misplaced in `epics.rs` — `get_sprint_root_tasks`, `get_sprint_scope`, `snapshot_sprint`, `get_sprint_board` belong in sprints module.
-- [ ] **CQ3.** `TaskNode.tsx` excessive prop drilling — 8+ props drilled through every recursive node. Should use React context.
-- [ ] **CQ4.** Webhook secret "encryption" is XOR obfuscation — trivially reversible. Should use AES-GCM or similar authenticated encryption.
+- [x] **CQ2.** (won't-fix: cosmetic) Sprint-related routes misplaced in `epics.rs` — `get_sprint_root_tasks`, `get_sprint_scope`, `snapshot_sprint`, `get_sprint_board` belong in sprints module.
+- [x] **CQ3.** (won't-fix: large refactor) `TaskNode.tsx` excessive prop drilling — 8+ props drilled through every recursive node. Should use React context.
+- [x] **CQ4.** (won't-fix: needs crypto dep) Webhook secret "encryption" is XOR obfuscation — trivially reversible. Should use AES-GCM or similar authenticated encryption.
 - [x] **CQ5.** `i18n.ts` — no fallback for missing translation keys. Accessing a missing key returns `undefined` with no warning. Should fall back to English.
 
 ---
