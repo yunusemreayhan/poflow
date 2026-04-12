@@ -181,6 +181,7 @@ function SprintView({ id, onBack }: { id: number; onBack: () => void }) {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<"board" | "backlog" | "burns" | "burndown" | "summary">("board");
   const [rootIds, setRootIds] = useState<number[]>([]);
+  const [wipLimit, setWipLimit] = useState(() => Number(localStorage.getItem(`wip_${id}`) || 5));
   const allTasks = useStore(s => s.tasks);
 
   const load = useCallback(async () => {
@@ -199,7 +200,17 @@ function SprintView({ id, onBack }: { id: number; onBack: () => void }) {
   useSseDebounce("sse-sprints", load);
 
   const start = () => useStore.getState().showConfirm(t.startThisSprint, async () => { await apiCall("POST", `/api/sprints/${id}/start`); load(); }, t.start);
-  const complete = () => useStore.getState().showConfirm(t.completeThisSprint, async () => { await apiCall("POST", `/api/sprints/${id}/complete`); load(); }, t.completed);
+  const complete = () => useStore.getState().showConfirm(t.completeThisSprint, async () => {
+    await apiCall("POST", `/api/sprints/${id}/complete`);
+    // BL5: Show completion summary
+    if (detail) {
+      const done = detail.tasks.filter(t => t.status === "completed" || t.status === "done");
+      const pts = done.reduce((s, t) => s + t.remaining_points, 0);
+      const carried = detail.tasks.length - done.length;
+      useStore.getState().toast(`Sprint complete! ${done.length}/${detail.tasks.length} tasks (${pts}pt)${carried > 0 ? `, ${carried} carried over` : ""}`, "success");
+    }
+    load();
+  }, t.completed);
   const snapshot = async () => { await apiCall("POST", `/api/sprints/${id}/snapshot`); load(); };
 
   if (loading || !detail) return (
@@ -308,7 +319,14 @@ function SprintView({ id, onBack }: { id: number; onBack: () => void }) {
         ))}
       </div>
 
-      {tab === "board" && board && <BoardView board={board} reload={load} />}
+      {tab === "board" && board && <>
+        <div className="flex items-center gap-2 text-xs text-white/30">
+          <span>WIP limit:</span>
+          <input type="number" min={1} max={50} value={wipLimit} onChange={e => { const v = Number(e.target.value) || 5; setWipLimit(v); localStorage.setItem(`wip_${id}`, String(v)); }}
+            className="w-12 bg-white/5 border border-white/10 rounded px-1 py-0.5 text-white/60 text-xs outline-none" />
+        </div>
+        <BoardView board={board} reload={load} wipLimit={wipLimit} />
+      </>}
       {tab === "backlog" && <BacklogView sprintId={id} taskIds={taskIds} reload={load} capacityHours={s.capacity_hours} tasks={detail.tasks} />}
       {tab === "burns" && <BurnsView sprintId={id} sprintName={detail.sprint.name} tasks={detail.tasks} />}
       {tab === "burndown" && <BurndownView stats={detail.stats} />}

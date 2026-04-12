@@ -5,7 +5,7 @@ import { matchSearch } from "../utils";
 import type { SprintBoard, SprintDetail, Task } from "../store/api";
 import TaskList from "./TaskList";
 
-export function BoardView({ board, reload }: { board: SprintBoard; reload: () => void }) {
+export function BoardView({ board, reload, wipLimit: wipLimitProp }: { board: SprintBoard; reload: () => void; wipLimit?: number }) {
   const changeStatus = async (taskId: number, status: string) => {
     await apiCall("PUT", `/api/tasks/${taskId}`, { status });
     reload();
@@ -33,7 +33,7 @@ export function BoardView({ board, reload }: { board: SprintBoard; reload: () =>
     }).catch(() => {});
   }, [board]);
 
-  const WIP_LIMIT = 5;
+  const WIP_LIMIT = wipLimitProp ?? 5;
   const Column = useCallback(({ title, tasks, color, status }: { title: string; tasks: Task[]; color: string; status: string }) => (
     <div className="flex-1 min-w-0 rounded-lg border-2 border-transparent transition-colors" role="list" aria-label={`${title} tasks`}
       onDragOver={e => { e.preventDefault(); e.currentTarget.style.borderColor = "var(--color-accent)"; e.currentTarget.style.background = "rgba(124,58,237,0.05)"; }}

@@ -5102,12 +5102,17 @@ async fn test_csv_import_title_length() {
 // Integration tests validating business flows end-to-end
 // ============================================================
 
-// Helper: register a user and return (token, user_id)
-async fn register_user(app: &axum::Router, username: &str, password: &str) -> (String, i64) {
+// Helper: register a user with custom password and return (token, user_id)
+async fn register_user_full(app: &axum::Router, username: &str, password: &str) -> (String, i64) {
     let resp = app.clone().oneshot(json_req("POST", "/api/auth/register", Some(json!({"username": username, "password": password})))).await.unwrap();
     assert_eq!(resp.status(), 200, "register {} failed", username);
     let j = body_json(resp).await;
     (j["token"].as_str().unwrap().to_string(), j["user_id"].as_i64().unwrap())
+}
+
+// Helper: register with default password, return just token
+async fn reg(app: &axum::Router, username: &str) -> String {
+    register_user_full(app, username, "Pass1234").await.0
 }
 
 // ---- Flow: initial-root-user-seeding ----
@@ -5128,7 +5133,7 @@ async fn flow_empty_db_seeds_root() {
 #[tokio::test]
 async fn flow_register_creates_user_role() {
     let app = app().await;
-    let (token, _) = register_user(&app, "newuser", "TestPass1").await;
+    let (token, _) = register_user_full(&app, "newuser", "TestPass1").await;
     // Verify role is "user" not "root"
     let resp = app.clone().oneshot(auth_req("GET", "/api/timer", &token, None)).await.unwrap();
     assert_eq!(resp.status(), 200);
@@ -5151,7 +5156,7 @@ async fn flow_register_weak_password_rejected() {
 #[tokio::test]
 async fn flow_register_duplicate_rejected() {
     let app = app().await;
-    register_user(&app, "dup", "TestPass1").await;
+    register_user_full(&app, "dup", "TestPass1").await;
     let resp = app.clone().oneshot(json_req("POST", "/api/auth/register", Some(json!({"username":"dup","password":"TestPass1"})))).await.unwrap();
     assert_eq!(resp.status(), 409);
 }
@@ -5229,7 +5234,7 @@ async fn flow_logout_revokes_access_token() {
 async fn flow_assignee_cannot_update_task() {
     let app = app().await;
     let root_token = login_root(&app).await;
-    let (user_token, _) = register_user(&app, "dev1", "DevPass11").await;
+    let (user_token, _) = register_user_full(&app, "dev1", "DevPass11").await;
     // Root creates task
     let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &root_token, Some(json!({"title":"Root's task"})))).await.unwrap();
     let task = body_json(resp).await;
@@ -5246,7 +5251,7 @@ async fn flow_assignee_cannot_update_task() {
 async fn flow_assignee_cannot_unassign_self() {
     let app = app().await;
     let root_token = login_root(&app).await;
-    let (_user_token, _) = register_user(&app, "dev2", "DevPass22").await;
+    let (_user_token, _) = register_user_full(&app, "dev2", "DevPass22").await;
     // Root creates task, assigns dev2
     let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &root_token, Some(json!({"title":"Task X"})))).await.unwrap();
     let tid = body_json(resp).await["id"].as_i64().unwrap();
@@ -5260,7 +5265,7 @@ async fn flow_assignee_cannot_unassign_self() {
 async fn flow_assignee_can_comment_on_others_task() {
     let app = app().await;
     let root_token = login_root(&app).await;
-    let (user_token, _) = register_user(&app, "dev3", "DevPass33").await;
+    let (user_token, _) = register_user_full(&app, "dev3", "DevPass33").await;
     // Root creates task
     let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &root_token, Some(json!({"title":"Commentable"})))).await.unwrap();
     let tid = body_json(resp).await["id"].as_i64().unwrap();
@@ -5273,8 +5278,8 @@ async fn flow_assignee_can_comment_on_others_task() {
 async fn flow_any_user_can_assign_anyone() {
     let app = app().await;
     let root_token = login_root(&app).await;
-    let (user_token, _) = register_user(&app, "dev4", "DevPass44").await;
-    register_user(&app, "dev5", "DevPass55").await;
+    let (user_token, _) = register_user_full(&app, "dev4", "DevPass44").await;
+    register_user_full(&app, "dev5", "DevPass55").await;
     // Root creates task
     let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &root_token, Some(json!({"title":"T"})))).await.unwrap();
     let tid = body_json(resp).await["id"].as_i64().unwrap();
@@ -5289,7 +5294,7 @@ async fn flow_any_user_can_assign_anyone() {
 async fn flow_root_can_update_others_task() {
     let app = app().await;
     let root_token = login_root(&app).await;
-    let (user_token, _) = register_user(&app, "dev6", "DevPass66").await;
+    let (user_token, _) = register_user_full(&app, "dev6", "DevPass66").await;
     // dev6 creates task
     let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &user_token, Some(json!({"title":"Dev task"})))).await.unwrap();
     let tid = body_json(resp).await["id"].as_i64().unwrap();
@@ -5303,7 +5308,7 @@ async fn flow_root_can_update_others_task() {
 async fn flow_normal_user_cannot_update_others_task() {
     let app = app().await;
     let root_token = login_root(&app).await;
-    let (user_token, _) = register_user(&app, "dev7", "DevPass77").await;
+    let (user_token, _) = register_user_full(&app, "dev7", "DevPass77").await;
     // Root creates task
     let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &root_token, Some(json!({"title":"Root task"})))).await.unwrap();
     let tid = body_json(resp).await["id"].as_i64().unwrap();
@@ -5318,7 +5323,7 @@ async fn flow_normal_user_cannot_update_others_task() {
 async fn flow_elevate_user_to_root() {
     let app = app().await;
     let root_token = login_root(&app).await;
-    let (_, uid) = register_user(&app, "promo", "PromoPass1").await;
+    let (_, uid) = register_user_full(&app, "promo", "PromoPass1").await;
     // Elevate
     let resp = app.clone().oneshot(auth_req("PUT", &format!("/api/admin/users/{}/role", uid), &root_token, Some(json!({"role":"root"})))).await.unwrap();
     assert_eq!(resp.status(), 200);
@@ -5328,7 +5333,7 @@ async fn flow_elevate_user_to_root() {
 #[tokio::test]
 async fn flow_normal_user_cannot_elevate() {
     let app = app().await;
-    let (user_token, uid) = register_user(&app, "sneaky", "SneakyP1").await;
+    let (user_token, uid) = register_user_full(&app, "sneaky", "SneakyP1").await;
     let resp = app.clone().oneshot(auth_req("PUT", &format!("/api/admin/users/{}/role", uid), &user_token, Some(json!({"role":"root"})))).await.unwrap();
     assert_eq!(resp.status(), 403);
 }
@@ -5337,7 +5342,7 @@ async fn flow_normal_user_cannot_elevate() {
 async fn flow_delete_user_reassigns_tasks() {
     let app = app().await;
     let root_token = login_root(&app).await;
-    let (user_token, uid) = register_user(&app, "doomed", "DoomedP1").await;
+    let (user_token, uid) = register_user_full(&app, "doomed", "DoomedP1").await;
     // User creates a task
     let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &user_token, Some(json!({"title":"Orphan task"})))).await.unwrap();
     let tid = body_json(resp).await["id"].as_i64().unwrap();
@@ -5363,7 +5368,7 @@ async fn flow_cannot_delete_last_root() {
 async fn flow_deleted_user_token_rejected() {
     let app = app().await;
     let root_token = login_root(&app).await;
-    let (user_token, uid) = register_user(&app, "gone", "GonePass1").await;
+    let (user_token, uid) = register_user_full(&app, "gone", "GonePass1").await;
     // Delete user
     app.clone().oneshot(auth_req("DELETE", &format!("/api/admin/users/{}", uid), &root_token, None)).await.unwrap();
     // User's token should be rejected (after cache invalidation)
@@ -5377,7 +5382,7 @@ async fn flow_deleted_user_token_rejected() {
 async fn flow_admin_reset_password() {
     let app = app().await;
     let root_token = login_root(&app).await;
-    let (_, uid) = register_user(&app, "resetme", "OldPass11").await;
+    let (_, uid) = register_user_full(&app, "resetme", "OldPass11").await;
     // Reset password
     let resp = app.clone().oneshot(auth_req("PUT", &format!("/api/admin/users/{}/password", uid), &root_token, Some(json!({"password":"NewPass11"})))).await.unwrap();
     assert_eq!(resp.status(), 204);
@@ -5392,7 +5397,7 @@ async fn flow_admin_reset_password() {
 #[tokio::test]
 async fn flow_admin_reset_password_non_root_rejected() {
     let app = app().await;
-    let (user_token, _) = register_user(&app, "noreset", "NoReset1").await;
+    let (user_token, _) = register_user_full(&app, "noreset", "NoReset1").await;
     let resp = app.clone().oneshot(auth_req("PUT", "/api/admin/users/1/password", &user_token, Some(json!({"password":"HackRoot1"})))).await.unwrap();
     assert_eq!(resp.status(), 403);
 }
@@ -5433,7 +5438,7 @@ async fn flow_sprint_full_lifecycle() {
 async fn flow_sprint_non_owner_cannot_manage() {
     let app = app().await;
     let root_token = login_root(&app).await;
-    let (user_token, _) = register_user(&app, "spdev", "SpDev123").await;
+    let (user_token, _) = register_user_full(&app, "spdev", "SpDev123").await;
     // Root creates sprint
     let resp = app.clone().oneshot(auth_req("POST", "/api/sprints", &root_token, Some(json!({"name":"S2"})))).await.unwrap();
     let sid = body_json(resp).await["id"].as_i64().unwrap();
@@ -5451,13 +5456,13 @@ async fn flow_sprint_non_owner_cannot_manage() {
 async fn flow_room_full_estimation_session() {
     let app = app().await;
     let root_token = login_root(&app).await;
-    let (u1_token, _) = register_user(&app, "voter1", "Voter1P1").await;
-    let (u2_token, _) = register_user(&app, "voter2", "Voter2P1").await;
+    let (u1_token, _) = register_user_full(&app, "voter1", "Voter1P1").await;
+    let (u2_token, _) = register_user_full(&app, "voter2", "Voter2P1").await;
     // Create task to estimate
     let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &root_token, Some(json!({"title":"Estimate me"})))).await.unwrap();
     let tid = body_json(resp).await["id"].as_i64().unwrap();
     // Create room
-    let resp = app.clone().oneshot(auth_req("POST", "/api/rooms", &root_token, Some(json!({"name":"Planning"}))).clone()).await.unwrap();
+    let resp = app.clone().oneshot(auth_req("POST", "/api/rooms", &root_token, Some(json!({"name":"Planning"})))).await.unwrap();
     assert_eq!(resp.status(), 201);
     let rid = body_json(resp).await["id"].as_i64().unwrap();
     // Users join
@@ -5490,7 +5495,7 @@ async fn flow_room_full_estimation_session() {
 async fn flow_timer_multi_user_isolation() {
     let app = app().await;
     let root_token = login_root(&app).await;
-    let (u_token, _) = register_user(&app, "timer1", "Timer1P1").await;
+    let (u_token, _) = register_user_full(&app, "timer1", "Timer1P1").await;
     // Root starts timer
     let resp = app.clone().oneshot(auth_req("POST", "/api/timer/start", &root_token, Some(json!({})))).await.unwrap();
     assert_eq!(resp.status(), 200);
@@ -5542,7 +5547,7 @@ async fn flow_timer_start_with_task_link() {
 #[tokio::test]
 async fn flow_change_password_via_profile() {
     let app = app().await;
-    let (token, _) = register_user(&app, "pwuser", "OldPass11").await;
+    let (token, _) = register_user_full(&app, "pwuser", "OldPass11").await;
     // Change password via profile
     let resp = app.clone().oneshot(auth_req("PUT", "/api/profile", &token, Some(json!({"password":"NewPass11","current_password":"OldPass11"})))).await.unwrap();
     assert_eq!(resp.status(), 200);
@@ -5556,7 +5561,7 @@ async fn flow_change_password_via_profile() {
 #[tokio::test]
 async fn flow_change_password_wrong_current_rejected() {
     let app = app().await;
-    let (token, _) = register_user(&app, "pwuser2", "OldPass22").await;
+    let (token, _) = register_user_full(&app, "pwuser2", "OldPass22").await;
     let resp = app.clone().oneshot(auth_req("PUT", "/api/profile", &token, Some(json!({"password":"NewPass22","current_password":"WrongOld1"})))).await.unwrap();
     assert_eq!(resp.status(), 403);
 }
@@ -5567,7 +5572,7 @@ async fn flow_change_password_wrong_current_rejected() {
 async fn flow_labels_require_task_ownership() {
     let app = app().await;
     let root_token = login_root(&app).await;
-    let (user_token, _) = register_user(&app, "labdev", "LabDev11").await;
+    let (user_token, _) = register_user_full(&app, "labdev", "LabDev11").await;
     // Create label
     let resp = app.clone().oneshot(auth_req("POST", "/api/labels", &root_token, Some(json!({"name":"bug","color":"#ff0000"})))).await.unwrap();
     let lid = body_json(resp).await["id"].as_i64().unwrap();
@@ -5610,7 +5615,7 @@ async fn flow_soft_delete_restore_cycle() {
 #[tokio::test]
 async fn flow_backup_non_root_rejected() {
     let app = app().await;
-    let (user_token, _) = register_user(&app, "nobackup", "NoBkup11").await;
+    let (user_token, _) = register_user_full(&app, "nobackup", "NoBkup11").await;
     let resp = app.clone().oneshot(auth_req("POST", "/api/admin/backup", &user_token, None)).await.unwrap();
     assert_eq!(resp.status(), 403);
 }
@@ -5634,7 +5639,7 @@ async fn flow_health_no_auth_required() {
 async fn flow_export_tasks_user_scoped() {
     let app = app().await;
     let root_token = login_root(&app).await;
-    let (user_token, _) = register_user(&app, "exdev", "ExDev111").await;
+    let (user_token, _) = register_user_full(&app, "exdev", "ExDev111").await;
     // Root creates task
     app.clone().oneshot(auth_req("POST", "/api/tasks", &root_token, Some(json!({"title":"Root only"})))).await.unwrap();
     // User creates task
@@ -5656,7 +5661,7 @@ async fn flow_export_tasks_user_scoped() {
 async fn flow_history_user_scoped() {
     let app = app().await;
     let root_token = login_root(&app).await;
-    let (user_token, _) = register_user(&app, "histdev", "HistDv11").await;
+    let (user_token, _) = register_user_full(&app, "histdev", "HistDv11").await;
     // Both start and stop timers to create sessions
     app.clone().oneshot(auth_req("POST", "/api/timer/start", &root_token, Some(json!({})))).await.unwrap();
     app.clone().oneshot(auth_req("POST", "/api/timer/stop", &root_token, None)).await.unwrap();

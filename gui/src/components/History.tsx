@@ -180,6 +180,29 @@ export default function History() {
         );
       })()}
 
+      {/* BL21: Week-over-week comparison */}
+      {filteredStats.length > 14 && (() => {
+        const thisWeek = filteredStats.slice(-7);
+        const lastWeek = filteredStats.slice(-14, -7);
+        const twFocus = thisWeek.reduce((a, s) => a + s.total_focus_s, 0) / 3600;
+        const lwFocus = lastWeek.reduce((a, s) => a + s.total_focus_s, 0) / 3600;
+        const twSessions = thisWeek.reduce((a, s) => a + s.completed, 0);
+        const lwSessions = lastWeek.reduce((a, s) => a + s.completed, 0);
+        const fDelta = lwFocus > 0 ? ((twFocus - lwFocus) / lwFocus * 100) : 0;
+        const sDelta = lwSessions > 0 ? ((twSessions - lwSessions) / lwSessions * 100) : 0;
+        const arrow = (d: number) => d > 0 ? `↑${Math.abs(d).toFixed(0)}%` : d < 0 ? `↓${Math.abs(d).toFixed(0)}%` : "—";
+        const color = (d: number) => d > 0 ? "text-green-400" : d < 0 ? "text-red-400" : "text-white/30";
+        return (
+          <div className="glass p-3">
+            <div className="text-xs text-white/40 mb-1 font-medium">This Week vs Last Week</div>
+            <div className="grid grid-cols-2 gap-3 text-center text-xs">
+              <div>Focus: {twFocus.toFixed(1)}h <span className={color(fDelta)}>{arrow(fDelta)}</span></div>
+              <div>Sessions: {twSessions} <span className={color(sDelta)}>{arrow(sDelta)}</span></div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Heatmap */}
       <div className="glass p-5">
         <h3 className="text-sm font-semibold text-white/60 mb-4">Activity (Last 365 Days)</h3>
