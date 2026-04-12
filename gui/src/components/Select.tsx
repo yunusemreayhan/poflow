@@ -13,7 +13,10 @@ export default function Select({ value, options, onChange, className = "", place
 }) {
   const [open, setOpen] = useState(false);
   const [focused, setFocused] = useState(-1);
+  const [filter, setFilter] = useState("");
   const ref = useRef<HTMLDivElement>(null);
+  const filterRef = useRef<HTMLInputElement>(null);
+  const filtered = filter ? options.filter(o => o.label.toLowerCase().includes(filter.toLowerCase())) : options;
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -23,11 +26,12 @@ export default function Select({ value, options, onChange, className = "", place
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // Reset focused index when opening
   useEffect(() => {
     if (open) {
-      const idx = options.findIndex(o => o.value === value);
+      const idx = filtered.findIndex(o => o.value === value);
       setFocused(idx >= 0 ? idx : 0);
+      setFilter("");
+      setTimeout(() => filterRef.current?.focus(), 0);
     }
   }, [open, options, value]);
 
@@ -39,7 +43,7 @@ export default function Select({ value, options, onChange, className = "", place
       }
       return;
     }
-    const enabledOptions = options.map((o, i) => ({ ...o, i })).filter(o => !o.disabled);
+    const enabledOptions = filtered.map((o, i) => ({ ...o, i })).filter(o => !o.disabled);
     if (e.key === "ArrowDown") {
       e.preventDefault();
       const cur = enabledOptions.findIndex(o => o.i === focused);
@@ -52,7 +56,7 @@ export default function Select({ value, options, onChange, className = "", place
       if (prev) setFocused(prev.i);
     } else if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
-      const opt = options[focused];
+      const opt = filtered[focused];
       if (opt && !opt.disabled) { onChange(opt.value); setOpen(false); }
     } else if (e.key === "Escape") {
       e.preventDefault();
@@ -80,7 +84,11 @@ export default function Select({ value, options, onChange, className = "", place
       </button>
       {open && (
         <div className="absolute z-50 mt-1 w-full max-h-60 overflow-auto rounded-lg border border-white/10 bg-[var(--color-surface)] shadow-xl" role="listbox">
-          {options.map((o, i) => (
+          {options.length > 5 && (
+            <input ref={filterRef} value={filter} onChange={e => { setFilter(e.target.value); setFocused(0); }}
+              placeholder="Search..." className="w-full px-3 py-1.5 text-xs bg-transparent border-b border-white/10 text-[var(--color-text)] outline-none placeholder-white/30" />
+          )}
+          {filtered.map((o, i) => (
             <button key={o.value} type="button" disabled={o.disabled}
               role="option" aria-selected={o.value === value}
               onClick={() => { if (!o.disabled) { onChange(o.value); setOpen(false); } }}

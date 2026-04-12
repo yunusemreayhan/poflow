@@ -146,6 +146,7 @@ pub struct BulkStatusRequest { pub task_ids: Vec<i64>, pub status: String }
 pub async fn bulk_update_status(State(engine): State<AppState>, claims: Claims, Json(req): Json<BulkStatusRequest>) -> Result<StatusCode, ApiError> {
     validate_task_status(&req.status)?;
     if req.task_ids.is_empty() { return Ok(StatusCode::NO_CONTENT); }
+    if req.task_ids.len() > 500 { return Err(err(StatusCode::BAD_REQUEST, "Too many task IDs (max 500)")); }
     // Batch ownership check
     if claims.role != "root" {
         let ph = req.task_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");

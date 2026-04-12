@@ -272,7 +272,7 @@ function BoardView({ board, reload }: { board: SprintBoard; reload: () => void }
     reload();
   };
 
-  const Column = ({ title, tasks, color, status }: { title: string; tasks: Task[]; color: string; status: string }) => (
+  const Column = useCallback(({ title, tasks, color, status }: { title: string; tasks: Task[]; color: string; status: string }) => (
     <div className="flex-1 min-w-0 rounded-lg border-2 border-transparent transition-colors" role="list" aria-label={`${title} tasks`}
       onDragOver={e => { e.preventDefault(); e.currentTarget.style.borderColor = "var(--color-accent)"; e.currentTarget.style.background = "rgba(124,58,237,0.05)"; }}
       onDragLeave={e => { e.currentTarget.style.borderColor = "transparent"; e.currentTarget.style.background = ""; }}
@@ -305,7 +305,7 @@ function BoardView({ board, reload }: { board: SprintBoard; reload: () => void }
         ))}
       </div>
     </div>
-  );
+  ), [changeStatus]);
 
   const total = board.todo.length + board.in_progress.length + board.done.length;
   const pct = total > 0 ? Math.round((board.done.length / total) * 100) : 0;
