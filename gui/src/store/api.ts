@@ -66,6 +66,22 @@ export async function setToken(token: string) {
   return invoke("set_token", { token });
 }
 
+// S1: Get a fresh token for direct fetch() calls (binary uploads/downloads).
+// Attempts refresh if the current token might be stale.
+export async function getFreshToken(): Promise<string> {
+  const { useStore } = await import("./store");
+  const token = useStore.getState().token;
+  if (!token) throw new Error("Not authenticated");
+  // Try a lightweight call to verify token is still valid
+  try {
+    await invoke("api_call", { method: "GET", path: "/api/health", body: null });
+  } catch {
+    const refreshed = await tryRefreshToken();
+    if (!refreshed) throw new Error("Token expired");
+  }
+  return useStore.getState().token || token;
+}
+
 // --- Types (re-exported from types.ts) ---
 export type {
   Task, Session, EngineState, Comment, TaskDetail, DayStat, Config,

@@ -1,7 +1,7 @@
 import { Paperclip } from "lucide-react";
 import { useStore } from "../store/store";
 import { useState, useEffect } from "react";
-import { apiCall } from "../store/api";
+import { apiCall, getFreshToken } from "../store/api";
 
 interface AuditEntry { id: number; user_id: number; username: string; action: string; entity_type: string; entity_id: number | null; detail: string | null; created_at: string }
 
@@ -50,13 +50,16 @@ interface Attachment {
 function AuthImage({ id, alt }: { id: number; alt: string }) {
   const [src, setSrc] = useState<string>();
   useEffect(() => {
-    const { serverUrl, token } = useStore.getState();
     let url: string | undefined;
-    fetch(`${serverUrl}/api/attachments/${id}/download`, {
-      headers: { "authorization": `Bearer ${token}`, "x-requested-with": "PomodoroGUI" },
-    }).then(r => r.ok ? r.blob() : null).then(b => {
-      if (b) { url = URL.createObjectURL(b); setSrc(url); }
-    }).catch(() => {});
+    (async () => {
+      const { serverUrl } = useStore.getState();
+      const token = await getFreshToken().catch(() => null);
+      if (!token) return;
+      const r = await fetch(`${serverUrl}/api/attachments/${id}/download`, {
+        headers: { "authorization": `Bearer ${token}`, "x-requested-with": "PomodoroGUI" },
+      });
+      if (r.ok) { const b = await r.blob(); url = URL.createObjectURL(b); setSrc(url); }
+    })().catch(() => {});
     return () => { if (url) URL.revokeObjectURL(url); };
   }, [id]);
   if (!src) return null;
@@ -73,7 +76,8 @@ export function TaskAttachments({ taskId }: { taskId: number }) {
   const upload = async (file: File) => {
     setUploading(true);
     try {
-      const { serverUrl, token } = useStore.getState();
+      const { serverUrl } = useStore.getState();
+      const token = await getFreshToken();
       const buf = await file.arrayBuffer();
       const resp = await fetch(`${serverUrl}/api/tasks/${taskId}/attachments`, {
         method: "POST",
@@ -98,7 +102,8 @@ export function TaskAttachments({ taskId }: { taskId: number }) {
   };
 
   const download = async (id: number, filename: string) => {
-    const { serverUrl, token } = useStore.getState();
+    const { serverUrl } = useStore.getState();
+    const token = await getFreshToken();
     const resp = await fetch(`${serverUrl}/api/attachments/${id}/download`, {
       headers: { "authorization": `Bearer ${token}`, "x-requested-with": "PomodoroGUI" },
     });
