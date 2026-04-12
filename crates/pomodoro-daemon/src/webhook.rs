@@ -6,6 +6,9 @@ fn webhook_client() -> &'static reqwest::Client {
     WEBHOOK_CLIENT.get_or_init(|| reqwest::Client::builder().timeout(std::time::Duration::from_secs(10)).build().unwrap_or_default())
 }
 
+/// Public wrapper for route-level validation
+pub fn is_private_ip_pub(ip: &IpAddr) -> bool { is_private_ip(ip) }
+
 fn is_private_ip(ip: &IpAddr) -> bool {
     match ip {
         IpAddr::V4(v4) => v4.is_loopback() || v4.is_private() || v4.is_link_local() || v4.is_broadcast() || v4.is_unspecified(),

@@ -224,11 +224,12 @@ pub struct LeaderboardQuery { pub period: Option<String> }
 #[utoipa::path(get, path = "/api/leaderboard", responses((status = 200)), security(("bearer" = [])))]
 pub async fn leaderboard(State(engine): State<AppState>, _claims: Claims, Query(q): Query<LeaderboardQuery>) -> ApiResult<Vec<serde_json::Value>> {
     let days = match q.period.as_deref() { Some("month") => 30, Some("year") => 365, _ => 7 };
+    let cutoff = (chrono::Utc::now() - chrono::Duration::days(days)).format("%Y-%m-%d").to_string();
     let rows: Vec<(String, f64, i64)> = sqlx::query_as(
         "SELECT u.username, COALESCE(SUM(s.duration_s),0)/3600.0, COUNT(s.id) \
-         FROM users u LEFT JOIN sessions s ON s.user_id = u.id AND s.status = 'completed' AND s.started_at >= date('now', ?) \
+         FROM users u LEFT JOIN sessions s ON s.user_id = u.id AND s.status = 'completed' AND s.started_at >= ? \
          GROUP BY u.id ORDER BY SUM(s.duration_s) DESC")
-        .bind(format!("-{} days", days)).fetch_all(&engine.pool).await.map_err(internal)?;
+        .bind(&cutoff).fetch_all(&engine.pool).await.map_err(internal)?;
     Ok(Json(rows.into_iter().map(|(u, h, s)| serde_json::json!({"username": u, "hours": (h * 100.0).round() / 100.0, "sessions": s})).collect()))
 }
 

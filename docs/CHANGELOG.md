@@ -2,9 +2,36 @@
 
 ## v2.0.1 — Stability & Hardening (2026-04-13)
 
+### Bug Fixes
+- **Auth**: `FromRequestParts` now uses per-router pool from state instead of global OnceLock, eliminating test flakiness from cross-DB token validation.
+- **Engine**: `get_state()` drops config and states locks before DB query, preventing latency on concurrent callers.
+- **Sprints**: Carry-over now excludes tasks with "done" status (previously only "completed" and "archived").
+- **Tasks**: `duplicate_task` copies `sort_order` from original.
+- **Tasks**: `auto_unblock_dependents` rewritten from N+1 to 2 queries per completed task.
+- **Notifications**: Desktop notifications wrapped in `catch_unwind` for headless servers (both session complete and due task reminders).
+- **CSV Import**: Now parses `estimated_hours` and `remaining_points` columns instead of hardcoding 0.0.
+- **Focus Score**: Streak calculation allows today to be missing (day not over yet) instead of resetting to 0.
+- **Leaderboard**: Cutoff date computed in Rust instead of SQLite `date()` function with string interpolation.
+
+### Security
+- Backup/restore `VACUUM INTO` format strings have runtime assertions preventing single-quote injection.
+- SSE ticket fallback to hash-based entropy now logs a security warning.
+- Webhook URL private IP check uses proper IP parsing instead of string prefix matching.
+
+### Frontend
+- Kanban cards have keyboard navigation (Enter to advance status, focus rings, aria-labels).
+- Kanban columns have `role="list"` for screen readers.
+- Task change detection uses ID-based comparison instead of fragile positional check.
+- Reparent search uses `useDeferredValue` for debounce.
+- CalendarView loads stats on mount.
+- Sidebar theme sync effect includes `theme` in dependency array.
+- Migrated from deprecated `whoami::hostname()` to `fallible::hostname()`.
+
 ### Behavior Notes
 - **Bulk status changes** (`PUT /api/tasks/bulk-status`) emit a single webhook event with `{"ids": [...], "bulk": true}` instead of per-task events.
-- **Sprint carry-over** now excludes tasks with status "done" (previously only excluded "completed" and "archived").
+
+### API
+- Added error response schemas (400/401/403/404/409/429) to auth and task CRUD endpoints in OpenAPI spec.
 
 ## v2.0.0 — Feature Release (2026-04-12)
 
