@@ -435,6 +435,18 @@ async fn migrate(pool: &Pool) -> Result<()> {
         sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (10, ?)").bind(&now_str()).execute(pool).await.ok();
     }
 
+    // Migration 11: Achievements table
+    if !applied_set.contains(&11) {
+        sqlx::query("CREATE TABLE IF NOT EXISTS achievements (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id         INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            achievement_type TEXT NOT NULL,
+            unlocked_at     TEXT NOT NULL,
+            UNIQUE(user_id, achievement_type)
+        )").execute(pool).await.ok();
+        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (11, ?)").bind(&now_str()).execute(pool).await.ok();
+    }
+
     sqlx::query("CREATE TABLE IF NOT EXISTS task_attachments (
         id          INTEGER PRIMARY KEY AUTOINCREMENT,
         task_id     INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,

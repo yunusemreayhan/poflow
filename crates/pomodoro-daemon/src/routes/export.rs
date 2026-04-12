@@ -235,3 +235,45 @@ fn parse_csv_line(line: &str) -> Vec<String> {
     fields.push(current);
     fields
 }
+
+// F4: iCal feed — tasks with due dates + sprint date ranges
+#[utoipa::path(get, path = "/api/export/ical", responses((status = 200)), security(("bearer" = [])))]
+pub async fn export_ical(State(engine): State<AppState>, claims: Claims) -> Result<axum::response::Response, ApiError> {
+    let user_filter = if claims.role == "root" { None } else { Some(claims.user_id) };
+    let filter = db::TaskFilter { status: None, project: None, search: None, assignee: None, due_before: None, due_after: None, priority: None, team_id: None, user_id: user_filter };
+    let tasks = db::list_tasks_paged(&engine.pool, filter, 50000, 0).await.map_err(internal)?;
+    let sprints = db::list_sprints(&engine.pool, None, None).await.map_err(internal)?;
+
+    let mut ical = String::from("BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//PomodoroLinux//EN\r\nCALSCALE:GREGORIAN\r\nMETHOD:PUBLISH\r\n");
+    for t in &tasks {
+        if let Some(ref due) = t.due_date {
+            let uid = format!("task-{}@pomodoro", t.id);
+            let summary = ical_escape(&t.title);
+            let date = due.replace('-', "");
+            ical.push_str(&format!("BEGIN:VEVENT\r\nUID:{}\r\nDTSTART;VALUE=DATE:{}\r\nSUMMARY:{}\r\n", uid, date, summary));
+            if let Some(ref desc) = t.description { ical.push_str(&format!("DESCRIPTION:{}\r\n", ical_escape(desc))); }
+            if t.priority >= 4 { ical.push_str("PRIORITY:1\r\n"); }
+            ical.push_str("END:VEVENT\r\n");
+        }
+    }
+    for s in &sprints {
+        if let (Some(ref start), Some(ref end)) = (&s.start_date, &s.end_date) {
+            let uid = format!("sprint-{}@pomodoro", s.id);
+            ical.push_str(&format!("BEGIN:VEVENT\r\nUID:{}\r\nDTSTART;VALUE=DATE:{}\r\nDTEND;VALUE=DATE:{}\r\nSUMMARY:Sprint: {}\r\n",
+                uid, start.replace('-', ""), end.replace('-', ""), ical_escape(&s.name)));
+            if let Some(ref goal) = s.goal { ical.push_str(&format!("DESCRIPTION:{}\r\n", ical_escape(goal))); }
+            ical.push_str("END:VEVENT\r\n");
+        }
+    }
+    ical.push_str("END:VCALENDAR\r\n");
+
+    Ok(axum::response::Response::builder()
+        .status(StatusCode::OK)
+        .header("content-type", "text/calendar; charset=utf-8")
+        .header("content-disposition", "attachment; filename=\"pomodoro.ics\"")
+        .body(axum::body::Body::from(ical)).map_err(|e| internal(e.to_string()))?)
+}
+
+fn ical_escape(s: &str) -> String {
+    s.replace('\\', "\\\\").replace(';', "\\;").replace(',', "\\,").replace('\n', "\\n").replace('\r', "")
+}

@@ -100,6 +100,12 @@ export default function Dashboard() {
       {/* F5: Productivity trends — weekly comparison */}
       <ProductivityTrends stats={stats} />
 
+      {/* F8: Focus score */}
+      <FocusScore />
+
+      {/* F22: Achievements */}
+      <Achievements />
+
       {/* BL3: Daily standup view */}
       <StandupView today={today} tasks={tasks} />
 
@@ -407,6 +413,59 @@ function ProductivityTrends({ stats }: { stats: import("../store/api").DayStat[]
               style={{ height: `${(w.focusH / maxH) * 100}%`, minHeight: w.focusH > 0 ? 2 : 0 }}
               title={`${w.label}: ${w.focusH.toFixed(1)}h, ${w.sessions} sessions`} />
             <span className={`text-[8px] ${i === weeks.length - 1 ? "text-[var(--color-accent)]" : "text-white/20"}`}>{w.label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// F8: Focus score widget
+function FocusScore() {
+  const [data, setData] = useState<{ score: number; streak_days: number; components: Record<string, number> } | null>(null);
+  useEffect(() => { apiCall<typeof data>("GET", "/api/analytics/focus-score").then(setData).catch(() => {}); }, []);
+  if (!data || data.score === 0) return null;
+  const color = data.score >= 80 ? "#10B981" : data.score >= 50 ? "#F59E0B" : "#EF4444";
+  return (
+    <div className="glass p-3 rounded-lg">
+      <div className="flex items-center gap-3">
+        <div className="relative w-14 h-14">
+          <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
+            <circle cx="18" cy="18" r="15.5" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="3" />
+            <circle cx="18" cy="18" r="15.5" fill="none" stroke={color} strokeWidth="3"
+              strokeDasharray={`${data.score} ${100 - data.score}`} strokeLinecap="round" />
+          </svg>
+          <div className="absolute inset-0 flex items-center justify-center text-sm font-bold" style={{ color }}>{Math.round(data.score)}</div>
+        </div>
+        <div className="flex-1">
+          <div className="text-xs text-white/40">Focus Score</div>
+          <div className="text-[10px] text-white/20 mt-0.5">
+            🔥 {data.streak_days}d streak · Goal {data.components.goal_achievement}/30 · Consistency {data.components.consistency}/30
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// F22: Achievements widget
+function Achievements() {
+  const [achievements, setAchievements] = useState<{ type: string; description: string; unlocked: boolean; unlocked_at: string | null }[]>([]);
+  useEffect(() => {
+    // Check for new achievements, then load all
+    apiCall("POST", "/api/achievements/check").catch(() => {});
+    apiCall<typeof achievements>("GET", "/api/achievements").then(d => d && setAchievements(d)).catch(() => {});
+  }, []);
+  const unlocked = achievements.filter(a => a.unlocked);
+  if (achievements.length === 0) return null;
+  return (
+    <div className="glass p-3 rounded-lg">
+      <div className="text-xs text-white/40 mb-2">Achievements ({unlocked.length}/{achievements.length})</div>
+      <div className="flex flex-wrap gap-2">
+        {achievements.map(a => (
+          <div key={a.type} title={a.description + (a.unlocked_at ? ` — ${a.unlocked_at.slice(0, 10)}` : "")}
+            className={`text-[10px] px-2 py-1 rounded-full ${a.unlocked ? "bg-[var(--color-accent)]/20 text-[var(--color-accent)]" : "bg-white/5 text-white/15"}`}>
+            {a.unlocked ? "🏆" : "🔒"} {a.description}
           </div>
         ))}
       </div>
