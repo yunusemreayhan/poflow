@@ -144,28 +144,27 @@ for API consumers.
 
 | ID | Severity | Category | Status |
 |----|----------|----------|--------|
-| V29-1 | Medium | Bug/Security | TODO |
-| V29-2 | Medium | Bug/Security | TODO |
+| V29-1 | Medium | Bug/Security | FIXED |
+| V29-2 | Medium | Bug/Security | FIXED |
 | V29-3 | Low | Design decision | WON'T FIX (shared workspace by design) |
 | V29-4 | Low | Design decision | WON'T FIX (shared workspace by design) |
-| V29-5 | Low | Missing validation | TODO |
+| V29-5 | Low | Missing validation | FIXED |
 | V29-6 | Low | Security | WON'T FIX (already blocked by allowlist) |
-| V29-7 | Low | Security | TODO |
-| V29-8 | Low | Security | TODO |
+| V29-7 | Low | Security | FIXED |
+| V29-8 | Low | Security | FIXED |
 | V29-9 | Low | Performance | WON'T FIX (acceptable for typical use) |
 | V29-10 | Low | Performance | WON'T FIX (500 row limit is reasonable) |
 | V29-11 | Low | Performance | WON'T FIX (acceptable for typical use) |
 | V29-12 | Low | Code quality | WON'T FIX (refactor, not a bug) |
 | V29-13 | Low | Code quality | WON'T FIX (refactor, not a bug) |
-| V29-14 | Low | Code quality | TODO |
-| V29-15 | Low | Error handling | TODO |
-| V29-16 | Low | Error handling | TODO |
-| V29-17 | Low | UX | TODO |
-| V29-18 | Low | UX | TODO |
-| V29-19 | Low | Accessibility | TODO |
+| V29-14 | Low | Code quality | FIXED |
+| V29-15 | Low | Error handling | FIXED |
+| V29-16 | Low | Error handling | FIXED |
+| V29-17 | Low | UX | FIXED |
+| V29-18 | Low | UX | FIXED |
+| V29-19 | Low | Accessibility | FIXED |
 | V29-20 | Low | UX | WON'T FIX (CSS limitation) |
-| V29-21 | Low | Documentation | TODO |
-| V29-22 | Low | Documentation | TODO |
+| V29-21 | Low | Documentation | FIXED |
+| V29-22 | Low | Documentation | FIXED |
 
-**Total: 22 items** — 2 medium, 20 low
-**To fix: 12** | **Won't fix: 10** (by design, refactors, or acceptable tradeoffs)
+**Total: 22 items** — 12 fixed, 10 won't fix

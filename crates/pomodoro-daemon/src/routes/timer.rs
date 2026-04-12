@@ -87,6 +87,9 @@ pub async fn join_session(State(engine): State<AppState>, claims: Claims, Path(s
 
 #[utoipa::path(get, path = "/api/timer/participants/{session_id}", responses((status = 200)), security(("bearer" = [])))]
 pub async fn session_participants(State(engine): State<AppState>, _claims: Claims, Path(session_id): Path<i64>) -> ApiResult<Vec<serde_json::Value>> {
+    // V29-5: Verify session exists
+    sqlx::query("SELECT 1 FROM sessions WHERE id = ?").bind(session_id).fetch_one(&engine.pool).await
+        .map_err(|_| err(StatusCode::NOT_FOUND, "Session not found"))?;
     let rows: Vec<(String, String)> = sqlx::query_as("SELECT u.username, sp.joined_at FROM session_participants sp JOIN users u ON sp.user_id = u.id WHERE sp.session_id = ?")
         .bind(session_id).fetch_all(&engine.pool).await.map_err(internal)?;
     Ok(Json(rows.into_iter().map(|(u, j)| serde_json::json!({"username": u, "joined_at": j})).collect()))

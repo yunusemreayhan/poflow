@@ -27,7 +27,9 @@ pub async fn add_comment(State(engine): State<AppState>, claims: Claims, Path(id
                     if let Some(username) = word.strip_prefix('@') {
                         let username = username.trim_matches(|c: char| !c.is_alphanumeric() && c != '_' && c != '-');
                         if let Ok(uid) = db::get_user_id_by_username(&pool, username).await {
-                            db::create_notification(&pool, uid, "mention", &format!("You were mentioned in a comment on task #{}", task_id), Some("task"), Some(task_id)).await.ok();
+                            if let Err(e) = db::create_notification(&pool, uid, "mention", &format!("You were mentioned in a comment on task #{}", task_id), Some("task"), Some(task_id)).await {
+                                tracing::warn!("Failed to create @mention notification for {}: {}", username, e);
+                            }
                         }
                     }
                 }

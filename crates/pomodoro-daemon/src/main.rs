@@ -136,6 +136,10 @@ async fn main() -> Result<()> {
     }
 
     tracing::info!("Pomodoro daemon starting...");
+    // V29-8: Warn if GitHub webhook secret is not configured
+    if std::env::var("GITHUB_WEBHOOK_SECRET").is_err() {
+        tracing::warn!("GITHUB_WEBHOOK_SECRET not set — GitHub webhook endpoint accepts unverified payloads");
+    }
 
     let config = config::Config::load()?;
     let pool = db::connect().await?;

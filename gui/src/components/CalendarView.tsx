@@ -80,7 +80,22 @@ export default function CalendarView() {
       </div>
 
       {/* Calendar grid */}
-      <div className="grid grid-cols-7 gap-1">
+      <div className="grid grid-cols-7 gap-1" role="grid" aria-label="Calendar"
+        onKeyDown={(e) => {
+          // V29-19: Arrow key navigation
+          const target = e.target as HTMLElement;
+          const idx = Array.from(target.parentElement?.children || []).indexOf(target);
+          if (idx < 0) return;
+          let next = -1;
+          if (e.key === "ArrowRight") next = idx + 1;
+          else if (e.key === "ArrowLeft") next = idx - 1;
+          else if (e.key === "ArrowDown") next = idx + 7;
+          else if (e.key === "ArrowUp") next = idx - 7;
+          if (next >= 0 && next < cells.length) {
+            (target.parentElement?.children[next] as HTMLElement)?.focus();
+            e.preventDefault();
+          }
+        }}>
         {cells.map((cell, i) => {
           const dueTasks = tasksByDate.get(cell.date) || [];
           const focusMin = Math.round((focusByDate.get(cell.date) || 0) / 60);

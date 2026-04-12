@@ -275,5 +275,5 @@ pub async fn export_ical(State(engine): State<AppState>, claims: Claims) -> Resu
 }
 
 fn ical_escape(s: &str) -> String {
-    s.replace('\\', "\\\\").replace(';', "\\;").replace(',', "\\,").replace('\n', "\\n").replace('\r', "")
+    s.replace('\\', "\\\\").replace(';', "\\;").replace(',', "\\,").replace(':', "\\:").replace('\n', "\\n").replace('\r', "")
 }

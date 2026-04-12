@@ -423,7 +423,9 @@ function ProductivityTrends({ stats }: { stats: import("../store/api").DayStat[]
 // F8: Focus score widget
 function FocusScore() {
   const [data, setData] = useState<{ score: number; streak_days: number; components: Record<string, number> } | null>(null);
-  useEffect(() => { apiCall<typeof data>("GET", "/api/analytics/focus-score").then(setData).catch(() => {}); }, []);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => { apiCall<typeof data>("GET", "/api/analytics/focus-score").then(setData).catch(() => {}).finally(() => setLoading(false)); }, []);
+  if (loading) return <div className="glass p-3 rounded-lg animate-pulse h-16" />;
   if (!data || data.score === 0) return null;
   const color = data.score >= 80 ? "#10B981" : data.score >= 50 ? "#F59E0B" : "#EF4444";
   return (
@@ -451,15 +453,17 @@ function FocusScore() {
 // F22: Achievements widget
 function Achievements() {
   const [achievements, setAchievements] = useState<{ type: string; description: string; unlocked: boolean; unlocked_at: string | null }[]>([]);
+  const [loading, setLoading] = useState(true);
   useEffect(() => {
     // PF14: Throttle check to once per hour
     const lastCheck = Number(localStorage.getItem("achievements_last_check") || "0");
     if (Date.now() - lastCheck > 3600_000) {
       apiCall("POST", "/api/achievements/check").then(() => localStorage.setItem("achievements_last_check", String(Date.now()))).catch(() => {});
     }
-    apiCall<typeof achievements>("GET", "/api/achievements").then(d => d && setAchievements(d)).catch(() => {});
+    apiCall<typeof achievements>("GET", "/api/achievements").then(d => d && setAchievements(d)).catch(() => {}).finally(() => setLoading(false));
   }, []);
   const unlocked = achievements.filter(a => a.unlocked);
+  if (loading) return <div className="glass p-3 rounded-lg animate-pulse h-16" />;
   if (achievements.length === 0) return null;
   return (
     <div className="glass p-3 rounded-lg">

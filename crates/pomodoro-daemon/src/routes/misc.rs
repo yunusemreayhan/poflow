@@ -222,6 +222,7 @@ pub struct GitHubRepo { pub full_name: Option<String> }
     request_body(content = GitHubPushEvent, content_type = "application/json"))]
 pub async fn github_webhook(State(engine): State<AppState>, headers: axum::http::HeaderMap, body: axum::body::Bytes) -> Result<StatusCode, ApiError> {
     // PF5: Verify HMAC-SHA256 signature if GITHUB_WEBHOOK_SECRET is set
+    // V29-8: Warn if secret is not configured
     if let Ok(secret) = std::env::var("GITHUB_WEBHOOK_SECRET") {
         let sig_header = headers.get("x-hub-signature-256").and_then(|v| v.to_str().ok()).unwrap_or("");
         let expected_sig = sig_header.strip_prefix("sha256=").unwrap_or("");

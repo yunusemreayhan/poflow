@@ -31,9 +31,21 @@ function reqToPromise<T>(req: IDBRequest<T>): Promise<T> {
 // --- Tasks cache ---
 
 export async function cacheTasksOffline(tasks: unknown[]): Promise<void> {
-  const db = await openDB();
-  const store = tx(db, 'tasks', 'readwrite');
-  for (const t of tasks) store.put(t);
+  try {
+    const db = await openDB();
+    const store = tx(db, 'tasks', 'readwrite');
+    for (const t of tasks) store.put(t);
+  } catch (e) {
+    // V29-16: Handle quota exceeded by clearing old data
+    if (e instanceof DOMException && e.name === 'QuotaExceededError') {
+      try {
+        const db = await openDB();
+        tx(db, 'tasks', 'readwrite').clear();
+        const store = tx(db, 'tasks', 'readwrite');
+        for (const t of tasks) store.put(t);
+      } catch { /* give up */ }
+    }
+  }
 }
 
 export async function getOfflineTasks(): Promise<unknown[]> {

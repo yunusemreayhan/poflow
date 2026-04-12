@@ -51,8 +51,11 @@ pub async fn create_backup(State(engine): State<AppState>, claims: Claims) -> Re
     std::fs::create_dir_all(&backup_dir).map_err(|e| internal(format!("Failed to create backup dir: {}", e)))?;
     let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S");
     let backup_path = backup_dir.join(format!("pomodoro_{}.db", timestamp));
-    // S3: Validate path to prevent SQL injection via POMODORO_DATA_DIR
+    // V29-1: Strict path validation — reject single quotes and other SQL-dangerous chars
     let path_str = backup_path.display().to_string();
+    if path_str.contains('\'') || path_str.contains('"') || path_str.contains(';') || path_str.contains('\0') {
+        return Err(err(StatusCode::BAD_REQUEST, "Invalid characters in backup path"));
+    }
     if !path_str.bytes().all(|b| b.is_ascii_alphanumeric() || b"/_-. ".contains(&b)) {
         return Err(err(StatusCode::BAD_REQUEST, "Invalid characters in backup path"));
     }
@@ -115,7 +118,11 @@ pub async fn restore_backup(State(engine): State<AppState>, claims: Claims, Json
     if !backup_path.exists() { return Err(err(StatusCode::NOT_FOUND, "Backup not found")); }
     // Create a safety backup before restoring
     let safety = backup_dir.join(format!("pre_restore_{}.db", chrono::Utc::now().format("%Y%m%d_%H%M%S")));
+    // V29-2: Strict path validation for safety backup
     let safety_str = safety.display().to_string();
+    if safety_str.contains('\'') || safety_str.contains('"') || safety_str.contains(';') || safety_str.contains('\0') {
+        return Err(err(StatusCode::BAD_REQUEST, "Invalid characters in backup path"));
+    }
     if !safety_str.bytes().all(|b| b.is_ascii_alphanumeric() || b"/_-. ".contains(&b)) {
         return Err(err(StatusCode::BAD_REQUEST, "Invalid characters in backup path"));
     }

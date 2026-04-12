@@ -1,5 +1,28 @@
 use super::*;
 
+// V29-14: Shared helper for auto-unblocking dependents
+async fn auto_unblock_dependents(engine: &AppState, task_id: i64) {
+    if let Ok(dependents) = db::get_dependents(&engine.pool, task_id).await {
+        for dep_id in dependents {
+            if let Ok(dep_task) = db::get_task(&engine.pool, dep_id).await {
+                if dep_task.status == "blocked" {
+                    if let Ok(deps) = db::get_dependencies(&engine.pool, dep_id).await {
+                        let mut all_done = true;
+                        for d in &deps {
+                            if let Ok(dt) = db::get_task(&engine.pool, *d).await {
+                                if dt.deleted_at.is_none() && dt.status != "completed" { all_done = false; break; }
+                            }
+                        }
+                        if all_done {
+                            db::update_task(&engine.pool, dep_id, None, None, None, None, None, None, None, None, None, Some("backlog"), None, None, None, None, None).await.ok();
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 #[utoipa::path(post, path = "/api/tasks/{id}/duplicate", responses((status = 201, body = db::Task)), security(("bearer" = [])))]
 pub async fn duplicate_task(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>) -> Result<(StatusCode, Json<db::Task>), ApiError> {
     let task = db::get_task(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Task not found"))?;
@@ -202,27 +225,7 @@ pub async fn update_task(State(engine): State<AppState>, claims: Claims, Path(id
     if let Err(e) = db::audit(&engine.pool, claims.user_id, "update", "task", Some(id), None).await { tracing::warn!("Audit log failed: {}", e); }
     // BL3: Auto-unblock dependents when task is completed
     if req.status.as_deref() == Some("completed") {
-        if let Ok(dependents) = db::get_dependents(&engine.pool, id).await {
-            for dep_id in dependents {
-                if let Ok(dep_task) = db::get_task(&engine.pool, dep_id).await {
-                    if dep_task.status == "blocked" {
-                        // Check if ALL dependencies are now completed
-                        if let Ok(deps) = db::get_dependencies(&engine.pool, dep_id).await {
-                            let mut all_done = true;
-                            for d in &deps {
-                                if let Ok(dt) = db::get_task(&engine.pool, *d).await {
-                                    // BL3: Soft-deleted or completed deps count as resolved
-                                    if dt.deleted_at.is_none() && dt.status != "completed" { all_done = false; break; }
-                                }
-                            }
-                            if all_done {
-                                db::update_task(&engine.pool, dep_id, None, None, None, None, None, None, None, None, None, Some("backlog"), None, None, None, None, None).await.ok();
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        auto_unblock_dependents(&engine, id).await;
     }
     crate::webhook::dispatch(engine.pool.clone(), "task.updated", serde_json::json!({"id": id}));
     engine.notify(ChangeEvent::Tasks);
@@ -288,25 +291,7 @@ pub async fn bulk_update_status(State(engine): State<AppState>, claims: Claims, 
     // B7: Auto-unblock dependents when bulk-completing tasks
     if req.status == "completed" {
         for tid in &req.task_ids {
-            if let Ok(dependents) = db::get_dependents(&engine.pool, *tid).await {
-                for dep_id in dependents {
-                    if let Ok(dep_task) = db::get_task(&engine.pool, dep_id).await {
-                        if dep_task.status == "blocked" {
-                            if let Ok(deps) = db::get_dependencies(&engine.pool, dep_id).await {
-                                let mut all_done = true;
-                                for d in &deps {
-                                    if let Ok(dt) = db::get_task(&engine.pool, *d).await {
-                                        if dt.deleted_at.is_none() && dt.status != "completed" { all_done = false; break; }
-                                    }
-                                }
-                                if all_done {
-                                    db::update_task(&engine.pool, dep_id, None, None, None, None, None, None, None, None, None, Some("backlog"), None, None, None, None, None).await.ok();
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+            auto_unblock_dependents(&engine, *tid).await;
         }
     }
     // B4: Fire webhooks for bulk status updates
