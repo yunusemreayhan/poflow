@@ -95,11 +95,16 @@ export function TaskAttachments({ taskId }: { taskId: number }) {
 
   const fmt = (bytes: number) => bytes < 1024 ? `${bytes}B` : bytes < 1048576 ? `${(bytes / 1024).toFixed(1)}KB` : `${(bytes / 1048576).toFixed(1)}MB`;
 
+  const [dragOver, setDragOver] = useState(false);
+
   return (
-    <div className="mb-3">
+    <div className="mb-3"
+      onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={e => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) upload(f); }}>
       <div className="flex items-center gap-2 mb-1">
         <Paperclip size={12} className="text-white/30" />
-        <span className="text-xs text-[var(--color-dim)]">Attachments ({atts.length})</span>
+        <span className="text-xs text-[var(--color-dim)]">Attachments ({atts.length}){dragOver && <span className="text-[var(--color-accent)] ml-1">Drop to upload</span>}</span>
         <label className="text-xs text-[var(--color-accent)] cursor-pointer hover:underline">
           {uploading ? "Uploading..." : "+ Add"}
           <input type="file" className="hidden" onChange={e => { if (e.target.files?.[0]) upload(e.target.files[0]); e.target.value = ""; }} />

@@ -361,6 +361,20 @@ async fn migrate(pool: &Pool) -> Result<()> {
         sqlx::query("ALTER TABLE tasks ADD COLUMN work_duration_minutes INTEGER").execute(pool).await.ok();
         sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (5, ?)").bind(&now_str()).execute(pool).await.ok();
     }
+    // Migration 6: Task watchers
+    if !applied_set.contains(&6) {
+        sqlx::query("CREATE TABLE IF NOT EXISTS task_watchers (
+            task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            created_at TEXT NOT NULL,
+            PRIMARY KEY (task_id, user_id)
+        )").execute(pool).await.ok();
+        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (6, ?)").bind(&now_str()).execute(pool).await.ok();
+    }
+    // Migration 7: Task dependencies (table already exists from initial schema, this is a no-op)
+    if !applied_set.contains(&7) {
+        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (7, ?)").bind(&now_str()).execute(pool).await.ok();
+    }
 
     sqlx::query("CREATE TABLE IF NOT EXISTS task_attachments (
         id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -388,6 +402,8 @@ mod comments;
 pub use comments::*;
 mod assignees;
 pub use assignees::*;
+mod watchers;
+pub use watchers::*;
 mod rooms;
 pub use rooms::*;
 mod sprints;

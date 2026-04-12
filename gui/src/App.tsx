@@ -8,6 +8,7 @@ import { useSseConnection } from "./hooks/useSseConnection";
 import Timer from "./components/Timer";
 import TaskList from "./components/TaskList";
 import History from "./components/History";
+import Dashboard from "./components/Dashboard";
 import Settings from "./components/Settings";
 import ApiReference from "./components/ApiReference";
 import AuthScreen from "./components/AuthScreen";
@@ -16,6 +17,7 @@ import Sprints from "./components/Sprints";
 
 const TABS = [
   { id: "timer", icon: TimerIcon, labelKey: "timer" },
+  { id: "dashboard", icon: BarChart3, labelKey: "dashboard" },
   { id: "tasks", icon: ListTodo, labelKey: "tasks" },
   { id: "sprints", icon: Zap, labelKey: "sprints" },
   { id: "rooms", icon: Users, labelKey: "rooms" },
@@ -172,7 +174,7 @@ export default function App() {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag !== "INPUT" && tag !== "TEXTAREA" && tag !== "SELECT" && !(e.target as HTMLElement)?.isContentEditable && !e.ctrlKey && !e.metaKey) {
         if (e.key === "r") { store.loadTasks(); store.toast("Refreshed"); }
-        const tabMap: Record<string, string> = { "0": "timer", "1": "tasks", "2": "sprints", "3": "rooms", "4": "history", "5": "api", "6": "settings" };
+        const tabMap: Record<string, string> = { "0": "timer", "1": "dashboard", "2": "tasks", "3": "sprints", "4": "rooms", "5": "history", "6": "api", "7": "settings" };
         if (tabMap[e.key]) { store.setTab(tabMap[e.key]); }
         if (e.key === "n" && store.activeTab === "tasks") {
           e.preventDefault();
@@ -245,6 +247,7 @@ export default function App() {
             className="h-full overflow-y-auto"
           >
             {(focusMode || activeTab === "timer") && <Timer />}
+            {!focusMode && activeTab === "dashboard" && <Dashboard />}
             <div style={{ display: !focusMode && activeTab === "tasks" ? undefined : "none" }}><TaskList /></div>
             {!focusMode && activeTab === "sprints" && <Sprints />}
             {!focusMode && activeTab === "rooms" && <Rooms />}
