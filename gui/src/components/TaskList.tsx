@@ -201,8 +201,8 @@ export default function TaskList({ selectMode, onSelect, selectedTaskId, votedTa
           {ftsResults.map(r => (
             <div key={r.id} className="text-xs text-white/60 py-0.5 cursor-pointer hover:text-white/80"
               onClick={() => { setSearch(""); setFtsResults(null); setViewStack([r.id]); }}>
-              <span dangerouslySetInnerHTML={{ __html: r.title }} />
-              {r.snippet && <span className="text-white/30 ml-2" dangerouslySetInnerHTML={{ __html: r.snippet }} />}
+              <span>{r.title.replace(/<[^>]*>/g, "")}</span>
+              {r.snippet && <span className="text-white/30 ml-2">{r.snippet.replace(/<[^>]*>/g, "")}</span>}
             </div>
           ))}
         </div>

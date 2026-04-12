@@ -56,7 +56,7 @@ fn secret() -> &'static [u8] {
             let hash = Sha256::digest(seed.as_bytes());
             buf[..32].copy_from_slice(&hash);
             buf[32..64].copy_from_slice(&Sha256::digest(&hash));
-            tracing::warn!("Using hash-based JWT secret — /dev/urandom unavailable. Set POMODORO_JWT_SECRET for production.");
+            tracing::error!("SECURITY: Using hash-based JWT secret — /dev/urandom unavailable. Set POMODORO_JWT_SECRET env var for production use.");
         }
         if let Some(parent) = secret_path.parent() { std::fs::create_dir_all(parent).ok(); }
         std::fs::write(&secret_path, &buf).ok();

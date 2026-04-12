@@ -30,8 +30,13 @@ pub async fn create_room(State(engine): State<AppState>, claims: Claims, Json(re
 }
 
 #[utoipa::path(get, path = "/api/rooms/{id}", responses((status = 200, body = db::RoomState)), security(("bearer" = [])))]
-pub async fn get_room_state(State(engine): State<AppState>, _claims: Claims, Path(id): Path<i64>) -> ApiResult<db::RoomState> {
-    db::get_room_state(&engine.pool, id).await.map(Json).map_err(internal)
+pub async fn get_room_state(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>) -> ApiResult<db::RoomState> {
+    // S2: Verify membership (or root)
+    let state = db::get_room_state(&engine.pool, id).await.map_err(internal)?;
+    if claims.role != "root" && !state.members.iter().any(|m| m.username == claims.username) {
+        return Err(err(StatusCode::FORBIDDEN, "Not a member of this room"));
+    }
+    Ok(Json(state))
 }
 
 #[utoipa::path(delete, path = "/api/rooms/{id}", responses((status = 204)), security(("bearer" = [])))]

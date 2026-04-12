@@ -102,7 +102,7 @@ pub struct RestoreRequest { pub filename: String }
 pub async fn restore_backup(State(engine): State<AppState>, claims: Claims, Json(req): Json<RestoreRequest>) -> Result<axum::response::Response, ApiError> {
     if claims.role != "root" { return Err(err(StatusCode::FORBIDDEN, "Root only")); }
     // Validate filename — must be alphanumeric + underscore + .db only
-    if !req.filename.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '.') || !req.filename.ends_with(".db") {
+    if !req.filename.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '.') || !req.filename.ends_with(".db") || req.filename.contains("..") {
         return Err(err(StatusCode::BAD_REQUEST, "Invalid backup filename"));
     }
     let backup_dir = db::db_path().parent().unwrap_or(std::path::Path::new("/tmp")).join("backups");

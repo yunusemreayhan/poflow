@@ -1184,10 +1184,12 @@ async fn test_get_room_no_auto_join() {
     let resp = app.clone().oneshot(auth_req("POST", "/api/rooms", &tok, Some(json!({"name":"R"})))).await.unwrap();
     let rid = body_json(resp).await["id"].as_i64().unwrap();
 
-    // Viewer GETs room state — should NOT auto-join
+    // Viewer GETs room state — should be forbidden (not a member, S2 fix)
     let resp = app.clone().oneshot(auth_req("GET", &format!("/api/rooms/{}", rid), &tok2, None)).await.unwrap();
+    assert_eq!(resp.status(), 403);
+    // Creator can still view
+    let resp = app.clone().oneshot(auth_req("GET", &format!("/api/rooms/{}", rid), &tok, None)).await.unwrap();
     let state = body_json(resp).await;
-    // Only root (creator) should be a member
     assert_eq!(state["members"].as_array().unwrap().len(), 1);
     assert_eq!(state["members"][0]["username"], "root");
 }
@@ -5282,9 +5284,12 @@ async fn flow_any_user_can_assign_anyone() {
     // Root creates task
     let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &root_token, Some(json!({"title":"T"})))).await.unwrap();
     let tid = body_json(resp).await["id"].as_i64().unwrap();
-    // dev4 (non-owner) assigns dev5 → currently succeeds (bug documented)
+    // dev4 (non-owner) assigns dev5 → should be forbidden (S1 fix)
     let resp = app.clone().oneshot(auth_req("POST", &format!("/api/tasks/{}/assignees", tid), &user_token, Some(json!({"username":"dev5"})))).await.unwrap();
-    assert_eq!(resp.status(), 200); // Documents current behavior
+    assert_eq!(resp.status(), 403);
+    // Root (owner) assigns dev5 → should succeed
+    let resp = app.clone().oneshot(auth_req("POST", &format!("/api/tasks/{}/assignees", tid), &root_token, Some(json!({"username":"dev5"})))).await.unwrap();
+    assert_eq!(resp.status(), 200);
 }
 
 // ---- Flow: root-views-others-task (root privilege) ----
