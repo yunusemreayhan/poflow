@@ -139,6 +139,11 @@ pub fn err(status: StatusCode, msg: impl ToString) -> ApiError {
 }
 pub fn internal(e: impl ToString) -> ApiError { err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()) }
 
+// Q6: Allow `?` on sqlx::Error without explicit .map_err(internal)
+impl From<sqlx::Error> for ApiError {
+    fn from(e: sqlx::Error) -> Self { internal(e) }
+}
+
 pub fn deserialize_optional_nullable<'de, D>(deserializer: D) -> Result<Option<Option<String>>, D::Error>
 where D: serde::Deserializer<'de> {
     Ok(Some(Option::deserialize(deserializer)?))
