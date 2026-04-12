@@ -123,3 +123,5 @@ mod templates;
 pub use templates::*;
 mod attachments;
 pub use attachments::*;
+mod notifications;
+pub use notifications::*;

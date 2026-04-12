@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence, MotionConfig } from "framer-motion";
-import { Timer as TimerIcon, ListTodo, BarChart3, Settings as SettingsIcon, Wifi, WifiOff, Code2, LogOut, Users, Zap, Sun, Moon, RefreshCw, LayoutDashboard } from "lucide-react";
+import { Timer as TimerIcon, ListTodo, BarChart3, Settings as SettingsIcon, Wifi, WifiOff, Code2, LogOut, Users, Zap, Sun, Moon, RefreshCw, LayoutDashboard, Bell } from "lucide-react";
 import { useStore } from "./store/store";
 import { useT } from "./i18n";
 import { apiCall } from "./store/api";
@@ -120,6 +120,7 @@ function Sidebar() {
       {/* User + theme + logout */}
       <div className="flex flex-col items-center gap-1 mb-2">
         <span className="text-[10px] text-white/30 truncate max-w-[60px]">{username}</span>
+        <NotificationBell />
         <button onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
           className="w-11 h-11 flex items-center justify-center rounded-xl text-white/30 hover:text-white/60 transition-all" title="Toggle theme" aria-label="Toggle theme">
           {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
@@ -374,5 +375,53 @@ export default function App() {
       </AnimatePresence>
     </div>
     </MotionConfig>
+  );
+}
+
+// BL21-23: Notification bell with unread count and dropdown
+function NotificationBell() {
+  const [count, setCount] = useState(0);
+  const [open, setOpen] = useState(false);
+  const [items, setItems] = useState<{ id: number; kind: string; message: string; read: boolean; created_at: string }[]>([]);
+
+  useEffect(() => {
+    const poll = () => apiCall<{ count: number }>("GET", "/api/notifications/unread").then(d => d && setCount(d.count)).catch(() => {});
+    poll();
+    const id = setInterval(poll, 30000);
+    return () => clearInterval(id);
+  }, []);
+
+  const loadItems = () => apiCall<typeof items>("GET", "/api/notifications?limit=20").then(d => d && setItems(d)).catch(() => {});
+
+  const markRead = async () => {
+    await apiCall("POST", "/api/notifications/read", {});
+    setCount(0);
+    setItems(prev => prev.map(i => ({ ...i, read: true })));
+  };
+
+  return (
+    <div className="relative">
+      <button onClick={() => { setOpen(!open); if (!open) loadItems(); }}
+        className="w-11 h-11 flex items-center justify-center rounded-xl text-white/30 hover:text-white/60 transition-all relative" aria-label="Notifications">
+        <Bell size={16} />
+        {count > 0 && <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 rounded-full text-[9px] text-white flex items-center justify-center">{count > 9 ? "9+" : count}</span>}
+      </button>
+      {open && (
+        <div className="absolute left-14 bottom-0 w-72 bg-[var(--color-surface)] border border-white/10 rounded-lg shadow-xl z-50 max-h-80 overflow-y-auto">
+          <div className="flex justify-between items-center p-2 border-b border-white/5">
+            <span className="text-xs text-white/50 font-medium">Notifications</span>
+            {count > 0 && <button onClick={markRead} className="text-[10px] text-[var(--color-accent)]">Mark all read</button>}
+          </div>
+          {items.length === 0 ? (
+            <div className="p-4 text-xs text-white/20 text-center">No notifications</div>
+          ) : items.map(n => (
+            <div key={n.id} className={`p-2 border-b border-white/5 text-xs ${n.read ? "text-white/30" : "text-white/60 bg-white/[0.02]"}`}>
+              <div className="truncate">{n.message}</div>
+              <div className="text-[10px] text-white/20 mt-0.5">{n.created_at.slice(0, 16).replace("T", " ")}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

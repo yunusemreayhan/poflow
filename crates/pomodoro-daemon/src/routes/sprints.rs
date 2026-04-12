@@ -80,6 +80,15 @@ pub async fn start_sprint(State(engine): State<AppState>, claims: Claims, Path(i
     let s = db::update_sprint(&engine.pool, id, None, None, None, Some("active"), None, None, None, None).await.map_err(internal)?;
     db::audit(&engine.pool, claims.user_id, "start", "sprint", Some(id), None).await.ok();
     crate::webhook::dispatch(engine.pool.clone(), "sprint.started", serde_json::json!({"id": id}));
+    // BL22: Notify all sprint task assignees
+    if let Ok(tasks) = db::get_sprint_tasks(&engine.pool, id).await {
+        let mut notified = std::collections::HashSet::new();
+        for t in &tasks {
+            if notified.insert(t.user_id) && t.user_id != claims.user_id {
+                db::create_notification(&engine.pool, t.user_id, "sprint_started", &format!("Sprint '{}' has started", sprint.name), Some("sprint"), Some(id)).await.ok();
+            }
+        }
+    }
     if let Err(e) = db::snapshot_sprint(&engine.pool, id).await { tracing::warn!("Snapshot failed: {}", e); }
     engine.notify(ChangeEvent::Sprints);
     Ok(Json(s))
@@ -93,6 +102,15 @@ pub async fn complete_sprint(State(engine): State<AppState>, claims: Claims, Pat
     let s = db::update_sprint(&engine.pool, id, None, None, None, Some("completed"), None, None, None, None).await.map_err(internal)?;
     db::audit(&engine.pool, claims.user_id, "complete", "sprint", Some(id), None).await.ok();
     crate::webhook::dispatch(engine.pool.clone(), "sprint.completed", serde_json::json!({"id": id}));
+    // BL22: Notify all sprint task assignees
+    if let Ok(tasks) = db::get_sprint_tasks(&engine.pool, id).await {
+        let mut notified = std::collections::HashSet::new();
+        for t in &tasks {
+            if notified.insert(t.user_id) && t.user_id != claims.user_id {
+                db::create_notification(&engine.pool, t.user_id, "sprint_completed", &format!("Sprint '{}' completed", sprint.name), Some("sprint"), Some(id)).await.ok();
+            }
+        }
+    }
     engine.notify(ChangeEvent::Sprints);
     Ok(Json(s))
 }

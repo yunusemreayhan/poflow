@@ -163,6 +163,10 @@ pub fn build_router(engine: Arc<engine::Engine>) -> Router {
             .post(routes::upload_attachment.layer(axum::extract::DefaultBodyLimit::max(10 * 1024 * 1024))))
         .route("/api/attachments/{id}/download", get(routes::download_attachment))
         .route("/api/attachments/{id}", delete(routes::delete_attachment))
+        // BL21-23: Notifications
+        .route("/api/notifications", get(routes::list_notifications))
+        .route("/api/notifications/unread", get(routes::unread_count))
+        .route("/api/notifications/read", post(routes::mark_notifications_read))
         .route("/api/timer/sse", get(routes::sse_timer))
         .route("/api/timer/ticket", axum::routing::post(routes::create_sse_ticket))
         .layer(axum::extract::DefaultBodyLimit::max(2 * 1024 * 1024)) // 2MB max request body

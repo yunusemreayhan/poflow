@@ -10,6 +10,10 @@ pub async fn list_assignees(State(engine): State<AppState>, _claims: Claims, Pat
 pub async fn add_assignee(State(engine): State<AppState>, _claims: Claims, Path(id): Path<i64>, Json(req): Json<AssignRequest>) -> Result<StatusCode, ApiError> {
     let uid = db::get_user_id_by_username(&engine.pool, &req.username).await.map_err(|_| err(StatusCode::NOT_FOUND, "User not found"))?;
     db::add_assignee(&engine.pool, id, uid).await.map_err(internal)?;
+    // BL21: Notify assigned user
+    let task = db::get_task(&engine.pool, id).await.ok();
+    let title = task.as_ref().map(|t| t.title.as_str()).unwrap_or("a task");
+    db::create_notification(&engine.pool, uid, "task_assigned", &format!("You were assigned to: {}", title), Some("task"), Some(id)).await.ok();
     engine.notify(ChangeEvent::Tasks);
     Ok(StatusCode::OK)
 }

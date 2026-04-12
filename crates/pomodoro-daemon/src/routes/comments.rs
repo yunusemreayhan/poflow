@@ -13,7 +13,24 @@ pub async fn add_comment(State(engine): State<AppState>, claims: Claims, Path(id
     // V7: Validate task exists
     db::get_task(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Task not found"))?;
     db::add_comment(&engine.pool, claims.user_id, id, req.session_id, &req.content)
-        .await.map(|c| { engine.notify(ChangeEvent::Tasks); (StatusCode::CREATED, Json(c)) }).map_err(internal)
+        .await.map(|c| {
+            // BL23: Notify @mentioned users
+            let pool = engine.pool.clone();
+            let content = req.content.clone();
+            let task_id = id;
+            tokio::spawn(async move {
+                for word in content.split_whitespace() {
+                    if let Some(username) = word.strip_prefix('@') {
+                        let username = username.trim_matches(|c: char| !c.is_alphanumeric() && c != '_' && c != '-');
+                        if let Ok(uid) = db::get_user_id_by_username(&pool, username).await {
+                            db::create_notification(&pool, uid, "mention", &format!("You were mentioned in a comment on task #{}", task_id), Some("task"), Some(task_id)).await.ok();
+                        }
+                    }
+                }
+            });
+            engine.notify(ChangeEvent::Tasks);
+            (StatusCode::CREATED, Json(c))
+        }).map_err(internal)
 }
 
 #[utoipa::path(delete, path = "/api/comments/{id}", responses((status = 204)), security(("bearer" = [])))]

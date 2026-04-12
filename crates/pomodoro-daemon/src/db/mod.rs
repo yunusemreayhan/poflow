@@ -424,6 +424,18 @@ async fn migrate(pool: &Pool) -> Result<()> {
         tasks::set_fts5_available(fts_exists);
     }
 
+    // BL21-23: In-app notifications
+    sqlx::query("CREATE TABLE IF NOT EXISTS notifications (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        kind        TEXT NOT NULL,
+        message     TEXT NOT NULL,
+        entity_type TEXT,
+        entity_id   INTEGER,
+        read        INTEGER NOT NULL DEFAULT 0,
+        created_at  TEXT NOT NULL
+    )").execute(pool).await?;
+
     Ok(())
 }
 
@@ -465,3 +477,5 @@ mod templates;
 pub use templates::*;
 mod attachments;
 pub use attachments::*;
+mod notifications;
+pub use notifications::*;
