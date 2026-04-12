@@ -36,9 +36,14 @@ export function useSseConnection(token: string | null) {
 
       const pending = new Set<string>();
       const flushChanges = () => {
-        if (pending.has("Tasks")) useStore.getState().loadTasks();
+        if (pending.has("Tasks") || pending.has("Sprints")) {
+          // V30-12: Throttle task reloads — skip if loaded within last 2s
+          const now = Date.now();
+          if (now - useStore.getState().tasksLoadedAt > 2000) {
+            useStore.getState().loadTasks();
+          }
+        }
         if (pending.has("Sprints")) {
-          useStore.getState().loadTasks();
           window.dispatchEvent(new CustomEvent("sse-sprints"));
         }
         if (pending.has("Rooms")) {

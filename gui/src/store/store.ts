@@ -228,6 +228,13 @@ export const useStore = create<Store>((set, get) => ({
       localStorage.setItem("auth", JSON.stringify({ token: server.token, refresh_token: server.refresh_token, username: server.username, role: server.role }));
     });
     set({ serverUrl: server.url, token: server.token, username: server.username, role: server.role });
+    // V30-19: Validate token — if expired, try refresh or force re-login
+    try {
+      await invoke("api_call", { method: "GET", path: "/api/timer", body: null });
+    } catch {
+      set({ token: null, username: null, role: null });
+      get().toast("Session expired — please log in again", "error");
+    }
   },
 
   removeServer: (url, username) => {

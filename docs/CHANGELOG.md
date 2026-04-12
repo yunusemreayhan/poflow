@@ -60,3 +60,56 @@
 - v14: PERT estimate columns
 - v15: automation_rules table
 - v16: session_participants table
+
+## Error Responses
+
+All endpoints return errors in this format:
+
+```json
+{"error": "Human-readable error message"}
+```
+
+| Status | Meaning |
+|--------|---------|
+| 400 | Bad request — validation failed, missing fields, invalid values |
+| 401 | Unauthorized — missing or expired JWT token |
+| 403 | Forbidden — insufficient permissions (not owner, not root) |
+| 404 | Not found — resource doesn't exist |
+| 409 | Conflict — duplicate resource (username, label name) |
+| 413 | Payload too large — attachment exceeds 10MB |
+| 429 | Too many requests — rate limit exceeded |
+| 500 | Internal server error — unexpected failure |
+
+## Developer Setup
+
+### Prerequisites
+- Rust 1.75+ with `cargo`
+- Node.js 18+ with `npm`
+- SQLite 3.35+ (for FTS5 support)
+
+### Backend
+```bash
+cd crates/pomodoro-daemon
+cargo check                    # Verify compilation
+cargo test                     # Run 310+ tests
+cargo run                      # Start server on :9090
+```
+
+Environment variables:
+- `POMODORO_DATA_DIR` — Database directory (default: `~/.local/share/pomodoro`)
+- `POMODORO_ROOT_PASSWORD` — Initial root user password (auto-generated if unset)
+- `GITHUB_WEBHOOK_SECRET` — HMAC secret for GitHub webhook verification
+- `POMODORO_NO_RATE_LIMIT=1` — Disable auth rate limiting (for tests)
+
+### Frontend
+```bash
+cd gui
+npm install
+npm run dev                    # Vite dev server
+npx tsc --noEmit               # Type check
+npm test                       # Run 154 tests
+```
+
+### Database
+SQLite with WAL mode. 16 migrations run automatically on startup.
+Database file: `$POMODORO_DATA_DIR/pomodoro.db` (default: `~/.local/share/pomodoro/pomodoro.db`)

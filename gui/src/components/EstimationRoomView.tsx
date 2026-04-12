@@ -158,7 +158,9 @@ export default function EstimationRoomView({ roomId, onBack }: { roomId: number;
           </button>
         )}
         {!isAdmin && (
-          <button onClick={async () => { await apiCall("POST", `/api/rooms/${roomId}/leave`); onBack(); }}
+          <button onClick={() => {
+              useStore.getState().showConfirm("Leave this room?", async () => { await apiCall("POST", `/api/rooms/${roomId}/leave`); onBack(); });
+            }}
             className="px-3 py-1.5 rounded-lg text-xs text-white/30 hover:text-white/60 bg-white/5" title="Leave room">
             Leave
           </button>

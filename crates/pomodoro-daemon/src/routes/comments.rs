@@ -10,6 +10,11 @@ pub async fn list_comments(State(engine): State<AppState>, _claims: Claims, Path
 pub async fn add_comment(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>, Json(req): Json<AddCommentRequest>) -> Result<(StatusCode, Json<db::Comment>), ApiError> {
     if req.content.trim().is_empty() { return Err(err(StatusCode::BAD_REQUEST, "Comment cannot be empty")); }
     if req.content.len() > 10000 { return Err(err(StatusCode::BAD_REQUEST, "Comment too long (max 10000 chars)")); }
+    // V30-10: Rate limit — max 30 comments per minute per user
+    let one_min_ago = (chrono::Utc::now() - chrono::Duration::seconds(60)).format("%Y-%m-%dT%H:%M:%S").to_string();
+    let (recent,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM comments WHERE user_id = ? AND created_at > ?")
+        .bind(claims.user_id).bind(&one_min_ago).fetch_one(&engine.pool).await.map_err(internal)?;
+    if recent >= 30 { return Err(err(StatusCode::TOO_MANY_REQUESTS, "Too many comments — max 30 per minute")); }
     // V7: Validate task exists
     db::get_task(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Task not found"))?;
     if let Some(sid) = req.session_id {

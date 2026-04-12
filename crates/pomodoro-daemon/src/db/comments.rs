@@ -12,7 +12,8 @@ pub async fn add_comment(pool: &Pool, user_id: i64, task_id: i64, session_id: Op
 }
 
 pub async fn list_comments(pool: &Pool, task_id: i64) -> Result<Vec<Comment>> {
-    Ok(sqlx::query_as::<_, Comment>(&format!("{} WHERE c.task_id = ? ORDER BY c.created_at ASC", COMMENT_SELECT))
+    // V30-15: Limit to 500 comments per task
+    Ok(sqlx::query_as::<_, Comment>(&format!("{} WHERE c.task_id = ? ORDER BY c.created_at ASC LIMIT 500", COMMENT_SELECT))
         .bind(task_id).fetch_all(pool).await?)
 }
 

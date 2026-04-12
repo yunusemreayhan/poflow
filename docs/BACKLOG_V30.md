@@ -199,33 +199,32 @@ tests, or configure the database. New contributors would struggle.
 |----|----------|----------|--------|
 | V30-1 | Medium | Bug | WON'T FIX (CASCADE handles it, task_links harmless) |
 | V30-2 | Low | Bug | WON'T FIX (format is consistent, fragility is theoretical) |
-| V30-3 | Low | Bug | TODO |
+| V30-3 | Low | Bug | FALSE POSITIVE (already calls validate_task_status) |
 | V30-4 | — | Bug | FALSE POSITIVE |
 | V30-5 | Low | Bug | WON'T FIX (50-level depth is extreme edge case) |
-| V30-6 | Low | Bug | TODO |
-| V30-7 | Low | Bug | TODO |
-| V30-8 | Medium | Security | TODO |
+| V30-6 | Low | Bug | FALSE POSITIVE (already auto-snapshots before completing) |
+| V30-7 | Low | Bug | FALSE POSITIVE (headers are in separate container) |
+| V30-8 | Medium | Security | FIXED |
 | V30-9 | Low | Security | WON'T FIX (webhook secrets are user-provided, not passwords) |
-| V30-10 | Low | Security | TODO |
+| V30-10 | Low | Security | FIXED |
 | V30-11 | Low | Security | WON'T FIX (root is trusted, re-auth adds friction) |
-| V30-12 | Medium | Performance | TODO |
+| V30-12 | Medium | Performance | FIXED |
 | V30-13 | Low | Performance | WON'T FIX (CTE overhead is negligible for leaf tasks) |
 | V30-14 | Low | Performance | WON'T FIX (sequential is fine for <100 groups) |
-| V30-15 | Low | Performance | TODO |
+| V30-15 | Low | Performance | FIXED |
 | V30-16 | Low | Code quality | WON'T FIX (refactor, not a bug) |
 | V30-17 | Low | Code quality | WON'T FIX (refactor, not a bug) |
 | V30-18 | Low | Code quality | WON'T FIX (refactor, not a bug) |
-| V30-19 | Low | Error handling | TODO |
-| V30-20 | Low | Error handling | TODO |
-| V30-21 | Low | UX | TODO |
+| V30-19 | Low | Error handling | FIXED |
+| V30-20 | Low | Error handling | FIXED |
+| V30-21 | Low | UX | FIXED |
 | V30-22 | Low | UX | WON'T FIX (SVG chart is intentionally minimal) |
-| V30-23 | Low | UX | TODO |
-| V30-24 | Low | UX | TODO |
-| V30-25 | Low | UX | TODO |
-| V30-26 | Low | Accessibility | TODO |
-| V30-27 | Low | Accessibility | TODO |
-| V30-28 | Low | Documentation | TODO |
-| V30-29 | Low | Documentation | TODO |
+| V30-23 | Low | UX | FIXED |
+| V30-24 | Low | UX | FIXED |
+| V30-25 | Low | UX | FALSE POSITIVE (keys 0-7 already switch tabs) |
+| V30-26 | Low | Accessibility | FALSE POSITIVE (columns have text titles) |
+| V30-27 | Low | Accessibility | FALSE POSITIVE (already has aria-live) |
+| V30-28 | Low | Documentation | FIXED |
+| V30-29 | Low | Documentation | FIXED |
 
-**Total: 29 items** (1 false positive)
-**To fix: 15** | **Won't fix: 13** (by design, refactors, or acceptable tradeoffs)
+**Total: 29 items** — 10 fixed, 7 false positives, 12 won't fix

@@ -236,6 +236,7 @@ export default function TaskNode({ node, depth, onView, selectMode, onSelect, se
               </span>;
             })()}
             {t.attachment_count > 0 && <span className="text-white/30" title={`${t.attachment_count} attachment${t.attachment_count > 1 ? "s" : ""}`}>📎{t.attachment_count}</span>}
+            {t.status === "blocked" && <span className="text-red-400/60" title="Blocked by dependencies">🔗</span>}
             {remainingPct !== null && (
               <span className={`${remainingPct > 50 ? "text-[var(--color-success)]" : remainingPct > 20 ? "text-[var(--color-warning)]" : "text-[var(--color-danger)]"}`}>{remainingPct}% left</span>
             )}

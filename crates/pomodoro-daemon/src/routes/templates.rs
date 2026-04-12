@@ -43,8 +43,8 @@ pub async fn instantiate_template(State(engine): State<AppState>, claims: Claims
     let title = resolve(data["title"].as_str().unwrap_or(&tmpl.name));
     let desc = data["description"].as_str().map(|s| resolve(s));
     let project = data["project"].as_str().map(|s| s.to_string());
-    let priority = data["priority"].as_i64().unwrap_or(3);
-    let estimated = data["estimated"].as_i64().unwrap_or(0);
+    let priority = data["priority"].as_i64().unwrap_or(3).clamp(1, 5);
+    let estimated = data["estimated"].as_i64().unwrap_or(0).max(0);
     let t = db::create_task(&engine.pool, claims.user_id, None, &title, desc.as_deref(), project.as_deref(), None, priority, estimated, 0.0, 0.0, None)
         .await.map_err(internal)?;
     engine.notify(ChangeEvent::Tasks);

@@ -174,6 +174,10 @@ export default function Timer() {
           <div className="text-xs text-white/30 font-mono">
             {engine?.session_count ?? 0} sessions today
             {currentTask && ` · ${currentTask.actual}/${currentTask.estimated} 🍅`}
+            {currentTask?.estimate_optimistic != null && currentTask?.estimate_pessimistic != null && (() => {
+              const o = currentTask.estimate_optimistic!, m = currentTask.estimated_hours, p = currentTask.estimate_pessimistic!;
+              return ` · PERT ${((o + 4 * m + p) / 6).toFixed(1)}h`;
+            })()}
           </div>
           <div className="flex gap-1.5 mt-1" role="img" aria-label={`${engine?.daily_completed ?? 0} of ${engine?.daily_goal ?? 8} daily goal completed`}>
             {Array.from({ length: engine?.daily_goal ?? 8 }).map((_, i) => (
