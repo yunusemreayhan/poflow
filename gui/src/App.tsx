@@ -204,7 +204,7 @@ export default function App() {
         if (e.key === "r") { store.loadTasks(); store.toast("Refreshed"); }
         const tabMap: Record<string, string> = { "0": "timer", "1": "dashboard", "2": "tasks", "3": "sprints", "4": "rooms", "5": "history", "6": "api", "7": "settings" };
         if (tabMap[e.key]) { store.setTab(tabMap[e.key]); }
-        if (e.key === "n" && store.activeTab === "tasks") {
+        if (e.key === "n" && ["tasks", "kanban", "calendar"].includes(store.activeTab)) {
           e.preventDefault();
           // Focus the new task input if it exists
           document.querySelector<HTMLInputElement>('[data-new-task-input]')?.focus();

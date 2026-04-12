@@ -345,8 +345,9 @@ pub async fn schedule_suggestions(State(engine): State<AppState>, claims: Claims
         "SELECT id, title, estimated_hours, due_date FROM tasks WHERE user_id = ? AND status IN ('backlog','active','in_progress') AND deleted_at IS NULL AND estimated_hours > 0 ORDER BY COALESCE(due_date, '9999') ASC LIMIT 10")
         .bind(claims.user_id).fetch_all(&engine.pool).await.map_err(internal)?;
 
+    let work_hours = engine.get_user_config(claims.user_id).await.work_duration_min as f64 / 60.0;
     let suggestions: Vec<serde_json::Value> = upcoming.iter().map(|(id, title, hours, due)| {
-        let sessions_needed = (*hours / 0.42).ceil() as i64; // ~25min per session
+        let sessions_needed = (*hours / work_hours.max(0.01)).ceil() as i64;
         let days_needed = (sessions_needed as f64 / avg_daily.max(1.0)).ceil() as i64;
         serde_json::json!({"task_id": id, "title": title, "estimated_hours": hours, "due_date": due, "sessions_needed": sessions_needed, "days_needed": days_needed})
     }).collect();
@@ -367,12 +368,15 @@ pub async fn weekly_digest(State(engine): State<AppState>, claims: Claims) -> Ap
     let total_sessions: i64 = stats.iter().map(|s| s.completed).sum();
 
     // Tasks completed this week
-    let (completed,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM tasks WHERE user_id = ? AND status IN ('completed','done') AND updated_at >= date('now', '-7 days') AND deleted_at IS NULL")
-        .bind(claims.user_id).fetch_one(&engine.pool).await.map_err(internal)?;
+    let week_ago = (chrono::Utc::now() - chrono::Duration::days(7)).format("%Y-%m-%d").to_string();
+    let today_str = chrono::Utc::now().format("%Y-%m-%d").to_string();
+    let week_ahead = (chrono::Utc::now() + chrono::Duration::days(7)).format("%Y-%m-%d").to_string();
+    let (completed,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM tasks WHERE user_id = ? AND status IN ('completed','done') AND updated_at >= ? AND deleted_at IS NULL")
+        .bind(claims.user_id).bind(&week_ago).fetch_one(&engine.pool).await.map_err(internal)?;
 
     // Upcoming due dates
-    let upcoming: Vec<(String, String)> = sqlx::query_as("SELECT title, due_date FROM tasks WHERE user_id = ? AND due_date BETWEEN date('now') AND date('now', '+7 days') AND status NOT IN ('completed','done','archived') AND deleted_at IS NULL ORDER BY due_date")
-        .bind(claims.user_id).fetch_all(&engine.pool).await.map_err(internal)?;
+    let upcoming: Vec<(String, String)> = sqlx::query_as("SELECT title, due_date FROM tasks WHERE user_id = ? AND due_date BETWEEN ? AND ? AND status NOT IN ('completed','done','archived') AND deleted_at IS NULL ORDER BY due_date")
+        .bind(claims.user_id).bind(&today_str).bind(&week_ahead).fetch_all(&engine.pool).await.map_err(internal)?;
 
     Ok(Json(serde_json::json!({
         "period": "last_7_days",

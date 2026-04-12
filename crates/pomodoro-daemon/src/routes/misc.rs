@@ -40,7 +40,7 @@ pub async fn get_all_assignees(State(engine): State<AppState>, _claims: Claims) 
     db::get_all_assignees(&engine.pool).await.map(Json).map_err(internal)
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 pub struct TasksFullResponse {
     pub tasks: Vec<db::Task>,
     pub task_sprints: Vec<db::TaskSprintInfo>,
@@ -49,7 +49,7 @@ pub struct TasksFullResponse {
     pub labels: Vec<db::TaskLabel>,
 }
 
-#[utoipa::path(get, path = "/api/tasks/full", responses((status = 200, body = Vec<db::Task>)), security(("bearer" = [])))]
+#[utoipa::path(get, path = "/api/tasks/full", responses((status = 200, body = TasksFullResponse)), security(("bearer" = [])))]
 pub async fn get_tasks_full(State(engine): State<AppState>, _claims: Claims, headers: axum::http::HeaderMap) -> Result<axum::response::Response, ApiError> {
     // B8: ETag includes labels and attachments to avoid stale data
     let (max_updated, task_count, sprint_task_count, burn_count, assignee_count, label_count, att_count): (String, i64, i64, i64, i64, i64, i64) =
@@ -102,28 +102,11 @@ pub(crate) fn sse_tickets() -> &'static tokio::sync::Mutex<HashMap<String, (i64,
 
 #[utoipa::path(post, path = "/api/timer/ticket", responses((status = 200)), security(("bearer" = [])))]
 pub async fn create_sse_ticket(claims: Claims) -> ApiResult<serde_json::Value> {
-    // Use /dev/urandom for cryptographic randomness, fallback to hash-based
+    // V36-1: Use getrandom for cryptographic randomness
     let ticket = {
         let mut buf = [0u8; 24];
-        let got = (|| -> Result<(), std::io::Error> {
-            use std::io::Read;
-            let mut f = std::fs::File::open("/dev/urandom")?;
-            f.read_exact(&mut buf)?;
-            Ok(())
-        })().is_ok();
-        if got {
-            buf.iter().map(|b| format!("{:02x}", b)).collect::<String>()
-        } else {
-            tracing::warn!("SECURITY: Using hash-based SSE ticket — /dev/urandom unavailable");
-            use sha2::{Sha256, Digest};
-            static CTR: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
-            let seed = format!("sse{}{}{}",
-                chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0),
-                claims.user_id,
-                CTR.fetch_add(1, std::sync::atomic::Ordering::Relaxed));
-            let hash = Sha256::digest(seed.as_bytes());
-            hash.iter().map(|b| format!("{:02x}", b)).collect::<String>()
-        }
+        getrandom::fill(&mut buf).map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to generate ticket: {}", e)))?;
+        buf.iter().map(|b| format!("{:02x}", b)).collect::<String>()
     };
     let mut tickets = sse_tickets().lock().await;
     let now = std::time::Instant::now();

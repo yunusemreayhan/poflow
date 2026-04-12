@@ -94,7 +94,13 @@ export async function processSyncQueue(_token: string): Promise<{ synced: number
       await api(entry.method, path, entry.body);
       if (entry.queueId) await clearSyncEntry(entry.queueId);
       synced++;
-    } catch { failed++; }
+    } catch (e) {
+      // V36-19: Treat 409 Conflict as success (skip conflicting entry)
+      if (String(e).includes('409') || String(e).includes('Conflict')) {
+        if (entry.queueId) await clearSyncEntry(entry.queueId);
+        synced++;
+      } else { failed++; }
+    }
   }
   return { synced, failed };
 }

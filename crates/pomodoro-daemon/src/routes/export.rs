@@ -11,16 +11,16 @@ pub async fn export_tasks(State(engine): State<AppState>, claims: Claims, Query(
     let fmt = q.format.as_deref().unwrap_or("json");
     match fmt {
         "csv" => {
-            let mut csv = String::from("id,parent_id,title,description,project,tags,priority,estimated,actual,status,due_date,created_at,work_duration_minutes\n");
+            let mut csv = String::from("id,parent_id,title,description,project,tags,priority,estimated,actual,estimated_hours,remaining_points,status,due_date,created_at,work_duration_minutes\n");
             for t in &tasks {
-                csv.push_str(&format!("{},{},{},{},{},{},{},{},{},{},{},{},{}\n",
+                csv.push_str(&format!("{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}\n",
                     t.id,
                     t.parent_id.map(|p| p.to_string()).unwrap_or_default(),
                     escape_csv(&t.title),
                     escape_csv(t.description.as_deref().unwrap_or("")),
                     escape_csv(t.project.as_deref().unwrap_or("")),
                     escape_csv(t.tags.as_deref().unwrap_or("")),
-                    t.priority, t.estimated, t.actual, t.status,
+                    t.priority, t.estimated, t.actual, t.estimated_hours, t.remaining_points, t.status,
                     t.due_date.as_deref().unwrap_or(""),
                     t.created_at,
                     t.work_duration_minutes.map(|m| m.to_string()).unwrap_or_default(),

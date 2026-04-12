@@ -23,8 +23,8 @@ fn blocklist() -> &'static RwLock<HashSet<String>> {
 /// Initialize auth with a DB pool for persistent token blocklist
 pub async fn init_pool(pool: crate::db::Pool) {
     AUTH_POOL.set(pool.clone()).ok();
-    let rows: Vec<(String,)> = sqlx::query_as("SELECT token_hash FROM token_blocklist WHERE expires_at > datetime('now')")
-        .fetch_all(&pool).await.unwrap_or_default();
+    let rows: Vec<(String,)> = sqlx::query_as("SELECT token_hash FROM token_blocklist WHERE expires_at > ?")
+        .bind(crate::db::now_str()).fetch_all(&pool).await.unwrap_or_default();
     let mut bl = blocklist().write().await;
     for (hash,) in rows { bl.insert(hash); }
 }
@@ -42,20 +42,15 @@ fn secret() -> &'static [u8] {
             if data.len() >= 32 { return data; }
         }
         // 3. Generate and persist a new random secret
-        use std::io::Read;
         let mut buf = [0u8; 64];
-        let mut got_entropy = false;
-        if let Ok(mut f) = std::fs::File::open("/dev/urandom") {
-            if f.read_exact(&mut buf).is_ok() { got_entropy = true; }
-        }
-        if !got_entropy {
+        if let Err(e) = getrandom::fill(&mut buf) {
+            tracing::error!("SECURITY: Failed to generate JWT secret via getrandom: {}. Set POMODORO_JWT_SECRET env var for production use.", e);
             // Fallback: hash-based entropy (weaker but avoids panic)
             use sha2::{Sha256, Digest};
             let seed = format!("jwt-init-{}-{}", chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0), std::process::id());
             let hash = Sha256::digest(seed.as_bytes());
             buf[..32].copy_from_slice(&hash);
             buf[32..64].copy_from_slice(&Sha256::digest(&hash));
-            tracing::error!("SECURITY: Using hash-based JWT secret — /dev/urandom unavailable. Set POMODORO_JWT_SECRET env var for production use.");
         }
         if let Some(parent) = secret_path.parent() { std::fs::create_dir_all(parent).ok(); }
         std::fs::write(&secret_path, &buf).ok();
@@ -116,12 +111,13 @@ pub async fn revoke_token(token: &str) {
         sqlx::query("INSERT OR IGNORE INTO token_blocklist (token_hash, expires_at) VALUES (?, ?)")
             .bind(&hash).bind(&expires).execute(pool).await.ok();
         // Prune expired from DB and sync in-memory blocklist
-        sqlx::query("DELETE FROM token_blocklist WHERE expires_at < datetime('now')").execute(pool).await.ok();
+        let now = crate::db::now_str();
+        sqlx::query("DELETE FROM token_blocklist WHERE expires_at < ?").bind(&now).execute(pool).await.ok();
         // S3: Trim in-memory set to match DB (prevents unbounded growth)
         let mut bl = blocklist().write().await;
         if bl.len() > 1000 {
-            let valid: Vec<(String,)> = sqlx::query_as("SELECT token_hash FROM token_blocklist WHERE expires_at > datetime('now')")
-                .fetch_all(pool).await.unwrap_or_default();
+            let valid: Vec<(String,)> = sqlx::query_as("SELECT token_hash FROM token_blocklist WHERE expires_at > ?")
+                .bind(&now).fetch_all(pool).await.unwrap_or_default();
             let valid_set: HashSet<String> = valid.into_iter().map(|(h,)| h).collect();
             *bl = valid_set;
         }

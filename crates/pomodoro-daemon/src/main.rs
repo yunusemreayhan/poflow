@@ -88,6 +88,9 @@ use utoipa_swagger_ui::SwaggerUi;
         routes::join_session, routes::session_participants,
         // V32-24/25: Previously unregistered endpoints
         routes::update_label, routes::duplicate_task, routes::update_webhook, routes::update_template,
+        // V36-6/7/8/9/10: Previously unregistered endpoints
+        routes::bulk_update_status, routes::admin_reset_password, routes::create_backup,
+        routes::get_notif_prefs, routes::update_notif_prefs, routes::get_task_sessions,
     ),
     components(schemas(
         db::Task, db::Session, db::Comment, db::User, db::TaskDetail, db::SessionWithPath, db::DayStat, db::TaskAssignee,
@@ -105,7 +108,7 @@ use utoipa_swagger_ui::SwaggerUi;
         routes::CreateRoomRequest, routes::RoomRoleRequest, routes::StartVotingRequest, routes::CastVoteRequest, routes::AcceptEstimateRequest,
         routes::CreateSprintRequest, routes::UpdateSprintRequest, routes::AddSprintTasksRequest,
         routes::LogBurnRequest, routes::ApiErrorBody,
-        db::Attachment, db::TaskTemplate, db::Notification, db::TaskLabel,
+        db::Attachment, db::TaskTemplate, db::Notification, db::TaskLabel, routes::TasksFullResponse,
         // Feature schemas (F1-F28)
         routes::AddTaskLinkRequest, routes::GitHubPushEvent, routes::GitHubCommit, routes::GitHubRepo,
         routes::CreateAutomationRuleRequest, routes::AutomationRule,
@@ -219,7 +222,7 @@ async fn main() -> Result<()> {
                 tracing::error!("Notification cleanup error: {}", e);
             }
             // BL4: Cleanup expired token blocklist entries
-            sqlx::query("DELETE FROM token_blocklist WHERE expires_at < datetime('now')").execute(&engine_snap.pool).await.ok();
+            sqlx::query("DELETE FROM token_blocklist WHERE expires_at < ?").bind(db::now_str()).execute(&engine_snap.pool).await.ok();
             engine_snap.heartbeat("snapshot").await;
         }
     });
@@ -297,8 +300,8 @@ async fn main() -> Result<()> {
             if days == 0 { continue; } // 0 = disabled
             let days = days.max(1) as i64;
             let cutoff = (chrono::Utc::now() - chrono::Duration::days(days)).format("%Y-%m-%dT%H:%M:%S").to_string();
-            if let Err(e) = sqlx::query("UPDATE tasks SET status = 'archived', updated_at = datetime('now') WHERE status = 'completed' AND updated_at < ? AND deleted_at IS NULL")
-                .bind(&cutoff).execute(&engine_archive.pool).await {
+            if let Err(e) = sqlx::query("UPDATE tasks SET status = 'archived', updated_at = ? WHERE status = 'completed' AND updated_at < ? AND deleted_at IS NULL")
+                .bind(db::now_str()).bind(&cutoff).execute(&engine_archive.pool).await {
                 tracing::warn!("Auto-archive error: {}", e);
             }
             // B13: Notify SSE clients about archived tasks
