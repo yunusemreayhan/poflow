@@ -161,6 +161,7 @@ export default function Timer() {
           </div>
           <div className="text-xs text-white/30 font-mono">
             {engine?.session_count ?? 0} sessions today
+            {currentTask && ` · ${currentTask.actual}/${currentTask.estimated} 🍅`}
           </div>
           <div className="flex gap-1.5 mt-1" role="img" aria-label={`${engine?.daily_completed ?? 0} of ${engine?.daily_goal ?? 8} daily goal completed`}>
             {Array.from({ length: engine?.daily_goal ?? 8 }).map((_, i) => (

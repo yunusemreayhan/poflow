@@ -1,27 +1,14 @@
 # Environment Variables
 
+All environment variables are optional. Defaults are shown.
+
 | Variable | Default | Description |
 |---|---|---|
-| `POMODORO_JWT_SECRET` | Random 32-byte hex (generated at startup) | JWT signing secret. Set for stable tokens across restarts. |
-| `POMODORO_ROOT_PASSWORD` | `root` | Initial root user password (only used on first DB init). |
-| `POMODORO_CORS_ORIGINS` | `*` | Comma-separated allowed CORS origins (e.g. `http://localhost:1420,https://app.example.com`). |
+| `POMODORO_JWT_SECRET` | auto-generated | JWT signing secret. If not set, a random 64-byte secret is generated and persisted to `~/.local/share/pomodoro/.jwt_secret`. |
+| `POMODORO_CORS_ORIGINS` | localhost:1420,9090 | Comma-separated list of allowed CORS origins. Overrides config file `cors_origins`. |
+| `POMODORO_LOG_JSON` | `false` | Set to `1` or `true` for JSON structured logging. |
 | `POMODORO_SWAGGER` | `true` | Set to `0` or `false` to disable Swagger UI at `/swagger-ui/`. |
-| `ACCESS_TOKEN_EXPIRY_SECS` | `7200` (2 hours) | JWT access token lifetime in seconds. |
-| `REFRESH_TOKEN_EXPIRY_SECS` | `2592000` (30 days) | JWT refresh token lifetime in seconds. |
-| `POMODORO_LOG_JSON` | `false` | Set to `1` or `true` for structured JSON log output. |
-
-## Config File
-
-Additional settings are in `~/.config/pomodoro/config.toml`:
-
-| Key | Default | Description |
-|---|---|---|
-| `bind_address` | `127.0.0.1` | HTTP server bind address. |
-| `bind_port` | `3030` | HTTP server bind port. |
-| `work_duration_min` | `25` | Default work session duration (minutes). |
-| `short_break_min` | `5` | Default short break duration (minutes). |
-| `long_break_min` | `15` | Default long break duration (minutes). |
-| `long_break_interval` | `4` | Work sessions before a long break. |
-| `auto_start_breaks` | `true` | Auto-start break after work session. |
-| `auto_start_work` | `false` | Auto-start work after break. |
-| `daily_goal` | `8` | Daily completed sessions goal. |
+| `POMODORO_ROOT_PASSWORD` | `root` | Initial password for the auto-created `root` user. Only used on first run. |
+| `ACCESS_TOKEN_EXPIRY_SECS` | `7200` (2h) | JWT access token lifetime in seconds. |
+| `REFRESH_TOKEN_EXPIRY_SECS` | `2592000` (30d) | JWT refresh token lifetime in seconds. |
+| `RUST_LOG` | `pomodoro_daemon=info` | Standard Rust log filter. Set to `debug` for verbose output. |

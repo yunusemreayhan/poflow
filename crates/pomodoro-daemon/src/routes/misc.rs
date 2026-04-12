@@ -4,6 +4,9 @@ use std::collections::HashMap;
 #[utoipa::path(get, path = "/api/health", responses((status = 200)))]
 pub async fn health(State(engine): State<AppState>) -> Json<serde_json::Value> {
     let db_ok = sqlx::query("SELECT 1").execute(&engine.pool).await.is_ok();
+    // O1: Report schema migration version
+    let migration_version: i64 = sqlx::query_as::<_, (i64,)>("SELECT COALESCE(MAX(version), 0) FROM schema_migrations")
+        .fetch_one(&engine.pool).await.map(|r| r.0).unwrap_or(0);
     let active_timers = engine.states.lock().await.values().filter(|s| s.status == crate::engine::TimerStatus::Running).count();
     // O2: Background task health
     let heartbeats = engine.heartbeats.lock().await;
@@ -12,7 +15,7 @@ pub async fn health(State(engine): State<AppState>) -> Json<serde_json::Value> {
         (name.clone(), serde_json::json!({ "last_heartbeat_secs_ago": secs_ago, "healthy": secs_ago < 120 }))
     }).collect();
     drop(heartbeats);
-    Json(serde_json::json!({ "status": if db_ok { "ok" } else { "degraded" }, "db": db_ok, "active_timers": active_timers, "background_tasks": tasks }))
+    Json(serde_json::json!({ "status": if db_ok { "ok" } else { "degraded" }, "db": db_ok, "schema_version": migration_version, "active_timers": active_timers, "background_tasks": tasks }))
 }
 
 #[utoipa::path(get, path = "/api/tasks/{id}/votes", responses((status = 200, body = Vec<db::RoomVote>)), security(("bearer" = [])))]

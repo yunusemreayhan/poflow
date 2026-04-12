@@ -44,6 +44,12 @@ pub async fn create_backup(State(engine): State<AppState>, claims: Claims) -> Re
         std::fs::set_permissions(&backup_path, std::fs::Permissions::from_mode(0o600)).ok();
     }
     let size = std::fs::metadata(&backup_path).map(|m| m.len()).unwrap_or(0);
+    // O3: Retain only last 10 backups
+    if let Ok(entries) = std::fs::read_dir(&backup_dir) {
+        let mut backups: Vec<_> = entries.filter_map(|e| e.ok()).filter(|e| e.file_name().to_string_lossy().starts_with("pomodoro_") && e.file_name().to_string_lossy().ends_with(".db")).collect();
+        backups.sort_by_key(|e| std::cmp::Reverse(e.file_name()));
+        for old in backups.into_iter().skip(10) { std::fs::remove_file(old.path()).ok(); }
+    }
     Ok(axum::response::Response::builder()
         .status(StatusCode::OK)
         .header("content-type", "application/json")

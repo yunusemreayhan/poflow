@@ -97,6 +97,7 @@ export default function TaskList({ selectMode, onSelect, selectedTaskId, votedTa
           onKeyDown={(e) => e.key === "Enter" && handleAddRoot()}
           placeholder="New project or top-level task..."
           aria-label="New project or top-level task"
+          data-new-task-input
           className="flex-1 bg-transparent border-none outline-none text-white placeholder-white/30 text-sm py-1"
         />
         <motion.button

@@ -13,8 +13,6 @@ import { computeRollup } from "../rollup";
 import CommentSection from "./CommentSection";
 import { formatDuration, EditField, ProgressBar, ExportButton } from "./TaskDetailHelpers";
 
-import CommentSection from "./CommentSection";
-
 function DetailNode({ detail, depth, onRefresh, hoursMap }: { detail: TaskDetail; depth: number; onRefresh: () => void; hoursMap: Map<number, number> }) {
   const { updateTask, username: currentUser, role, taskSprints } = useStore();
   const [showComments, setShowComments] = useState(false);

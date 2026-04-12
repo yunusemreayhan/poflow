@@ -1,5 +1,11 @@
 use super::*;
 
+// Q5: Helper to fetch sprint and verify ownership
+async fn get_owned_sprint(pool: &db::Pool, id: i64, claims: &Claims) -> Result<db::Sprint, ApiError> {
+    let sprint = db::get_sprint(pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Sprint not found"))?;
+    if !is_owner_or_root(sprint.created_by_id, claims) { return Err(err(StatusCode::FORBIDDEN, "Not owner")); }
+    Ok(sprint)
+}
 
 #[utoipa::path(get, path = "/api/sprints", responses((status = 200, body = Vec<db::Sprint>)), security(("bearer" = [])))]
 pub async fn list_sprints(State(engine): State<AppState>, _claims: Claims, Query(q): Query<SprintQuery>) -> ApiResult<Vec<db::Sprint>> {
@@ -30,8 +36,7 @@ pub async fn get_sprint_detail(State(engine): State<AppState>, _claims: Claims, 
 
 #[utoipa::path(put, path = "/api/sprints/{id}", request_body = UpdateSprintRequest, responses((status = 200, body = db::Sprint)), security(("bearer" = [])))]
 pub async fn update_sprint(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>, Json(req): Json<UpdateSprintRequest>) -> ApiResult<db::Sprint> {
-    let sprint = db::get_sprint(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Sprint not found"))?;
-    if !is_owner_or_root(sprint.created_by_id, &claims) { return Err(err(StatusCode::FORBIDDEN, "Not owner")); }
+    let sprint = get_owned_sprint(&engine.pool, id, &claims).await?;
     if req.goal.as_ref().and_then(|o| o.as_ref()).map_or(false, |g| g.len() > 1000) { return Err(err(StatusCode::BAD_REQUEST, "Goal too long (max 1000)")); }
     if req.retro_notes.as_ref().and_then(|o| o.as_ref()).map_or(false, |r| r.len() > 10000) { return Err(err(StatusCode::BAD_REQUEST, "Retro notes too long (max 10000)")); }
     if req.status.is_some() { return Err(err(StatusCode::BAD_REQUEST, "Use /start or /complete endpoints to change sprint status")); }
@@ -54,9 +59,8 @@ pub async fn update_sprint(State(engine): State<AppState>, claims: Claims, Path(
 
 #[utoipa::path(delete, path = "/api/sprints/{id}", responses((status = 204)), security(("bearer" = [])))]
 pub async fn delete_sprint(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>) -> Result<StatusCode, ApiError> {
-    let sprint = db::get_sprint(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Sprint not found"))?;
-    if !is_owner_or_root(sprint.created_by_id, &claims) { return Err(err(StatusCode::FORBIDDEN, "Not owner")); }
-    db::delete_sprint(&engine.pool, id).await.map_err(internal)?;
+    get_owned_sprint(&engine.pool, id, &claims).await?;
+    db::delete_sprint(&engine.pool, id).await.map_err(internal);
     engine.notify(ChangeEvent::Sprints);
     Ok(StatusCode::NO_CONTENT)
 }
@@ -94,8 +98,7 @@ pub async fn get_sprint_tasks(State(engine): State<AppState>, _claims: Claims, P
 
 #[utoipa::path(post, path = "/api/sprints/{id}/tasks", request_body = AddSprintTasksRequest, responses((status = 200, body = Vec<db::SprintTask>)), security(("bearer" = [])))]
 pub async fn add_sprint_tasks(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>, Json(req): Json<AddSprintTasksRequest>) -> ApiResult<Vec<db::SprintTask>> {
-    let sprint = db::get_sprint(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Sprint not found"))?;
-    if !is_owner_or_root(sprint.created_by_id, &claims) { return Err(err(StatusCode::FORBIDDEN, "Not sprint owner")); }
+    get_owned_sprint(&engine.pool, id, &claims).await?;
     if req.task_ids.len() > 500 { return Err(err(StatusCode::BAD_REQUEST, "Too many task IDs (max 500)")); }
     if req.task_ids.is_empty() { return Err(err(StatusCode::BAD_REQUEST, "task_ids cannot be empty")); }
     // Batch validate all tasks exist and are not soft-deleted
@@ -115,8 +118,7 @@ pub async fn add_sprint_tasks(State(engine): State<AppState>, claims: Claims, Pa
 
 #[utoipa::path(delete, path = "/api/sprints/{id}/tasks/{task_id}", responses((status = 204)), security(("bearer" = [])))]
 pub async fn remove_sprint_task(State(engine): State<AppState>, claims: Claims, Path((id, task_id)): Path<(i64, i64)>) -> Result<StatusCode, ApiError> {
-    let sprint = db::get_sprint(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Sprint not found"))?;
-    if !is_owner_or_root(sprint.created_by_id, &claims) { return Err(err(StatusCode::FORBIDDEN, "Not sprint owner")); }
+    get_owned_sprint(&engine.pool, id, &claims).await?;
     db::remove_sprint_task(&engine.pool, id, task_id).await.map_err(internal)?;
     if db::get_sprint(&engine.pool, id).await.map(|s| s.status == "active").unwrap_or(false) {
         if let Err(e) = db::snapshot_sprint(&engine.pool, id).await { tracing::warn!("Snapshot failed: {}", e); }
