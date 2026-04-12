@@ -3,6 +3,11 @@ use super::*;
 
 pub const SESSION_SELECT: &str = "SELECT s.id, s.task_id, s.user_id, u.username as user, s.session_type, s.status, s.started_at, s.ended_at, s.duration_s, s.notes FROM sessions s JOIN users u ON s.user_id = u.id";
 
+pub async fn get_task_sessions(pool: &Pool, task_id: i64) -> Result<Vec<Session>> {
+    Ok(sqlx::query_as::<_, Session>(&format!("{} WHERE s.task_id = ? ORDER BY s.started_at DESC LIMIT 200", SESSION_SELECT))
+        .bind(task_id).fetch_all(pool).await?)
+}
+
 pub async fn create_session(pool: &Pool, user_id: i64, task_id: Option<i64>, session_type: &str) -> Result<Session> {
     let now = now_str();
     let id = sqlx::query("INSERT INTO sessions (task_id, user_id, session_type, status, started_at) VALUES (?, ?, ?, 'running', ?)")

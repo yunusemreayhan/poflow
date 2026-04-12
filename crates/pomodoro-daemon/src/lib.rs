@@ -63,6 +63,7 @@ pub fn build_router(engine: Arc<engine::Engine>) -> Router {
         .route("/api/tasks/{id}/assignees", get(routes::list_assignees).post(routes::add_assignee))
         .route("/api/tasks/{id}/assignees/{username}", delete(routes::remove_assignee))
         .route("/api/tasks/{id}/votes", get(routes::get_task_votes))
+        .route("/api/tasks/{id}/sessions", get(routes::get_task_sessions))
         .route("/api/tasks/{id}/burn-total", get(routes::get_task_burn_total))
         .route("/api/tasks/{id}/burn-users", get(routes::get_task_burn_users))
         .route("/api/history", get(routes::get_history))

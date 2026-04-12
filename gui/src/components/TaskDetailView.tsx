@@ -6,7 +6,7 @@ import type { TaskDetail, Comment, TimeReport } from "../store/api";
 import { TaskLabelPicker } from "./Labels";
 import { TaskDependencies } from "./Dependencies";
 import { TaskRecurrence } from "./Recurrence";
-import { TaskActivityFeed, TaskAttachments } from "./TaskDetailParts";
+import { TaskActivityFeed, TaskAttachments, TaskTimeChart } from "./TaskDetailParts";
 import Select from "./Select";
 import { apiCall } from "../store/api";
 import { computeRollup } from "../rollup";
@@ -498,6 +498,7 @@ function DetailNode({ detail, depth, onRefresh, hoursMap }: { detail: TaskDetail
       </div>
 
       {/* Activity feed */}
+      {depth === 0 && <TaskTimeChart taskId={t.id} />}
       {depth === 0 && <TaskActivityFeed taskId={t.id} />}
 
       {detail.children.map((ch) => (

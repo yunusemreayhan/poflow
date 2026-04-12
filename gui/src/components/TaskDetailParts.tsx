@@ -117,3 +117,43 @@ export function TaskAttachments({ taskId }: { taskId: number }) {
     </div>
   );
 }
+
+// F3: Task time tracking chart — shows daily focus time for a task
+import type { Session } from "../store/api";
+
+export function TaskTimeChart({ taskId }: { taskId: number }) {
+  const [sessions, setSessions] = useState<Session[]>([]);
+  useEffect(() => {
+    apiCall<Session[]>("GET", `/api/tasks/${taskId}/sessions`).then(s => s && setSessions(s)).catch(() => {});
+  }, [taskId]);
+
+  if (sessions.length === 0) return null;
+
+  // Aggregate by date
+  const byDate: Record<string, number> = {};
+  sessions.forEach(s => {
+    if (!s.started_at || !s.duration_s) return;
+    const date = s.started_at.slice(0, 10);
+    byDate[date] = (byDate[date] || 0) + s.duration_s;
+  });
+  const data = Object.entries(byDate).sort(([a], [b]) => a.localeCompare(b)).slice(-14);
+  if (data.length === 0) return null;
+  const maxSecs = Math.max(...data.map(([, v]) => v), 1);
+
+  return (
+    <div className="mt-2">
+      <div className="text-[10px] text-white/40 mb-1">Focus time (last 14 days)</div>
+      <div className="flex items-end gap-0.5 h-12">
+        {data.map(([date, secs]) => (
+          <div key={date} className="flex-1 flex flex-col items-center" title={`${date}: ${(secs / 3600).toFixed(1)}h`}>
+            <div className="w-full bg-[var(--color-accent)]/30 rounded-t" style={{ height: `${(secs / maxSecs) * 100}%`, minHeight: 2 }} />
+          </div>
+        ))}
+      </div>
+      <div className="flex justify-between text-[8px] text-white/20 mt-0.5">
+        <span>{data[0][0].slice(5)}</span>
+        <span>{data[data.length - 1][0].slice(5)}</span>
+      </div>
+    </div>
+  );
+}

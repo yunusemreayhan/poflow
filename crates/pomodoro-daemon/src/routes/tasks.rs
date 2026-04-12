@@ -94,6 +94,11 @@ pub async fn get_task_detail(State(engine): State<AppState>, _claims: Claims, Pa
     db::get_task_detail(&engine.pool, id).await.map(Json).map_err(internal)
 }
 
+#[utoipa::path(get, path = "/api/tasks/{id}/sessions", responses((status = 200, body = Vec<db::Session>)), security(("bearer" = [])))]
+pub async fn get_task_sessions(State(engine): State<AppState>, _claims: Claims, Path(id): Path<i64>) -> ApiResult<Vec<db::Session>> {
+    db::get_task_sessions(&engine.pool, id).await.map(Json).map_err(internal)
+}
+
 #[utoipa::path(put, path = "/api/tasks/{id}", request_body = UpdateTaskRequest, responses((status = 200, body = db::Task)), security(("bearer" = [])))]
 pub async fn update_task(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>, Json(req): Json<UpdateTaskRequest>) -> ApiResult<db::Task> {
     let task = db::get_task(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Task not found"))?;
