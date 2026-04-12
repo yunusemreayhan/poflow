@@ -394,7 +394,7 @@ function NotificationBell() {
         {count > 0 && <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 rounded-full text-[9px] text-white flex items-center justify-center">{count > 9 ? "9+" : count}</span>}
       </button>
       {open && (
-        <div role="dialog" aria-label="Notifications" onKeyDown={e => { if (e.key === "Escape") setOpen(false); }}
+        <div role="dialog" aria-label="Notifications" tabIndex={-1} ref={el => el?.focus()} onKeyDown={e => { if (e.key === "Escape") setOpen(false); }}
           className="absolute left-14 bottom-0 w-72 bg-[var(--color-surface)] border border-white/10 rounded-lg shadow-xl z-50 max-h-80 overflow-y-auto">
           <div className="flex justify-between items-center p-2 border-b border-white/5">
             <span className="text-xs text-white/50 font-medium">Notifications</span>

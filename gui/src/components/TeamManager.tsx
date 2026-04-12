@@ -47,6 +47,7 @@ export default function TeamManager() {
       <div className="flex gap-1 flex-wrap">
         {teams.map(t => (
           <button key={t.id} onClick={() => loadDetail(t.id)}
+            aria-pressed={selected?.team.id === t.id}
             className={`px-2 py-1 rounded text-xs transition-colors ${selected?.team.id === t.id ? "bg-[var(--color-accent)] text-white" : "bg-white/5 text-white/50 hover:text-white/70"}`}>{t.name}</button>
         ))}
         {teams.length === 0 && !creating && <span className="text-xs text-white/20">No teams yet</span>}

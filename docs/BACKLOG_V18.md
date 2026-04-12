@@ -55,41 +55,41 @@ Full audit of 56 backend .rs files (6523 LOC), 53 frontend .ts/.tsx files (9261 
 
 ## UX Improvements (10 items)
 
-- [ ] **UX1.** `TemplateManager` sends `data` as double-encoded JSON string — fix to send as object so templates work correctly with `instantiate_template`.
-- [ ] **UX2.** No way to edit a label name or color after creation — only create and delete.
-- [ ] **UX3.** No way to edit a webhook URL or events after creation — only create and delete.
-- [ ] **UX4.** `TaskContextMenu` "Move up/Move down" swaps sort_order values — but if two tasks have the same sort_order (common after import), the swap is a no-op.
-- [ ] **UX5.** `Dashboard` component doesn't show sprint progress or upcoming due dates — it's a missed opportunity for a useful overview.
-- [ ] **UX6.** `History` component loads sessions but doesn't show task path breadcrumbs even though the API returns `task_path` — the data is fetched but not displayed.
-- [ ] **UX7.** No visual indicator for tasks with dependencies — users can't see at a glance which tasks are blocked.
-- [ ] **UX8.** `EstimationRoomView` doesn't show vote history export button prominently — the export endpoint exists but is hard to discover.
-- [ ] **UX9.** `Timer` component doesn't show which task is being timed in the sidebar — only the timer tab shows the task name.
-- [ ] **UX10.** No keyboard shortcut to quickly switch between timer and tasks — `Space` toggles timer but there's no quick way to jump to the task being timed.
+- [x] **UX1.** `TemplateManager` sends `data` as double-encoded JSON string — fix to send as object so templates work correctly with `instantiate_template`.
+- [x] **UX2.** No way to edit a label name or color after creation — only create and delete.
+- [x] **UX3.** No way to edit a webhook URL or events after creation — only create and delete.
+- [x] **UX4.** `TaskContextMenu` "Move up/Move down" swaps sort_order values — but if two tasks have the same sort_order (common after import), the swap is a no-op.
+- [x] **UX5.** `Dashboard` component doesn't show sprint progress or upcoming due dates — it's a missed opportunity for a useful overview.
+- [x] **UX6.** `History` component loads sessions but doesn't show task path breadcrumbs even though the API returns `task_path` — the data is fetched but not displayed.
+- [x] **UX7.** No visual indicator for tasks with dependencies — users can't see at a glance which tasks are blocked.
+- [x] **UX8.** `EstimationRoomView` doesn't show vote history export button prominently — the export endpoint exists but is hard to discover.
+- [x] **UX9.** `Timer` component doesn't show which task is being timed in the sidebar — only the timer tab shows the task name.
+- [x] **UX10.** No keyboard shortcut to quickly switch between timer and tasks — `Space` toggles timer but there's no quick way to jump to the task being timed.
 
 ## Accessibility (8 items)
 
-- [ ] **A1.** `TaskContextMenu` — menu items lack `tabIndex={0}` so keyboard-only users can't navigate with Tab (only Arrow keys work via custom handler).
-- [ ] **A2.** `NotificationBell` dropdown has `role="dialog"` but no focus trap — Tab key escapes the dropdown.
-- [ ] **A3.** `Select` component — when closed, the button doesn't announce the selected value to screen readers (missing `aria-label` with current value).
-- [ ] **A4.** `Timer` component — the circular progress SVG has no `role="progressbar"` or `aria-valuenow` — screen readers can't announce timer progress.
-- [ ] **A5.** `EpicBurndown` — epic group chips use `div` with `role="button"` but no keyboard handler for Space key (only Enter works via `onKeyDown`).
-- [ ] **A6.** `BurndownView` chart — `ResponsiveContainer` renders an SVG with no `aria-label` — screen readers see an unlabeled graphic. The `sr-only` table helps but the chart itself should have `role="img"`.
-- [ ] **A7.** `CsvImport` drag-and-drop zone has no keyboard alternative — users who can't drag need the file input (which exists but is visually hidden inside the drop zone).
-- [ ] **A8.** `TeamManager` — team selection buttons don't indicate current selection to screen readers (missing `aria-pressed` or `aria-current`).
+- [x] **A1.** `TaskContextMenu` — menu items lack `tabIndex={0}` so keyboard-only users can't navigate with Tab (only Arrow keys work via custom handler).
+- [x] **A2.** `NotificationBell` dropdown has `role="dialog"` but no focus trap — Tab key escapes the dropdown.
+- [x] **A3.** `Select` component — when closed, the button doesn't announce the selected value to screen readers (missing `aria-label` with current value).
+- [x] **A4.** `Timer` component — the circular progress SVG has no `role="progressbar"` or `aria-valuenow` — screen readers can't announce timer progress.
+- [x] **A5.** `EpicBurndown` — epic group chips use `div` with `role="button"` but no keyboard handler for Space key (only Enter works via `onKeyDown`).
+- [x] **A6.** `BurndownView` chart — `ResponsiveContainer` renders an SVG with no `aria-label` — screen readers see an unlabeled graphic. The `sr-only` table helps but the chart itself should have `role="img"`.
+- [x] **A7.** `CsvImport` drag-and-drop zone has no keyboard alternative — users who can't drag need the file input (which exists but is visually hidden inside the drop zone).
+- [x] **A8.** `TeamManager` — team selection buttons don't indicate current selection to screen readers (missing `aria-pressed` or `aria-current`).
 
 ## Performance (5 items)
 
-- [ ] **P1.** `get_room_state` fetches ALL tasks for room members when no project filter — `LIMIT 500` but still loads full task rows with JOINs. Should only load leaf tasks or tasks relevant to estimation.
-- [ ] **P2.** `loadTasks` in store.ts compares tasks with `some((t, i) => t.id !== prev[i]?.id || t.updated_at !== prev[i]?.updated_at)` — O(n) comparison on every load. Could use the ETag from `/api/tasks/full` to skip entirely.
-- [ ] **P3.** `get_task_detail` recursive CTE fetches all descendants then batch-loads comments and sessions — but for deeply nested trees (50+ levels), the CTE can be slow. Add a depth limit parameter.
-- [ ] **P4.** `Sidebar` component calls `apiCall("GET", "/api/me/teams")` on every render (no dependency array issue, but the effect runs once) — should be cached in the store.
-- [ ] **P5.** `snapshot_epic_group` calls `get_descendant_ids` which runs a recursive CTE, then builds a dynamic IN clause — for large trees, this generates very long SQL. Consider using a temp table.
+- [x] **P1.** `get_room_state` fetches ALL tasks for room members when no project filter — `LIMIT 500` but still loads full task rows with JOINs. Should only load leaf tasks or tasks relevant to estimation.
+- [x] **P2.** `loadTasks` in store.ts compares tasks with `some((t, i) => t.id !== prev[i]?.id || t.updated_at !== prev[i]?.updated_at)` — O(n) comparison on every load. Could use the ETag from `/api/tasks/full` to skip entirely.
+- [x] **P3.** `get_task_detail` recursive CTE fetches all descendants then batch-loads comments and sessions — but for deeply nested trees (50+ levels), the CTE can be slow. Add a depth limit parameter.
+- [x] **P4.** `Sidebar` component calls `apiCall("GET", "/api/me/teams")` on every render (no dependency array issue, but the effect runs once) — should be cached in the store.
+- [x] **P5.** `snapshot_epic_group` calls `get_descendant_ids` which runs a recursive CTE, then builds a dynamic IN clause — for large trees, this generates very long SQL. Consider using a temp table.
 
 ## Infrastructure (3 items)
 
-- [ ] **INF1.** No database migration rollback mechanism — if a migration fails partway, the DB can be in an inconsistent state. Add a `schema_migrations.status` column to track partial migrations.
-- [ ] **INF2.** `connect_memory()` used in tests doesn't run `seed_root_user` with the same password validation — test root user has password "root" which wouldn't pass `validate_password`. Tests may not catch password validation regressions.
-- [ ] **INF3.** No health check for background tasks beyond heartbeat — if the tick loop panics (which `tokio::spawn` would silently swallow), the timer stops working but health endpoint still reports "ok".
+- [x] **INF1.** No database migration rollback mechanism — if a migration fails partway, the DB can be in an inconsistent state. Add a `schema_migrations.status` column to track partial migrations.
+- [x] **INF2.** `connect_memory()` used in tests doesn't run `seed_root_user` with the same password validation — test root user has password "root" which wouldn't pass `validate_password`. Tests may not catch password validation regressions.
+- [x] **INF3.** No health check for background tasks beyond heartbeat — if the tick loop panics (which `tokio::spawn` would silently swallow), the timer stops working but health endpoint still reports "ok".
 
 ---
 
