@@ -142,7 +142,7 @@ export default function AuthScreen() {
                     <span className={`text-[10px] px-1 rounded ${s.role === "root" ? "text-[var(--color-accent)] bg-[var(--color-accent)]/10" : "text-white/20 bg-white/5"}`}>{s.role}</span>
                   </button>
                   <button onClick={() => removeServer(s.url, s.username)}
-                    className="opacity-0 group-hover:opacity-100 w-6 h-6 flex items-center justify-center text-white/20 hover:text-[var(--color-danger)] transition-all shrink-0">
+                    className="opacity-0 group-hover:opacity-100 w-6 h-6 flex items-center justify-center text-white/30 hover:text-[var(--color-danger)] transition-all shrink-0">
                     <Trash2 size={12} />
                   </button>
                 </div>

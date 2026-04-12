@@ -116,6 +116,8 @@ pub async fn import_tasks_csv(State(engine): State<AppState>, claims: Claims, Js
     if req.csv.len() > 1_048_576 { return Err(err(StatusCode::BAD_REQUEST, "CSV too large (max 1MB)")); }
     let mut created = 0i64;
     let mut errors = Vec::new();
+    // BL3: Use deferred transaction for atomicity
+    sqlx::query("BEGIN DEFERRED").execute(&engine.pool).await.map_err(internal)?;
     for (i, line) in req.csv.lines().enumerate() {
         if i == 0 { continue; }
         let cols = parse_csv_line(line);
@@ -127,9 +129,10 @@ pub async fn import_tasks_csv(State(engine): State<AppState>, claims: Claims, Js
         let project = cols.get(3).map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
         match db::create_task(&engine.pool, claims.user_id, None, &title, None, project.as_deref(), None, priority, estimated, 0.0, 0.0, None).await {
             Ok(_) => created += 1,
-            Err(e) => errors.push(format!("Line {}: {}", i + 1, e)),
+            Err(e) => { sqlx::query("ROLLBACK").execute(&engine.pool).await.ok(); return Err(internal(format!("Line {}: {}", i + 1, e))); }
         }
     }
+    sqlx::query("COMMIT").execute(&engine.pool).await.map_err(internal)?;
     engine.notify(ChangeEvent::Tasks);
     Ok(Json(serde_json::json!({ "created": created, "errors": errors })))
 }

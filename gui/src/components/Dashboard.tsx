@@ -207,7 +207,7 @@ function StandupView({ today, tasks }: { today: string; tasks: import("../store/
             `**@${user}**\n${done.length ? `✅ Done: ${done.join(", ")}\n` : ""}${wip.length ? `🔨 Working: ${wip.join(", ")}\n` : ""}${blocked.length ? `🚫 Blocked: ${blocked.join(", ")}\n` : ""}`
           ).join("\n");
           navigator.clipboard.writeText(md);
-        }} className="text-[10px] text-white/20 hover:text-white/50" title="Copy standup">📋</button>
+        }} className="text-[10px] text-white/30 hover:text-white/50" title="Copy standup">📋</button>
       </div>
       {byUser.map(([user, { done, wip, blocked }]) => (
         <div key={user} className="mb-2 last:mb-0">

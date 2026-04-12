@@ -100,7 +100,7 @@ function RoomList({ onSelect }: { onSelect: (id: number) => void }) {
             </div>
             {(r.creator === username) && (
               <button onClick={e => { e.stopPropagation(); remove(r.id); }}
-                className="opacity-0 group-hover:opacity-100 text-white/20 hover:text-[var(--color-danger)] transition-all">
+                className="opacity-0 group-hover:opacity-100 text-white/30 hover:text-[var(--color-danger)] transition-all">
                 <Trash2 size={16} />
               </button>
             )}

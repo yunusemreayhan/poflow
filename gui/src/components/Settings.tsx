@@ -84,7 +84,7 @@ function AdminPanel() {
                 {u.role === "root" ? <Shield size={16} /> : <ShieldOff size={16} />}
               </button>
               <button onClick={() => deleteUser(u)}
-                className="w-8 h-8 flex items-center justify-center rounded-lg text-white/20 hover:text-[var(--color-danger)] hover:bg-white/5 transition-all"
+                className="w-8 h-8 flex items-center justify-center rounded-lg text-white/30 hover:text-[var(--color-danger)] hover:bg-white/5 transition-all"
                 title="Delete user">
                 <Trash2 size={16} />
               </button>

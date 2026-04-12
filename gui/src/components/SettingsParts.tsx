@@ -59,7 +59,7 @@ export function TemplateManager() {
         <div key={t.id} className="flex items-center gap-2 text-xs py-1 group">
           <span className="flex-1 text-[var(--color-text)]">{t.name}</span>
           <button onClick={() => apply(t)} className="text-[var(--color-accent)] hover:underline">Use</button>
-          <button onClick={() => del(t.id)} className="text-white/20 hover:text-[var(--color-danger)] opacity-0 group-hover:opacity-100">✕</button>
+          <button onClick={() => del(t.id)} className="text-white/30 hover:text-[var(--color-danger)] opacity-0 group-hover:opacity-100">✕</button>
         </div>
       ))}
       {templates.length === 0 && <div className="text-xs text-[var(--color-dim)]">No templates yet</div>}
@@ -110,7 +110,7 @@ export function WebhookManager() {
         <div key={h.id} className="flex items-center gap-2 text-xs py-1 group">
           <span className="flex-1 truncate text-[var(--color-text)]">{h.url}</span>
           <span className="text-[var(--color-dim)]">{h.events}</span>
-          <button onClick={() => del(h.id)} className="text-white/20 hover:text-[var(--color-danger)] opacity-0 group-hover:opacity-100">✕</button>
+          <button onClick={() => del(h.id)} className="text-white/30 hover:text-[var(--color-danger)] opacity-0 group-hover:opacity-100">✕</button>
         </div>
       ))}
       {hooks.length === 0 && <div className="text-xs text-[var(--color-dim)]">No webhooks configured</div>}

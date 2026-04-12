@@ -90,7 +90,7 @@ export default function EpicBurndown() {
           <button key={g.id} onClick={() => setSelected(g.id)}
             className={`px-2 py-0.5 rounded text-xs transition-colors ${selected === g.id ? "bg-[var(--color-accent)] text-white" : "bg-white/5 text-white/50 hover:text-white/70"}`}>
             {g.name}
-            <button onClick={e => { e.stopPropagation(); del(g.id); }} className="ml-1 text-white/20 hover:text-red-400" aria-label={`Delete ${g.name}`}>×</button>
+            <button onClick={e => { e.stopPropagation(); del(g.id); }} className="ml-1 text-white/30 hover:text-red-400" aria-label={`Delete ${g.name}`}>×</button>
           </button>
         ))}
       </div>

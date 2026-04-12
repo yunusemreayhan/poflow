@@ -138,7 +138,7 @@ export default function EstimationRoomView({ roomId, onBack }: { roomId: number;
             <span>{members.length} members</span>
             {/* BL18: Share room ID */}
             <button onClick={() => { navigator.clipboard.writeText(`Room #${state.room.id}: ${room.name}`); useStore.getState().toast("Room ID copied"); }}
-              className="text-white/20 hover:text-white/50">📋 Share</button>
+              className="text-white/30 hover:text-white/50">📋 Share</button>
           </div>
         </div>
         {/* Tabs */}
@@ -191,7 +191,7 @@ export default function EstimationRoomView({ roomId, onBack }: { roomId: number;
                       {current_task.title}
                       {elapsed > 0 && <span className={`text-xs font-mono ${elapsed > discussionLimit ? "text-red-400" : "text-white/30"}`}>{Math.floor(elapsed / 60)}:{String(elapsed % 60).padStart(2, "0")}{elapsed > discussionLimit ? " ⏰" : ""}</span>}
                       {isAdmin && <button onClick={() => { setEditTitle(current_task.title); setEditDesc(current_task.description || ""); setEditingTask(true); }}
-                        className="text-white/20 hover:text-white/50"><Edit3 size={14} /></button>}
+                        className="text-white/30 hover:text-white/50"><Edit3 size={14} /></button>}
                     </div>
                     {current_task.description && <p className="text-sm text-white/50 mb-3 whitespace-pre-wrap">{current_task.description}</p>}
                   </>

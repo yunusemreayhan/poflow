@@ -56,12 +56,12 @@ export default function CommentSection({ taskId, sessionId }: { taskId: number; 
           </div>
           {canEdit && <button onClick={() => { setEditingId(c.id); setEditText(c.content); }}
             aria-label={`Edit comment`}
-            className="opacity-0 group-hover:opacity-100 text-white/20 hover:text-white/50 transition-all shrink-0">
+            className="opacity-0 group-hover:opacity-100 text-white/30 hover:text-white/50 transition-all shrink-0">
             <Pencil size={10} />
           </button>}
           {isOwner && <button onClick={async () => { await apiCall("DELETE", `/api/comments/${c.id}`); load(); }}
             aria-label={`Delete comment by ${c.user}`}
-            className="opacity-0 group-hover:opacity-100 text-white/20 hover:text-[var(--color-danger)] transition-all shrink-0">
+            className="opacity-0 group-hover:opacity-100 text-white/30 hover:text-[var(--color-danger)] transition-all shrink-0">
             <Trash2 size={12} />
           </button>}
         </div>

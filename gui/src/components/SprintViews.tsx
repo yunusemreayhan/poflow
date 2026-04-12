@@ -82,7 +82,7 @@ export function BurnsView({ sprintId, sprintName, tasks }: { sprintId: number; s
               {b.cancelled ? (
                 <span className="text-red-400/50 text-[10px] shrink-0">cancelled by {b.cancelled_by}</span>
               ) : (
-                <button onClick={() => cancel(b.id)} className="text-white/20 hover:text-red-400 shrink-0" title="Cancel this burn">✕</button>
+                <button onClick={() => cancel(b.id)} className="text-white/30 hover:text-red-400 shrink-0" title="Cancel this burn">✕</button>
               )}
             </div>
           ))}

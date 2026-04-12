@@ -160,7 +160,7 @@ export default function Sprints() {
             const tasks = await apiCall<unknown[]>("GET", `/api/sprints/${s.id}/tasks`).catch(() => []);
             const msg = tasks && tasks.length > 0 ? `Delete sprint "${s.name}"? (${tasks.length} tasks will be unlinked)` : `Delete sprint "${s.name}"?`;
             useStore.getState().showConfirm(msg, () => del(s.id));
-          }} className="p-1 text-white/20 hover:text-red-400"><Trash2 size={14} /></button>
+          }} className="p-1 text-white/30 hover:text-red-400"><Trash2 size={14} /></button>
         </div>
       ))}
       {loading && sprints.length === 0 && <div className="text-center py-12 text-white/20 text-sm">Loading sprints...</div>}

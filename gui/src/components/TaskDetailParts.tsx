@@ -117,7 +117,7 @@ export function TaskAttachments({ taskId }: { taskId: number }) {
             <span className="text-white/20">{fmt(a.size_bytes)}</span>
             <button onClick={() => download(a.id, a.filename)}
               className="text-[var(--color-accent)] hover:underline">↓</button>
-            <button onClick={() => del(a.id)} className="text-white/20 hover:text-[var(--color-danger)] opacity-0 group-hover:opacity-100">✕</button>
+            <button onClick={() => del(a.id)} className="text-white/30 hover:text-[var(--color-danger)] opacity-0 group-hover:opacity-100">✕</button>
           </div>
           {/* F7: Inline preview for images */}
           {a.mime_type.startsWith("image/") && (

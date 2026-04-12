@@ -46,6 +46,14 @@ pub async fn connect() -> Result<Pool> {
     Ok(pool)
 }
 
+// INF5: Log migration errors that aren't "duplicate column" (the expected idempotent case)
+fn log_migration_err(sql: &str, e: sqlx::Error) {
+    let msg = e.to_string();
+    if !msg.contains("duplicate column") && !msg.contains("already exists") {
+        tracing::warn!("Migration warning: {} — {}", sql.chars().take(60).collect::<String>(), msg);
+    }
+}
+
 pub async fn connect_memory() -> Result<Pool> {
     let opts = SqliteConnectOptions::from_str("sqlite::memory:")?;
     let pool = SqlitePoolOptions::new().max_connections(1).connect_with(opts).await?;
@@ -345,12 +353,12 @@ async fn migrate(pool: &Pool) -> Result<()> {
 
     // Migration 1: Add retro_notes to sprints
     if !applied_set.contains(&1) {
-        sqlx::query("ALTER TABLE sprints ADD COLUMN retro_notes TEXT").execute(pool).await.ok();
+        if let Err(e) = sqlx::query("ALTER TABLE sprints ADD COLUMN retro_notes TEXT").execute(pool).await { log_migration_err("ALTER TABLE sprints ADD COLUMN retro_notes TEXT", e); }
         sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (1, ?)").bind(&now_str()).execute(pool).await.ok();
     }
     // Migration 2: Soft delete support
     if !applied_set.contains(&2) {
-        sqlx::query("ALTER TABLE tasks ADD COLUMN deleted_at TEXT").execute(pool).await.ok();
+        if let Err(e) = sqlx::query("ALTER TABLE tasks ADD COLUMN deleted_at TEXT").execute(pool).await { log_migration_err("ALTER TABLE tasks ADD COLUMN deleted_at TEXT", e); }
         sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (2, ?)").bind(&now_str()).execute(pool).await.ok();
     }
     // Migration 3: Notification preferences per event type
@@ -366,12 +374,12 @@ async fn migrate(pool: &Pool) -> Result<()> {
 
     // Migration 4: Sprint capacity hours
     if !applied_set.contains(&4) {
-        sqlx::query("ALTER TABLE sprints ADD COLUMN capacity_hours REAL").execute(pool).await.ok();
+        if let Err(e) = sqlx::query("ALTER TABLE sprints ADD COLUMN capacity_hours REAL").execute(pool).await { log_migration_err("ALTER TABLE sprints ADD COLUMN capacity_hours REAL", e); }
         sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (4, ?)").bind(&now_str()).execute(pool).await.ok();
     }
     // Migration 5: Per-task work duration override
     if !applied_set.contains(&5) {
-        sqlx::query("ALTER TABLE tasks ADD COLUMN work_duration_minutes INTEGER").execute(pool).await.ok();
+        if let Err(e) = sqlx::query("ALTER TABLE tasks ADD COLUMN work_duration_minutes INTEGER").execute(pool).await { log_migration_err("ALTER TABLE tasks ADD COLUMN work_duration_minutes INTEGER", e); }
         sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (5, ?)").bind(&now_str()).execute(pool).await.ok();
     }
     // Migration 6: Task watchers
