@@ -14,6 +14,9 @@ pub struct CreateTeamRequest { pub name: String }
 pub async fn create_team(State(engine): State<AppState>, claims: Claims, Json(req): Json<CreateTeamRequest>) -> Result<(StatusCode, Json<db::Team>), ApiError> {
     if req.name.trim().is_empty() { return Err(err(StatusCode::BAD_REQUEST, "Team name cannot be empty")); }
     if req.name.len() > 100 { return Err(err(StatusCode::BAD_REQUEST, "Team name too long (max 100 chars)")); }
+    // V4: Limit total teams
+    let teams = db::list_teams(&engine.pool).await.map_err(internal)?;
+    if teams.len() >= 50 { return Err(err(StatusCode::BAD_REQUEST, "Too many teams (max 50)")); }
     let team = db::create_team(&engine.pool, req.name.trim()).await.map_err(internal)?;
     db::add_team_member(&engine.pool, team.id, claims.user_id, "admin").await.map_err(internal)?;
     Ok((StatusCode::CREATED, Json(team)))

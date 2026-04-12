@@ -89,10 +89,6 @@ pub async fn get_day_stats(pool: &Pool, days: i64) -> Result<Vec<DayStat>> {
     Ok(map.into_values().collect())
 }
 
-pub async fn get_today_completed(pool: &Pool) -> Result<i64> {
-    get_today_completed_for_user(pool, None).await
-}
-
 pub async fn get_today_completed_for_user(pool: &Pool, user_id: Option<i64>) -> Result<i64> {
     let today = Utc::now().naive_utc().format("%Y-%m-%dT00:00:00").to_string();
     let (count,): (i64,) = if let Some(uid) = user_id {

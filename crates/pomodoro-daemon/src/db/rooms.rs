@@ -90,15 +90,26 @@ pub async fn get_room_votes(pool: &Pool, room_id: i64, task_id: i64) -> Result<V
 pub async fn get_room_state(pool: &Pool, room_id: i64) -> Result<RoomState> {
     let room = get_room(pool, room_id).await?;
 
-    // Parallelize independent queries
-    let members_fut = get_room_members(pool, room_id);
+    // Fetch members first (needed for task scoping when no project)
+    let members = get_room_members(pool, room_id).await?;
+
     let tasks_fut = async {
         match &room.project {
             Some(p) if !p.is_empty() => {
                 sqlx::query_as(&format!("{} WHERE t.project = ? ORDER BY t.sort_order LIMIT 1000", TASK_SELECT)).bind(p).fetch_all(pool).await
             }
             _ => {
-                sqlx::query_as(&format!("{} WHERE t.id NOT IN (SELECT DISTINCT parent_id FROM tasks WHERE parent_id IS NOT NULL) ORDER BY t.sort_order LIMIT 500", TASK_SELECT)).fetch_all(pool).await
+                // B3: Scope to tasks owned by room members (not all global leaf tasks)
+                let member_ids: Vec<i64> = members.iter().map(|m| m.user_id).collect();
+                if member_ids.is_empty() {
+                    Ok(vec![])
+                } else {
+                    let ph = member_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+                    let sql = format!("{} WHERE t.user_id IN ({}) AND t.deleted_at IS NULL ORDER BY t.sort_order LIMIT 500", TASK_SELECT, ph);
+                    let mut q = sqlx::query_as::<_, Task>(&sql);
+                    for uid in &member_ids { q = q.bind(uid); }
+                    q.fetch_all(pool).await
+                }
             }
         }
     };
@@ -110,9 +121,8 @@ pub async fn get_room_state(pool: &Pool, room_id: i64) -> Result<RoomState> {
             .bind(room_id).fetch_all(pool).await.unwrap_or_default()
     };
 
-    let (members, tasks_result, current_task, all_room_votes) =
-        tokio::join!(members_fut, tasks_fut, current_task_fut, all_room_votes_fut);
-    let members = members?;
+    let (tasks_result, current_task, all_room_votes) =
+        tokio::join!(tasks_fut, current_task_fut, all_room_votes_fut);
     let tasks = tasks_result?;
 
     let votes = if let Some(tid) = room.current_task_id {

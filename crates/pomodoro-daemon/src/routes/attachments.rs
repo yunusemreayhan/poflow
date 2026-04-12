@@ -64,9 +64,16 @@ pub async fn download_attachment(State(engine): State<AppState>, _claims: Claims
     let path = db::attachments_dir().join(&att.storage_key);
     let data = tokio::fs::read(&path).await.map_err(|_| err(StatusCode::NOT_FOUND, "File not found on disk"))?;
 
+    // S3: Force safe content-type to prevent XSS via uploaded HTML/SVG
+    let safe_mime = if att.mime_type.starts_with("image/") || att.mime_type == "application/pdf" || att.mime_type.starts_with("text/plain") {
+        &att.mime_type
+    } else {
+        "application/octet-stream"
+    };
+
     Ok(axum::response::Response::builder()
         .status(StatusCode::OK)
-        .header("content-type", &att.mime_type)
+        .header("content-type", safe_mime)
         .header("content-disposition", format!("attachment; filename=\"{}\"", att.filename.replace('"', "_")))
         .header("content-security-policy", "default-src 'none'")
         .header("x-content-type-options", "nosniff")

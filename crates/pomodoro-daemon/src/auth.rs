@@ -8,6 +8,12 @@ use std::collections::HashSet;
 static SECRET: OnceLock<Vec<u8>> = OnceLock::new();
 static BLOCKLIST: OnceLock<RwLock<HashSet<String>>> = OnceLock::new();
 static AUTH_POOL: OnceLock<crate::db::Pool> = OnceLock::new();
+// S2: Cache verified user IDs to avoid per-request DB lookup (60s TTL)
+static USER_CACHE: OnceLock<RwLock<std::collections::HashMap<i64, std::time::Instant>>> = OnceLock::new();
+
+fn user_cache() -> &'static RwLock<std::collections::HashMap<i64, std::time::Instant>> {
+    USER_CACHE.get_or_init(|| RwLock::new(std::collections::HashMap::new()))
+}
 
 fn blocklist() -> &'static RwLock<HashSet<String>> {
     BLOCKLIST.get_or_init(|| RwLock::new(HashSet::new()))
@@ -158,11 +164,18 @@ impl<S: Send + Sync> FromRequestParts<S> for Claims {
             let claims = verify_token(token).map_err(|_| axum::http::StatusCode::UNAUTHORIZED)?;
             // Reject refresh tokens used as access tokens
             if claims.typ == "refresh" { return Err(axum::http::StatusCode::UNAUTHORIZED); }
-            // Reject tokens from deleted users
+            // Reject tokens from deleted users (cached for 60s)
             if let Some(pool) = AUTH_POOL.get() {
-                let exists: Option<(i64,)> = sqlx::query_as("SELECT id FROM users WHERE id = ?")
-                    .bind(claims.user_id).fetch_optional(pool).await.unwrap_or(None);
-                if exists.is_none() { return Err(axum::http::StatusCode::UNAUTHORIZED); }
+                let cached = {
+                    let cache = user_cache().read().await;
+                    cache.get(&claims.user_id).map(|t| t.elapsed().as_secs() < 60).unwrap_or(false)
+                };
+                if !cached {
+                    let exists: Option<(i64,)> = sqlx::query_as("SELECT id FROM users WHERE id = ?")
+                        .bind(claims.user_id).fetch_optional(pool).await.unwrap_or(None);
+                    if exists.is_none() { return Err(axum::http::StatusCode::UNAUTHORIZED); }
+                    user_cache().write().await.insert(claims.user_id, std::time::Instant::now());
+                }
             }
             Ok(claims)
         }
@@ -172,4 +185,9 @@ impl<S: Send + Sync> FromRequestParts<S> for Claims {
 /// Check if the authenticated user owns the resource or is root
 pub fn is_owner_or_root(resource_user_id: i64, claims: &Claims) -> bool {
     claims.user_id == resource_user_id || claims.role == "root"
+}
+
+/// Remove a user from the verified-user cache (call on user deletion)
+pub async fn invalidate_user_cache(user_id: i64) {
+    user_cache().write().await.remove(&user_id);
 }

@@ -78,15 +78,13 @@ pub async fn export_sessions(State(engine): State<AppState>, claims: Claims, Que
 
 fn escape_csv(s: &str) -> String {
     // Prefix formula-triggering characters to prevent CSV injection in spreadsheet apps
-    let s = if s.starts_with('=') || s.starts_with('+') || s.starts_with('-') || s.starts_with('@') {
-        format!("'{}", s)
-    } else {
-        s.to_string()
-    };
-    if s.contains(',') || s.contains('"') || s.contains('\n') || s.contains('\r') {
+    let needs_prefix = s.starts_with('=') || s.starts_with('+') || s.starts_with('-') || s.starts_with('@');
+    let s = if needs_prefix { format!("'{}", s) } else { s.to_string() };
+    // B6: Always quote prefixed fields + fields with special chars
+    if needs_prefix || s.contains(',') || s.contains('"') || s.contains('\n') || s.contains('\r') {
         format!("\"{}\"", s.replace('"', "\"\""))
     } else {
-        s.to_string()
+        s
     }
 }
 

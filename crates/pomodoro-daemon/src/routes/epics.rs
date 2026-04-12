@@ -12,6 +12,9 @@ pub struct CreateEpicGroupRequest { pub name: String }
 pub async fn create_epic_group(State(engine): State<AppState>, claims: Claims, Json(req): Json<CreateEpicGroupRequest>) -> Result<(StatusCode, Json<db::EpicGroup>), ApiError> {
     if req.name.trim().is_empty() { return Err(err(StatusCode::BAD_REQUEST, "Epic group name cannot be empty")); }
     if req.name.len() > 200 { return Err(err(StatusCode::BAD_REQUEST, "Epic group name too long (max 200 chars)")); }
+    // V5: Limit total epic groups
+    let groups = db::list_epic_groups(&engine.pool).await.map_err(internal)?;
+    if groups.len() >= 100 { return Err(err(StatusCode::BAD_REQUEST, "Too many epic groups (max 100)")); }
     let g = db::create_epic_group(&engine.pool, req.name.trim(), claims.user_id).await.map_err(internal)?;
     Ok((StatusCode::CREATED, Json(g)))
 }

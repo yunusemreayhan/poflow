@@ -19,6 +19,8 @@ pub async fn delete_user(State(engine): State<AppState>, claims: Claims, Path(id
     if claims.role != "root" { return Err(err(StatusCode::FORBIDDEN, "Root only")); }
     if claims.user_id == id { return Err(err(StatusCode::BAD_REQUEST, "Cannot delete yourself")); }
     db::delete_user(&engine.pool, id).await.map_err(|e| err(StatusCode::BAD_REQUEST, e.to_string()))?;
+    // Invalidate user cache so deleted user's tokens are rejected immediately
+    auth::invalidate_user_cache(id).await;
     Ok(StatusCode::NO_CONTENT)
 }
 

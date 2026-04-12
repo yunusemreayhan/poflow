@@ -167,11 +167,16 @@ pub async fn room_ws(
     };
 
     let room_id = id;
-    let _user_id = _user_id;
+    let user_id = _user_id;
+
+    // S4: Verify user is a room member before allowing WebSocket connection
+    let members = db::get_room_members(&engine.pool, room_id).await.map_err(internal)?;
+    if !members.iter().any(|m| m.user_id == user_id) {
+        return Err(err(StatusCode::FORBIDDEN, "Not a room member"));
+    }
+
     let mut change_rx = engine.changes.subscribe();
     let pool = engine.pool.clone();
-
-    // Don't auto-join — connecting to observe shouldn't mutate membership
 
     Ok(ws.on_upgrade(move |mut socket| async move {
         use axum::extract::ws::Message;

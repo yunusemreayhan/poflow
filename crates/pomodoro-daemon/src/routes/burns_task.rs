@@ -13,6 +13,7 @@ pub async fn add_time_report(State(engine): State<AppState>, claims: Claims, Pat
     if req.points.map_or(false, |p| p < 0.0 || p > 1000.0) { return Err(err(StatusCode::BAD_REQUEST, "Points must be 0-1000")); }
     // Verify task exists and user is owner, assignee, or root
     let task = db::get_task(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Task not found"))?;
+    if task.deleted_at.is_some() { return Err(err(StatusCode::BAD_REQUEST, "Cannot log time on deleted tasks")); }
     if task.user_id != claims.user_id && claims.role != "root" {
         let assignees = db::list_assignees(&engine.pool, id).await.unwrap_or_default();
         if !assignees.contains(&claims.username) {
