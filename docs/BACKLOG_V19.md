@@ -4,71 +4,77 @@ Full audit of 56 backend .rs files (6547 LOC), 53 frontend .ts/.tsx files (9282 
 
 ## Security (5 items)
 
-- [ ] **S1.** `api_rate_limit` middleware uses `std::sync::Mutex` (blocking) inside async context — can block the tokio runtime under high contention. Replace with `parking_lot::Mutex` or `tokio::sync::Mutex`.
-- [ ] **S2.** `RateLimiter` uses `Vec<Instant>` per IP — O(n) cleanup per request. Under sustained load from one IP, the vec grows unbounded within the window. Use a sliding window counter (two counters per window) instead.
-- [ ] **S3.** `Sidebar` sends partial config `{ theme: th }` via `apiCall("PUT", "/api/config", { theme: th })` — backend `update_config` expects a full `Config` struct. This overwrites all other config fields with serde defaults (e.g., resets `work_duration_min` to 25). Should use PATCH semantics or merge with current config.
-- [ ] **S4.** Webhook secret encryption uses XOR with a derived key — this is not a real encryption scheme (no IV, no authentication, trivially reversible if key is known). Should use AES-GCM or ChaCha20-Poly1305 via the `aead` crate.
-- [ ] **S5.** `download_attachment` reads entire file into memory via `tokio::fs::read` — for large files (up to 10MB), this holds the full content in RAM. Use `tokio_util::io::ReaderStream` for streaming response.
+- [x] **S1.** `api_rate_limit` middleware uses `std::sync::Mutex` (blocking) inside async context — replaced with `parking_lot::Mutex` + sliding window counter.
+- [x] **S2.** `RateLimiter` uses `Vec<Instant>` per IP — O(n) cleanup per request. Replaced with sliding window counter (two counters per window), O(1) per request.
+- [x] **S3.** `Sidebar` sends partial config `{ theme: th }` — now merges with current config before PUT to prevent overwriting all settings.
+- [x] **S4.** Webhook secret encryption uses XOR — replaced with AES-256-GCM via `aes-gcm` crate. Legacy XOR decryption preserved as fallback.
+- [x] **S5.** `download_attachment` reads entire file into memory — now streams via `tokio_util::io::ReaderStream`.
 
 ## Bugs (12 items)
 
-- [ ] **B1.** `Sidebar` theme toggle calls `apiCall("PUT", "/api/config", { theme: th })` which sends a partial Config — backend deserializes it as a full Config with defaults, overwriting user's timer durations, daily goal, etc. Every theme toggle resets all settings.
-- [ ] **B2.** `useSseConnection` creates a new EventSource on every `token` change — if the token is refreshed (via `tryRefreshToken`), the old SSE connection is closed and a new one opened, causing a brief gap where timer ticks are missed.
-- [ ] **B3.** `Rooms.tsx` has duplicate `import { useStore }` — line 5 imports from `../store/store` and line 6 also imports `useStore` from `../store/store`. This is a duplicate import that bundlers handle but is messy.
-- [ ] **B4.** `TeamManager` calls `apiCall("GET", "/api/users")` which returns `string[]` (usernames only), but the component expects `{ id: number; username: string }[]` — the user search/add feature is broken because `u.id` is undefined.
-- [ ] **B5.** `import_tasks_csv` doesn't handle the new `description` column added to CSV export in v18 — export now has 12 columns but import still expects 4 columns (title, priority, estimated, project). Round-trip is broken.
-- [ ] **B6.** `duplicate_task` route handler doesn't copy `work_duration_minutes` — duplicated tasks lose their custom timer duration.
-- [ ] **B7.** `carryover_sprint` copies `start_date`/`end_date` from the completed sprint — but these are the OLD sprint's dates. The carry-over sprint should have no dates (or shifted dates), not the same dates as the completed sprint.
-- [ ] **B8.** `ErrorBoundary` calls `useI18n.getState()` inside `render()` of a class component — this works but is unconventional and may break if zustand changes its API. Should use a wrapper or context.
-- [ ] **B9.** `allUsers` state in `TeamManager` is typed as `{ id: number; username: string }[]` but `/api/users` returns `string[]` — TypeScript doesn't catch this because `apiCall` uses a generic type parameter that trusts the caller.
-- [ ] **B10.** `change_password` (PUT /api/auth/password) route exists in the router but the handler validates `current_password` — if the user provides wrong current password, the error message says "Current password is incorrect" but the status is 403 (FORBIDDEN) instead of 401 (UNAUTHORIZED).
-- [ ] **B11.** `restore_backup` closes the pool but the server continues running with a dead pool — all subsequent requests will fail with connection errors until restart. The response says "Restart the server" but there's no mechanism to trigger it.
-- [ ] **B12.** `isDescendantOf` in `TaskNode` drag-and-drop walks the parent chain via `tasks` array lookup — for deep trees (50+ levels), this is O(depth × n) per drag operation. Should use a Map for O(depth) lookup.
+- [x] **B1.** Theme toggle resets all config — fixed (same as S3, merges with current config).
+- [x] ~~**B2.**~~ FALSE POSITIVE — SSE gap on token refresh is covered by 2-second polling fallback.
+- [x] **B3.** Duplicate `import { useStore }` in Rooms.tsx — removed.
+- [x] **B4.** `TeamManager` calls `/api/users` expecting `{id, username}[]` but got `string[]` — changed endpoint to return `{id, username}` objects.
+- [x] **B5.** CSV import doesn't handle new export format — now detects columns by header name, supports both simple and full export formats.
+- [x] ~~**B6.**~~ FALSE POSITIVE — `duplicate_task` already copies `work_duration_minutes`.
+- [x] **B7.** `carryover_sprint` copies old dates — now leaves dates blank for user to set.
+- [x] ~~**B8.**~~ WON'T FIX — ErrorBoundary zustand usage is unconventional but functional.
+- [x] **B9.** Same root cause as B4 — fixed by changing `/api/users` return type.
+- [x] ~~**B10.**~~ FALSE POSITIVE — `change_password` already returns 401 UNAUTHORIZED.
+- [x] ~~**B11.**~~ WON'T FIX — restore_backup dead pool is inherent limitation, note tells user to restart.
+- [x] **B12.** `isDescendantOf` O(depth × n) — now uses Map for O(depth) lookup.
 
 ## Business Logic (6 items)
 
-- [ ] **BL1.** `add_assignee` route allows task owner to assign anyone, but `remove_assignee` also requires task ownership — an assigned user cannot unassign themselves from a task they don't own.
-- [ ] **BL2.** `delete_team` is root-only but `create_team` is available to any user — a non-root user can create teams but only root can delete them, leaving orphaned teams if the creator leaves.
-- [ ] **BL3.** `update_sprint` rejects `status` field changes ("Use /start or /complete endpoints") but doesn't prevent setting status via the `status` field in the request — the check returns an error, which is correct, but the error message could be clearer about which endpoints to use.
-- [ ] **BL4.** `auto_archive` task loop runs daily but doesn't check if the task has active timer sessions — archiving a task that's currently being timed could cause confusion.
-- [ ] **BL5.** `accept_estimate` for "tshirt" unit stores the numeric value (1,2,3,5,8) as `estimated` — but the frontend displays T-shirt labels (XS,S,M,L,XL). The stored value loses the T-shirt semantics.
-- [ ] **BL6.** `carryover_sprint` doesn't check if any of the incomplete tasks are already in another active sprint — could result in a task being in two active sprints simultaneously.
+- [x] **BL1.** Assigned user can now unassign themselves (not just task owner/root). Updated test.
+- [x] **BL2.** Team admins can now delete their own teams (not just root).
+- [x] ~~**BL3.**~~ FALSE POSITIVE — error message already clear ("Use /start or /complete endpoints").
+- [x] ~~**BL4.**~~ FALSE POSITIVE — auto_archive only targets completed tasks, not active timer tasks.
+- [x] ~~**BL5.**~~ WON'T FIX — T-shirt estimate display is a frontend mapping concern.
+- [x] **BL6.** Carryover sprint now filters out tasks already in an active sprint.
 
 ## Validation (4 items)
 
-- [ ] **V1.** `update_profile` allows changing username to any string including empty — `validate_username` is called but if it only checks length, usernames with special characters (spaces, unicode) could be created.
-- [ ] **V2.** `create_task` doesn't validate `title` length — unbounded string stored in DB. Should cap at 500 chars like `import_tasks_json` does.
-- [ ] **V3.** `update_sprint` doesn't validate `project` length on update — only `create_sprint` validates it.
-- [ ] **V4.** `add_time_report` allows `hours` up to 24.0 per entry but doesn't limit total hours per day per user — a user could log 100+ hours in a single day across multiple entries.
+- [x] ~~**V1.**~~ FALSE POSITIVE — `validate_username` already enforces alphanumeric+_- and max 32 chars.
+- [x] ~~**V2.**~~ FALSE POSITIVE — `create_task` already validates title length (max 500).
+- [x] **V3.** `update_sprint` now validates project length (max 200) on update.
+- [x] ~~**V4.**~~ WON'T FIX — daily hours limit is a nice-to-have, not critical.
 
 ## UX Improvements (6 items)
 
-- [ ] **UX1.** `Dashboard` component loads stats and sprints independently but doesn't show sprint progress or upcoming due dates — missed opportunity for a useful overview widget.
-- [ ] **UX2.** `History` component loads sessions but doesn't display `task_path` breadcrumbs even though the API returns them — the data is fetched but not rendered.
-- [ ] **UX3.** No visual indicator for tasks with unresolved dependencies in the task list — users can't see at a glance which tasks are blocked (only visible in sprint board).
-- [ ] **UX4.** No way to edit a label name or color after creation — only create and delete are supported.
-- [ ] **UX5.** No way to edit a webhook URL or events after creation — only create and delete.
-- [ ] **UX6.** `TaskContextMenu` "Move up/Move down" swaps sort_order values — but if two tasks have the same sort_order (common after import), the swap is a no-op.
+- [x] ~~**UX1.**~~ WON'T FIX — Dashboard widget enhancement is a feature request.
+- [x] ~~**UX2.**~~ FALSE POSITIVE — History already renders task_path breadcrumbs.
+- [x] ~~**UX3.**~~ WON'T FIX — Blocked task indicators in task list is a feature request.
+- [x] ~~**UX4.**~~ WON'T FIX — Label editing is a feature request.
+- [x] ~~**UX5.**~~ WON'T FIX — Webhook editing is a feature request.
+- [x] **UX6.** Move up/down now offsets sort_order by ±1 when values are equal.
 
 ## Accessibility (3 items)
 
-- [ ] **A1.** `NotificationBell` dropdown has no focus trap — Tab key escapes the dropdown to the page behind it. Should trap focus within the dialog.
-- [ ] **A2.** `CsvImport` drag-and-drop zone label is not focusable via keyboard — the `<label>` wraps a hidden input but the label itself doesn't have `tabIndex` so keyboard users can't discover it without Tab-navigating to the hidden input.
-- [ ] **A3.** `Rooms` "Show closed" toggle button doesn't have `aria-pressed` attribute — screen readers can't determine the toggle state.
+- [x] **A1.** NotificationBell dropdown now has focus trap (Tab cycles within dialog).
+- [x] **A2.** CSV import label is now keyboard-focusable and activatable with Enter/Space.
+- [x] ~~**A3.**~~ FALSE POSITIVE — Rooms toggle already has `aria-pressed`.
 
 ## Performance (3 items)
 
-- [ ] **P1.** `get_task_detail` recursive CTE fetches all descendants then batch-loads comments and sessions for each — for deeply nested trees with many comments, this generates N+1 queries. Should batch-load comments for all descendant IDs in one query.
-- [ ] **P2.** `Sidebar` calls `apiCall("GET", "/api/me/teams")` on mount but the result is stored in local state — if the user navigates away and back, teams are re-fetched. Should cache in the store.
-- [ ] **P3.** `loadTasks` compares tasks with `some((t, i) => t.id !== prev[i]?.id || t.updated_at !== prev[i]?.updated_at)` — O(n) comparison on every load. The ETag from `/api/tasks/full` already handles this at the HTTP level (304 Not Modified), but the client-side comparison still runs.
+- [x] ~~**P1.**~~ FALSE POSITIVE — `get_task_detail` already batch-loads comments/sessions.
+- [x] ~~**P2.**~~ WON'T FIX — Teams caching is premature optimization.
+- [x] ~~**P3.**~~ WON'T FIX — Client-side ETag comparison is negligible overhead.
 
 ## Code Quality (4 items)
 
-- [ ] **CQ1.** `Rooms.tsx` has duplicate `import { useStore } from "../store/store"` on consecutive lines — should be deduplicated.
-- [ ] **CQ2.** `api_rate_limit` uses `std::sync::Mutex` which is a blocking mutex — should use `parking_lot::Mutex` for better performance in async context (no poisoning, faster).
-- [ ] **CQ3.** `webhook.rs` `dispatch` function spawns a tokio task per webhook event — if many events fire rapidly, this creates many concurrent HTTP requests. Should use a bounded channel/queue.
-- [ ] **CQ4.** Multiple route handlers have inline SQL queries that could be extracted to `db/` layer functions — e.g., `create_room` has `SELECT COUNT(*) FROM rooms WHERE creator_id = ?` inline.
+- [x] **CQ1.** Duplicate import removed (same as B3).
+- [x] **CQ2.** Blocking mutex replaced (same as S1).
+- [x] ~~**CQ3.**~~ WON'T FIX — Webhook dispatch queue is premature optimization (6 call sites).
+- [x] ~~**CQ4.**~~ WON'T FIX — Inline SQL extraction is code style preference.
 
 ---
 
-**Total: 43 items** — S:5, B:12, BL:6, V:4, UX:6, A:3, P:3, CQ:4
+**Total: 43 items** — 20 FIXED, 12 FALSE POSITIVE, 11 WON'T FIX
+
+### Commits
+1. `799a361` — B1/S3, B4/B9, B5, S4, B7 (theme config, team API, CSV, AES-GCM, carryover)
+2. `3c748c8` — S1/S2, S5, B3/CQ1, B12, V3, BL1, BL2, BL6 (rate limiter, streaming, assignees, teams)
+3. `c0e8909` — A1, A2 (notification focus trap, CSV keyboard)
+4. `702c332` — UX6 (sort_order swap fix)
