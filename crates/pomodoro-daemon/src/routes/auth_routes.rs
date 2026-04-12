@@ -1,7 +1,7 @@
 use super::*;
 
 
-#[utoipa::path(post, path = "/api/auth/register", request_body = RegisterRequest, responses((status = 200, body = AuthResponse)))]
+#[utoipa::path(post, path = "/api/auth/register", request_body = RegisterRequest, responses((status = 200, body = AuthResponse), (status = 400, body = ApiErrorBody), (status = 409, body = ApiErrorBody), (status = 429, body = ApiErrorBody)))]
 pub async fn register(headers: axum::http::HeaderMap, State(engine): State<AppState>, Json(req): Json<RegisterRequest>) -> ApiResult<AuthResponse> {
     check_auth_rate_limit(&headers)?;
     validate_username(&req.username)?;
@@ -17,7 +17,7 @@ pub async fn register(headers: axum::http::HeaderMap, State(engine): State<AppSt
     Ok(Json(AuthResponse { token, refresh_token, user_id: user.id, username: user.username, role: user.role }))
 }
 
-#[utoipa::path(post, path = "/api/auth/login", request_body = LoginRequest, responses((status = 200, body = AuthResponse)))]
+#[utoipa::path(post, path = "/api/auth/login", request_body = LoginRequest, responses((status = 200, body = AuthResponse), (status = 401, body = ApiErrorBody), (status = 429, body = ApiErrorBody)))]
 pub async fn login(headers: axum::http::HeaderMap, State(engine): State<AppState>, Json(req): Json<LoginRequest>) -> ApiResult<AuthResponse> {
     check_auth_rate_limit(&headers)?;
     let user = db::get_user_by_username(&engine.pool, &req.username).await

@@ -143,7 +143,7 @@ pub async fn list_tasks(State(engine): State<AppState>, _claims: Claims, Query(q
     Ok(resp.body(axum::body::Body::from(body)).map_err(|e| internal(e.to_string()))?)
 }
 
-#[utoipa::path(post, path = "/api/tasks", request_body = CreateTaskRequest, responses((status = 201, body = db::Task)), security(("bearer" = [])))]
+#[utoipa::path(post, path = "/api/tasks", request_body = CreateTaskRequest, responses((status = 201, body = db::Task), (status = 400, body = ApiErrorBody), (status = 401), (status = 403, body = ApiErrorBody)), security(("bearer" = [])))]
 pub async fn create_task(State(engine): State<AppState>, claims: Claims, Json(req): Json<CreateTaskRequest>) -> Result<(StatusCode, Json<db::Task>), ApiError> {
     if req.title.trim().is_empty() { return Err(err(StatusCode::BAD_REQUEST, "Title cannot be empty")); }
     if req.title.len() > 500 { return Err(err(StatusCode::BAD_REQUEST, "Title too long (max 500 chars)")); }
@@ -188,7 +188,7 @@ pub async fn update_session_note(State(engine): State<AppState>, claims: Claims,
     db::update_session_note(&engine.pool, id, &req.note).await.map(Json).map_err(internal)
 }
 
-#[utoipa::path(put, path = "/api/tasks/{id}", request_body = UpdateTaskRequest, responses((status = 200, body = db::Task)), security(("bearer" = [])))]
+#[utoipa::path(put, path = "/api/tasks/{id}", request_body = UpdateTaskRequest, responses((status = 200, body = db::Task), (status = 400, body = ApiErrorBody), (status = 403, body = ApiErrorBody), (status = 404, body = ApiErrorBody), (status = 409, body = ApiErrorBody)), security(("bearer" = [])))]
 pub async fn update_task(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>, Json(req): Json<UpdateTaskRequest>) -> ApiResult<db::Task> {
     let task = db::get_task(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Task not found"))?;
     if !is_owner_or_root(task.user_id, &claims) { return Err(err(StatusCode::FORBIDDEN, "Not owner")); }
@@ -238,7 +238,7 @@ pub async fn update_task(State(engine): State<AppState>, claims: Claims, Path(id
     Ok(Json(t))
 }
 
-#[utoipa::path(delete, path = "/api/tasks/{id}", responses((status = 204)), security(("bearer" = [])))]
+#[utoipa::path(delete, path = "/api/tasks/{id}", responses((status = 204), (status = 403, body = ApiErrorBody), (status = 404, body = ApiErrorBody)), security(("bearer" = [])))]
 pub async fn delete_task(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>) -> Result<impl IntoResponse, ApiError> {
     let task = db::get_task(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Task not found"))?;
     if !is_owner_or_root(task.user_id, &claims) { return Err(err(StatusCode::FORBIDDEN, "Not owner")); }

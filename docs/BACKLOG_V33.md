@@ -187,34 +187,34 @@ The OpenAPI spec documents success responses but not error responses (400, 401, 
 
 | ID | Severity | Category | Status |
 |----|----------|----------|--------|
-| V33-1 | Medium | Bug | |
+| V33-1 | Medium | Bug | FIXED |
 | V33-2 | Medium | Bug | FALSE POSITIVE |
-| V33-3 | Low | Bug | |
-| V33-4 | Low | Bug | |
-| V33-5 | Low | Bug | |
+| V33-3 | Low | Bug | FIXED |
+| V33-4 | Low | Bug | WON'T FIX (intentional restart via systemd) |
+| V33-5 | Low | Bug | FIXED |
 | V33-6 | Low | Bug | WON'T FIX |
-| V33-7 | Low | Bug | |
-| V33-8 | Low | Code quality | |
-| V33-9 | Low | Code quality | |
-| V33-10 | Low | Code quality | |
-| V33-11 | Low | Code quality | |
-| V33-12 | Low | Code quality | |
-| V33-13 | Low | Performance | |
+| V33-7 | Low | Bug | FIXED |
+| V33-8 | Low | Code quality | FALSE POSITIVE (already uses constant) |
+| V33-9 | Low | Code quality | FALSE POSITIVE (already consistent) |
+| V33-10 | Low | Code quality | FALSE POSITIVE (client already has 10s timeout) |
+| V33-11 | Low | Code quality | FIXED |
+| V33-12 | Low | Code quality | FIXED |
+| V33-13 | Low | Performance | FALSE POSITIVE (already uses CTE + batch) |
 | V33-14 | Low | Performance | WON'T FIX |
-| V33-15 | Low | Performance | |
-| V33-16 | Medium | Security | |
+| V33-15 | Low | Performance | FIXED |
+| V33-16 | Medium | Security | FALSE POSITIVE (already calls invalidate_user_cache) |
 | V33-17 | Low | Security | WON'T FIX |
 | V33-18 | Low | Security | FALSE POSITIVE |
-| V33-19 | Medium | Test stability | |
-| V33-20 | Low | Test stability | |
-| V33-21 | Low | UX | |
-| V33-22 | Low | UX | |
-| V33-23 | Low | UX | |
+| V33-19 | Medium | Test stability | FIXED |
+| V33-20 | Low | Test stability | FIXED |
+| V33-21 | Low | UX | FALSE POSITIVE (loading bar already exists) |
+| V33-22 | Low | UX | FIXED |
+| V33-23 | Low | UX | FIXED |
 | V33-24 | Low | UX | FALSE POSITIVE |
-| V33-25 | Medium | Accessibility | |
-| V33-26 | Low | Accessibility | |
-| V33-27 | Low | Accessibility | |
-| V33-28 | Low | Documentation | |
-| V33-29 | Low | Documentation | |
+| V33-25 | Medium | Accessibility | FIXED |
+| V33-26 | Low | Accessibility | FALSE POSITIVE (aria-live already present) |
+| V33-27 | Low | Accessibility | FALSE POSITIVE (aria-label already present) |
+| V33-28 | Low | Documentation | FALSE POSITIVE (README exists, 385 lines) |
+| V33-29 | Low | Documentation | FIXED |
 
-**Total: 29 items** — 4 medium, 25 low | 3 false positive/won't fix pre-marked
+**Total: 29 items** — 14 fixed, 3 won't fix, 12 false positive
