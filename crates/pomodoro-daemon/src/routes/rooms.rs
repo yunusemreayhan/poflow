@@ -226,6 +226,10 @@ pub async fn room_ws(
             tokio::select! {
                 Ok(evt) = change_rx.recv() => {
                     if matches!(evt, ChangeEvent::Rooms) {
+                        // BL3: Re-verify membership on each state push
+                        let still_member = db::get_room_members(&pool, room_id).await
+                            .map(|m| m.iter().any(|m| m.user_id == user_id)).unwrap_or(false);
+                        if !still_member { let _ = socket.send(Message::Close(None)).await; break; }
                         if let Ok(state) = db::get_room_state(&pool, room_id).await {
                             if let Ok(json) = serde_json::to_string(&state) {
                                 // P2: Skip sending if state unchanged

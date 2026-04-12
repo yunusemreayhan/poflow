@@ -12,6 +12,14 @@ pub async fn duplicate_task(State(engine): State<AppState>, claims: Claims, Path
         task.priority as i64, task.estimated as i64,
         task.estimated_hours, task.remaining_points, task.due_date.as_deref())
         .await.map_err(internal)?;
+    // Copy work_duration_minutes if set
+    if task.work_duration_minutes.is_some() {
+        db::update_task(&engine.pool, t.id, None, None, None, None, None, None, None, None, None, None, None, None, task.work_duration_minutes.map(Some)).await.ok();
+    }
+    // Copy labels
+    if let Ok(labels) = db::get_task_labels(&engine.pool, id).await {
+        for label in labels { db::add_task_label(&engine.pool, t.id, label.id).await.ok(); }
+    }
     engine.notify(ChangeEvent::Tasks);
     Ok((StatusCode::CREATED, Json(t)))
 }

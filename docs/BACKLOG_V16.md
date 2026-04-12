@@ -8,24 +8,24 @@ Tests: 275 backend, 154 frontend
 
 ## Confirmed Bugs (18)
 
-- [ ] **B1.** `import_tasks_csv` uses manual `BEGIN DEFERRED`/`COMMIT` on pool — may execute on different connections, breaking atomicity. Must use `pool.begin()` for proper transaction.
-- [ ] **B2.** `import_tasks_json` has no transaction wrapping — partial imports leave orphaned tasks on failure.
-- [ ] **B3.** `bulk_update_status` doesn't filter `deleted_at IS NULL` — can resurrect soft-deleted tasks.
-- [ ] **B4.** `delete_user` reassignment subquery `SELECT id FROM users WHERE role='root' LIMIT 1` can return the user being deleted. Add `AND id != ?`.
-- [ ] **B5.** `get_room_state` project-scoped task query missing `AND t.deleted_at IS NULL` — soft-deleted tasks appear in estimation rooms.
-- [ ] **B6.** `epic_snapshots` uses `status='completed'` but misses `'done'` status — should use `IN ('completed','done')` like sprint snapshots.
-- [ ] **B7.** `PRAGMA foreign_keys = ON` only set on one pool connection during migrate — other connections may not enforce FKs. Set via `SqliteConnectOptions.pragma()`.
-- [ ] **B8.** `cleanup_notifications` datetime format mismatch — `datetime('now','-30 days')` produces `YYYY-MM-DD HH:MM:SS` but `created_at` uses `YYYY-MM-DDTHH:MM:SS.fff`. Use `strftime` with T separator.
-- [ ] **B9.** `AuditLog` page state not reset when filter changes — user on page 5 changing filter sees empty results.
-- [ ] **B10.** `EditField` onBlur fires save after Escape — blur event triggers after keydown, saving value user intended to discard.
-- [ ] **B11.** `i18n.ts` Proxy fallback only applies when `setLocale` is called — initial load with non-English locale gets no fallback for missing keys.
-- [ ] **B12.** `useSseConnection` debounceTimer never cleared on cleanup — post-unmount `flushChanges` call on unmounted component.
-- [ ] **B13.** `EpicBurndown` nested `<button>` inside `<button>` — invalid HTML, inconsistent browser behavior.
-- [ ] **B14.** `Rooms.tsx` room delete has no confirmation dialog — destructive action fires immediately.
-- [ ] **B15.** `add_sprint_tasks` notification uses wrong event type `"sprint_started"` — should be `"task_added_to_sprint"`.
-- [ ] **B16.** `accept_estimate` has no value validation — negative or extreme estimates written directly to task.
-- [ ] **B17.** Webhook URL rewrite to resolved IP breaks HTTPS TLS certificate validation — SNI mismatch.
-- [ ] **B18.** `auto_archive_days=0` doesn't disable archiving — `.max(1)` clamps to minimum 1 day.
+- [x] **B1.** `import_tasks_csv` uses manual `BEGIN DEFERRED`/`COMMIT` on pool — may execute on different connections, breaking atomicity. Must use `pool.begin()` for proper transaction.
+- [x] **B2.** `import_tasks_json` has no transaction wrapping — partial imports leave orphaned tasks on failure.
+- [x] **B3.** `bulk_update_status` doesn't filter `deleted_at IS NULL` — can resurrect soft-deleted tasks.
+- [x] **B4.** `delete_user` reassignment subquery `SELECT id FROM users WHERE role='root' LIMIT 1` can return the user being deleted. Add `AND id != ?`.
+- [x] **B5.** `get_room_state` project-scoped task query missing `AND t.deleted_at IS NULL` — soft-deleted tasks appear in estimation rooms.
+- [x] **B6.** `epic_snapshots` uses `status='completed'` but misses `'done'` status — should use `IN ('completed','done')` like sprint snapshots.
+- [x] **B7.** `PRAGMA foreign_keys = ON` only set on one pool connection during migrate — other connections may not enforce FKs. Set via `SqliteConnectOptions.pragma()`.
+- [x] **B8.** `cleanup_notifications` datetime format mismatch — `datetime('now','-30 days')` produces `YYYY-MM-DD HH:MM:SS` but `created_at` uses `YYYY-MM-DDTHH:MM:SS.fff`. Use `strftime` with T separator.
+- [x] **B9.** `AuditLog` page state not reset when filter changes — user on page 5 changing filter sees empty results.
+- [x] **B10.** `EditField` onBlur fires save after Escape — blur event triggers after keydown, saving value user intended to discard.
+- [x] **B11.** `i18n.ts` Proxy fallback only applies when `setLocale` is called — initial load with non-English locale gets no fallback for missing keys.
+- [x] **B12.** `useSseConnection` debounceTimer never cleared on cleanup — post-unmount `flushChanges` call on unmounted component.
+- [x] **B13.** `EpicBurndown` nested `<button>` inside `<button>` — invalid HTML, inconsistent browser behavior.
+- [x] **B14.** `Rooms.tsx` room delete has no confirmation dialog — destructive action fires immediately.
+- [x] **B15.** `add_sprint_tasks` notification uses wrong event type `"sprint_started"` — should be `"task_added_to_sprint"`.
+- [x] **B16.** `accept_estimate` has no value validation — negative or extreme estimates written directly to task.
+- [x] **B17.** Webhook URL rewrite to resolved IP breaks HTTPS TLS certificate validation — SNI mismatch.
+- [x] **B18.** `auto_archive_days=0` doesn't disable archiving — `.max(1)` clamps to minimum 1 day.
 
 ## Security (5)
 

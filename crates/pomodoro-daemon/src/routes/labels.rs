@@ -14,6 +14,9 @@ pub async fn list_labels(State(engine): State<AppState>, _claims: Claims) -> Api
 pub async fn create_label(State(engine): State<AppState>, _claims: Claims, Json(req): Json<CreateLabelRequest>) -> Result<(StatusCode, Json<db::Label>), ApiError> {
     if req.name.trim().is_empty() { return Err(err(StatusCode::BAD_REQUEST, "Label name cannot be empty")); }
     let color = req.color.as_deref().unwrap_or("#6366f1");
+    if !color.starts_with('#') || !matches!(color.len(), 4 | 7) || !color[1..].chars().all(|c| c.is_ascii_hexdigit()) {
+        return Err(err(StatusCode::BAD_REQUEST, "Color must be #RGB or #RRGGBB hex format"));
+    }
     let label = db::create_label(&engine.pool, req.name.trim(), color).await
         .map_err(|e| if e.to_string().contains("UNIQUE") { err(StatusCode::CONFLICT, "Label already exists") } else { internal(e) })?;
     Ok((StatusCode::CREATED, Json(label)))

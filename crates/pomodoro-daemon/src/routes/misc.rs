@@ -67,7 +67,7 @@ pub struct TasksFullResponse {
 pub async fn get_tasks_full(State(engine): State<AppState>, _claims: Claims, headers: axum::http::HeaderMap) -> Result<axum::response::Response, ApiError> {
     // B8: ETag includes labels and attachments to avoid stale data
     let (max_updated, task_count, sprint_task_count, burn_count, assignee_count, label_count, att_count): (String, i64, i64, i64, i64, i64, i64) =
-        sqlx::query_as("SELECT COALESCE((SELECT MAX(updated_at) FROM tasks), ''), (SELECT COUNT(*) FROM tasks), (SELECT COUNT(*) FROM sprint_tasks), (SELECT COUNT(*) FROM burn_log WHERE cancelled = 0), (SELECT COUNT(*) FROM task_assignees), (SELECT COUNT(*) FROM task_labels), (SELECT COUNT(*) FROM task_attachments)")
+        sqlx::query_as("SELECT COALESCE((SELECT MAX(COALESCE(deleted_at, updated_at)) FROM tasks), ''), (SELECT COUNT(*) FROM tasks WHERE deleted_at IS NULL), (SELECT COUNT(*) FROM sprint_tasks), (SELECT COUNT(*) FROM burn_log WHERE cancelled = 0), (SELECT COUNT(*) FROM task_assignees), (SELECT COUNT(*) FROM task_labels), (SELECT COUNT(*) FROM task_attachments)")
         .fetch_one(&engine.pool).await.map_err(internal)?;
     let etag = format!("\"{}:{}:{}:{}:{}:{}:{}\"", max_updated, task_count, sprint_task_count, burn_count, assignee_count, label_count, att_count);
 

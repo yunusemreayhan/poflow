@@ -66,6 +66,7 @@ pub async fn delete_user(pool: &Pool, id: i64) -> Result<()> {
     sqlx::query("UPDATE sprint_tasks SET added_by_id = (SELECT id FROM users WHERE role = 'root' AND id != ? LIMIT 1) WHERE added_by_id = ?").bind(id).bind(id).execute(&mut *tx).await?;
     sqlx::query("UPDATE rooms SET creator_id = (SELECT id FROM users WHERE role = 'root' AND id != ? LIMIT 1) WHERE creator_id = ?").bind(id).bind(id).execute(&mut *tx).await?;
     sqlx::query("UPDATE sprints SET created_by_id = (SELECT id FROM users WHERE role = 'root' AND id != ? LIMIT 1) WHERE created_by_id = ?").bind(id).bind(id).execute(&mut *tx).await?;
+    sqlx::query("UPDATE epic_groups SET created_by = (SELECT id FROM users WHERE role = 'root' AND id != ? LIMIT 1) WHERE created_by = ?").bind(id).bind(id).execute(&mut *tx).await?;
     sqlx::query("DELETE FROM users WHERE id = ?").bind(id).execute(&mut *tx).await?;
     tx.commit().await?;
     Ok(())
