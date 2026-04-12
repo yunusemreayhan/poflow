@@ -314,6 +314,7 @@ export const useStore = create<Store>((set, get) => ({
     } finally { set({ mutating: false }); }
   },
 
+  // Note: deleteTask shows confirmation dialog before deleting (UI concern in store for convenience)
   deleteTask: (id) => {
     const task = get().tasks.find(t => t.id === id);
     get().showConfirm("Delete this task and all subtasks?", async () => {

@@ -75,8 +75,6 @@ async fn migrate(pool: &Pool) -> Result<()> {
         created_at  TEXT NOT NULL,
         updated_at  TEXT NOT NULL
     )").execute(pool).await?;
-    // F1: Soft delete support
-    sqlx::query("ALTER TABLE tasks ADD COLUMN deleted_at TEXT").execute(pool).await.ok();
 
     sqlx::query("CREATE TABLE IF NOT EXISTS sessions (
         id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -336,6 +334,11 @@ async fn migrate(pool: &Pool) -> Result<()> {
     if !applied_set.contains(&1) {
         sqlx::query("ALTER TABLE sprints ADD COLUMN retro_notes TEXT").execute(pool).await.ok();
         sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (1, ?)").bind(&now_str()).execute(pool).await.ok();
+    }
+    // Migration 2: Soft delete support
+    if !applied_set.contains(&2) {
+        sqlx::query("ALTER TABLE tasks ADD COLUMN deleted_at TEXT").execute(pool).await.ok();
+        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (2, ?)").bind(&now_str()).execute(pool).await.ok();
     }
 
     sqlx::query("CREATE TABLE IF NOT EXISTS task_attachments (
