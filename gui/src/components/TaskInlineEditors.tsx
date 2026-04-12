@@ -44,7 +44,7 @@ export function InlineTimeReport({ taskId, depth, show, onClose, onLogged }: Pro
             <button onClick={() => { setShowHistory(!showHistory); if (!showHistory) loadHistory(); }} className="text-[10px] text-white/30 hover:text-white/50">
               {showHistory ? "Hide" : "History"}
             </button>
-            <button onClick={onClose} className="text-white/30 text-xs">✕</button>
+            <button onClick={onClose} className="text-white/30 text-xs" aria-label="Close">✕</button>
           </div>
           {showHistory && history.length > 0 && (
             <div className="px-4 pb-2 space-y-0.5">
@@ -83,7 +83,7 @@ export function InlineComment({ taskId, depth, show, onClose }: Props) {
             <input value={content} onChange={e => setContent(e.target.value)} onKeyDown={e => e.key === "Enter" && submit()}
               placeholder="Add a comment..." className="flex-1 bg-white/5 border border-white/10 rounded-lg text-xs text-white placeholder-white/30 px-3 py-2 outline-none focus:border-[var(--color-work)]" autoFocus />
             <button onClick={submit} className="px-3 py-2 rounded-lg bg-[var(--color-accent)] text-white text-xs">Post</button>
-            <button onClick={onClose} className="text-white/30 text-xs">✕</button>
+            <button onClick={onClose} className="text-white/30 text-xs" aria-label="Close">✕</button>
           </div>
         </motion.div>
       )}
@@ -110,7 +110,7 @@ export function InlineAddSubtask({ parentId, depth, show, onClose }: { parentId:
             <input value={title} onChange={e => setTitle(e.target.value)} onKeyDown={e => { if (e.key === "Enter") submit(); if (e.key === "Escape") onClose(); }}
               placeholder="New subtask..." className="flex-1 bg-white/5 border border-white/10 rounded-lg text-xs text-white placeholder-white/30 px-3 py-2 outline-none focus:border-[var(--color-work)]" autoFocus />
             <button onClick={submit} className="px-3 py-2 rounded-lg bg-[var(--color-accent)] text-white text-xs">Add</button>
-            <button onClick={onClose} className="text-white/30 text-xs">✕</button>
+            <button onClick={onClose} className="text-white/30 text-xs" aria-label="Close">✕</button>
           </div>
         </motion.div>
       )}

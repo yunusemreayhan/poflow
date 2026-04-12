@@ -276,7 +276,7 @@ function DetailNode({ detail, depth, onRefresh, hoursMap }: { detail: TaskDetail
         )}
 
         {/* Time Reports */}
-        <button onClick={() => setShowTimeReports(!showTimeReports)}
+        <button onClick={() => setShowTimeReports(!showTimeReports)} aria-expanded={showTimeReports}
           className="flex items-center gap-1 text-xs text-white/40 hover:text-white/70 transition-colors mb-2">
           <Clock size={12} /> {showTimeReports ? "Hide" : "Show"} burns ({timeReports.length})
         </button>
@@ -309,7 +309,7 @@ function DetailNode({ detail, depth, onRefresh, hoursMap }: { detail: TaskDetail
         {/* Sessions */}
         {detail.sessions.length > 0 && (
           <>
-            <button onClick={() => setShowSessions(!showSessions)}
+            <button onClick={() => setShowSessions(!showSessions)} aria-expanded={showSessions}
               className="flex items-center gap-1 text-xs text-white/40 hover:text-white/70 transition-colors mb-2">
               🍅 {showSessions ? "Hide" : "Show"} sessions ({completedSessions} completed, {formatDuration(rollup.ownSessionSecs)})
             </button>
@@ -366,7 +366,7 @@ function DetailNode({ detail, depth, onRefresh, hoursMap }: { detail: TaskDetail
         </AnimatePresence>
 
         {/* Comments */}
-        <button onClick={() => setShowComments(!showComments)}
+        <button onClick={() => setShowComments(!showComments)} aria-expanded={showComments}
           className="flex items-center gap-1 text-xs text-white/40 hover:text-white/70 transition-colors mb-2">
           <MessageSquare size={12} /> {showComments ? "Hide" : "Show"} comments ({detail.comments.length})
         </button>

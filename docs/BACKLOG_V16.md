@@ -48,16 +48,16 @@ Tests: 275 backend, 154 frontend
 
 ## UX Improvements (10)
 
-- [ ] **UX1.** `TaskContextMenu` — most action buttons lack `role="menuitem"`, breaking keyboard navigation (ArrowUp/Down only finds items with that role).
-- [ ] **UX2.** Template and webhook delete in `SettingsParts.tsx` have no confirmation dialog.
-- [ ] **UX3.** Attachment delete in `TaskDetailParts.tsx` has no confirmation dialog.
-- [ ] **UX4.** Comment delete in `CommentSection.tsx` has no confirmation dialog.
-- [ ] **UX5.** `Recurrence.tsx` pattern names display raw strings ("daily","weekly") — should use existing i18n keys (`t.daily`, `t.weekly`).
-- [ ] **UX6.** `CsvImport` drag-and-drop doesn't validate file type — accepts any file.
-- [ ] **UX7.** `TrashView` has no "permanently delete" or "empty trash" option.
-- [ ] **UX8.** `AuthScreen` server URL edit has no URL format validation.
-- [ ] **UX9.** `SprintViews BurnsView` — `taskId` defaults to 0 when tasks empty, submitting burn targets task 0.
-- [ ] **UX10.** `ExportButton` submenu uses `group-hover` CSS — disappears when mouse moves between button and submenu.
+- [x] **UX1.** `TaskContextMenu` — most action buttons lack `role="menuitem"`, breaking keyboard navigation (ArrowUp/Down only finds items with that role).
+- [x] **UX2.** Template and webhook delete in `SettingsParts.tsx` have no confirmation dialog.
+- [x] **UX3.** Attachment delete in `TaskDetailParts.tsx` has no confirmation dialog.
+- [x] **UX4.** Comment delete in `CommentSection.tsx` has no confirmation dialog.
+- [x] **UX5.** `Recurrence.tsx` pattern names display raw strings ("daily","weekly") — should use existing i18n keys (`t.daily`, `t.weekly`).
+- [x] **UX6.** `CsvImport` drag-and-drop doesn't validate file type — accepts any file.
+- [x] **UX7.** `TrashView` has no "permanently delete" or "empty trash" option.
+- [x] **UX8.** `AuthScreen` server URL edit has no URL format validation.
+- [x] **UX9.** `SprintViews BurnsView` — `taskId` defaults to 0 when tasks empty, submitting burn targets task 0.
+- [x] **UX10.** `ExportButton` submenu uses `group-hover` CSS — disappears when mouse moves between button and submenu.
 
 ## Accessibility (10)
 

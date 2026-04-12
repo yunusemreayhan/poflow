@@ -195,7 +195,7 @@ export function BacklogView({ sprintId, taskIds, reload, capacityHours, tasks: s
             return (
               <span className={`ml-2 ${overCapacity ? "text-red-400" : "text-white/30"}`}>
                 ({totalHrs.toFixed(1)}h{capacityHours ? ` / ${capacityHours}h` : ""} · {totalPts}pt)
-                {overCapacity && " ⚠ over capacity"}
+                {overCapacity && <span role="alert"> ⚠ over capacity</span>}
               </span>
             );
           })()}

@@ -85,7 +85,7 @@ export default function TaskContextMenu(p: CtxMenuProps) {
             🏃 Sprints <ChevronRight size={12} className="text-white/30" />
           </div>
           {ctxSub === "sprints" && (
-            <div className="absolute top-0 bg-[var(--color-surface)] border border-white/10 rounded-lg shadow-xl py-1 min-w-48 z-50"
+            <div role="menu" aria-label="Sprint actions" className="absolute top-0 bg-[var(--color-surface)] border border-white/10 rounded-lg shadow-xl py-1 min-w-48 z-50"
               style={pos.x > window.innerWidth - 520 ? { right: "100%" } : { left: "100%" }}>
               {taskSprints.filter(ts => ts.task_id === t.id).map(ts => (
                 <button key={`rm-${ts.sprint_id}`} onClick={async () => {
@@ -116,7 +116,7 @@ export default function TaskContextMenu(p: CtxMenuProps) {
             👤 Assignees <ChevronRight size={12} className="text-white/30" />
           </div>
           {ctxSub === "assign" && (
-            <div className="absolute top-0 bg-[var(--color-surface)] border border-white/10 rounded-lg shadow-xl py-1 min-w-48 z-50 max-h-64 overflow-y-auto"
+            <div role="menu" aria-label="Assignee actions" className="absolute top-0 bg-[var(--color-surface)] border border-white/10 rounded-lg shadow-xl py-1 min-w-48 z-50 max-h-64 overflow-y-auto"
               style={pos.x > window.innerWidth - 520 ? { right: "100%" } : { left: "100%" }}>
               {assignees.length > 0 && (
                 <>

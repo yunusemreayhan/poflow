@@ -74,7 +74,7 @@ export default function AuthScreen() {
             ) : (
               <button onClick={() => setEditingServer(true)}
                 className="flex-1 text-left text-xs text-white/30 hover:text-white/60 font-mono truncate transition-colors flex items-center gap-1"
-                title="Click to change server">
+                title="Click to change server" aria-label="Edit server URL">
                 🌐 {serverUrl} <span className="text-[10px] opacity-50">✎</span>
               </button>
             )}

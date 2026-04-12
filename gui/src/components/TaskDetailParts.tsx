@@ -17,7 +17,7 @@ export function TaskActivityFeed({ taskId }: { taskId: number }) {
 
   return (
     <div className="mt-2">
-      <button onClick={() => setShow(!show)} className="text-xs text-white/30 hover:text-white/50 flex items-center gap-1">
+      <button onClick={() => setShow(!show)} aria-expanded={show} className="text-xs text-white/30 hover:text-white/50 flex items-center gap-1">
         📋 {show ? "Hide" : "Show"} activity
       </button>
       {show && (
@@ -117,8 +117,8 @@ export function TaskAttachments({ taskId }: { taskId: number }) {
             <span className="truncate flex-1">{a.filename}</span>
             <span className="text-white/20">{fmt(a.size_bytes)}</span>
             <button onClick={() => download(a.id, a.filename)}
-              className="text-[var(--color-accent)] hover:underline">↓</button>
-            <button onClick={() => del(a.id)} className="text-white/30 hover:text-[var(--color-danger)] opacity-0 group-hover:opacity-100">✕</button>
+              className="text-[var(--color-accent)] hover:underline" aria-label={`Download ${a.filename}`}>↓</button>
+            <button onClick={() => del(a.id)} className="text-white/30 hover:text-[var(--color-danger)] opacity-0 group-hover:opacity-100" aria-label={`Delete ${a.filename}`}>✕</button>
           </div>
           {/* F7: Inline preview for images */}
           {a.mime_type.startsWith("image/") && (

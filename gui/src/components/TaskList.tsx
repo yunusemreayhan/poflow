@@ -202,8 +202,9 @@ export default function TaskList({ selectMode, onSelect, selectedTaskId, votedTa
         <div className="bg-[var(--color-surface)] rounded-lg border border-white/5 p-2 space-y-1">
           <div className="text-[10px] text-white/30 mb-1">Search results ({ftsResults.length})</div>
           {ftsResults.map(r => (
-            <div key={r.id} className="text-xs text-white/60 py-0.5 cursor-pointer hover:text-white/80"
-              onClick={() => { setSearch(""); setFtsResults(null); setViewStack([r.id]); }}>
+            <div key={r.id} role="button" tabIndex={0} className="text-xs text-white/60 py-0.5 cursor-pointer hover:text-white/80"
+              onClick={() => { setSearch(""); setFtsResults(null); setViewStack([r.id]); }}
+              onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setSearch(""); setFtsResults(null); setViewStack([r.id]); } }}>
               <span>{r.title.replace(/<[^>]*>/g, "")}</span>
               {r.snippet && <span className="text-white/30 ml-2">{r.snippet.replace(/<[^>]*>/g, "")}</span>}
             </div>
