@@ -27,11 +27,10 @@ export function TemplateManager() {
   };
 
   const apply = async (t: Template) => {
-    try {
-      const d = JSON.parse(t.data);
-      await useStore.getState().createTask(d.title || t.name, undefined, d.project, d.priority ?? 3, d.estimated ?? 1);
-      useStore.getState().toast(`Created task from "${t.name}"`);
-    } catch { useStore.getState().toast("Invalid template data", "error"); }
+    // BL10: Use instantiate endpoint for variable resolution ({{today}}, {{username}})
+    await apiCall("POST", `/api/templates/${t.id}/instantiate`);
+    useStore.getState().loadTasks();
+    useStore.getState().toast(`Created task from "${t.name}"`);
   };
 
   return (

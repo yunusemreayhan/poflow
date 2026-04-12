@@ -104,6 +104,7 @@ export default function Settings() {
   const [saved, setSaved] = useState(false);
   const [newUsername, setNewUsername] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
   const [profileMsg, setProfileMsg] = useState("");
   const [serverDraft, setServerDraft] = useState(serverUrl);
 
@@ -115,13 +116,14 @@ export default function Settings() {
     try {
       const body: Record<string, string> = {};
       if (newUsername && newUsername !== username) body.username = newUsername;
-      if (newPassword) body.password = newPassword;
+      if (newPassword) { body.password = newPassword; body.current_password = currentPassword; }
       if (Object.keys(body).length === 0) return;
       const resp = await apiCall<AuthResponse>("PUT", "/api/profile", body);
       await setToken(resp.token);
       localStorage.setItem("auth", JSON.stringify(resp));
       useStore.setState({ token: resp.token, username: resp.username, role: resp.role });
       setNewPassword("");
+      setCurrentPassword("");
       setProfileMsg("Profile updated!");
       setTimeout(() => setProfileMsg(""), 2000);
     } catch (e) {
@@ -227,6 +229,12 @@ export default function Settings() {
           <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="unchanged"
             className="w-36 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white text-right outline-none focus:border-[var(--color-accent)] placeholder-white/20" />
         </Field>
+        {newPassword && (
+          <Field label="Current Password">
+            <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} placeholder="required"
+              className="w-36 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white text-right outline-none focus:border-[var(--color-accent)] placeholder-white/20" />
+          </Field>
+        )}
         <Field label="Role">
           <span className={`text-sm px-2 py-0.5 rounded ${role === "root" ? "bg-[var(--color-accent)]/20 text-[var(--color-accent)]" : "bg-white/5 text-white/60"}`}>{role}</span>
         </Field>

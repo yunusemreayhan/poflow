@@ -197,7 +197,15 @@ function StandupView({ today, tasks }: { today: string; tasks: import("../store/
   if (byUser.length === 0) return null;
   return (
     <div className="glass p-3 rounded-lg">
-      <div className="text-xs text-white/40 mb-2">Daily Standup</div>
+      <div className="flex justify-between items-center mb-2">
+        <div className="text-xs text-white/40">Daily Standup</div>
+        <button onClick={() => {
+          const md = byUser.map(([user, { done, wip, blocked }]) =>
+            `**@${user}**\n${done.length ? `✅ Done: ${done.join(", ")}\n` : ""}${wip.length ? `🔨 Working: ${wip.join(", ")}\n` : ""}${blocked.length ? `🚫 Blocked: ${blocked.join(", ")}\n` : ""}`
+          ).join("\n");
+          navigator.clipboard.writeText(md);
+        }} className="text-[10px] text-white/20 hover:text-white/50" title="Copy standup">📋</button>
+      </div>
       {byUser.map(([user, { done, wip, blocked }]) => (
         <div key={user} className="mb-2 last:mb-0">
           <div className="text-xs text-[var(--color-accent)]/70 font-medium">@{user}</div>

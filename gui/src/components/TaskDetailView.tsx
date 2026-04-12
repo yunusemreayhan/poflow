@@ -216,6 +216,23 @@ function DetailNode({ detail, depth, onRefresh, hoursMap }: { detail: TaskDetail
           <TaskDependencies taskId={t.id} allTasks={tasks} />
         </div>
 
+        {/* BL6: Sprint history */}
+        {(() => {
+          const sprintInfos = useStore.getState().taskSprintsMap.get(t.id);
+          return sprintInfos && sprintInfos.length > 0 ? (
+            <div className="mb-3">
+              <span className="text-xs text-[var(--color-dim)]">Sprints</span>
+              <div className="flex flex-wrap gap-1 mt-0.5">
+                {sprintInfos.map(si => (
+                  <span key={si.sprint_id} className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-white/50">
+                    {si.sprint_name || `#${si.sprint_id}`}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ) : null;
+        })()}
+
         {/* Recurrence */}
         <div className="mb-3">
           <TaskRecurrence taskId={t.id} />
