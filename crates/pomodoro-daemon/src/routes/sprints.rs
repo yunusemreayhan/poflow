@@ -39,6 +39,7 @@ pub async fn get_sprint_detail(State(engine): State<AppState>, _claims: Claims, 
 pub async fn update_sprint(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>, Json(req): Json<UpdateSprintRequest>) -> ApiResult<db::Sprint> {
     let sprint = get_owned_sprint(&engine.pool, id, &claims).await?;
     if req.goal.as_ref().and_then(|o| o.as_ref()).map_or(false, |g| g.len() > 1000) { return Err(err(StatusCode::BAD_REQUEST, "Goal too long (max 1000)")); }
+    if let Some(ref name) = req.name { if name.trim().is_empty() { return Err(err(StatusCode::BAD_REQUEST, "Sprint name cannot be empty")); } if name.len() > 200 { return Err(err(StatusCode::BAD_REQUEST, "Sprint name too long (max 200)")); } }
     if req.retro_notes.as_ref().and_then(|o| o.as_ref()).map_or(false, |r| r.len() > 10000) { return Err(err(StatusCode::BAD_REQUEST, "Retro notes too long (max 10000)")); }
     if req.status.is_some() { return Err(err(StatusCode::BAD_REQUEST, "Use /start or /complete endpoints to change sprint status")); }
     if let Some(Some(cap)) = req.capacity_hours { if cap < 0.0 || cap > 10000.0 { return Err(err(StatusCode::BAD_REQUEST, "capacity_hours must be 0-10000")); } }

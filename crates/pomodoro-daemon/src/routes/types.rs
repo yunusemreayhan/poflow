@@ -158,7 +158,7 @@ pub use crate::auth::is_owner_or_root;
 pub const VALID_TASK_STATUSES: &[&str] = &["backlog", "active", "in_progress", "blocked", "completed", "done", "estimated", "archived"];
 pub const VALID_SPRINT_STATUSES: &[&str] = &["planning", "active", "completed"];
 pub const VALID_ROLES: &[&str] = &["user", "root"];
-pub const VALID_ROOM_ROLES: &[&str] = &["admin", "voter"];
+pub const VALID_ROOM_ROLES: &[&str] = &["admin", "voter", "observer"];
 
 pub fn validate_task_status(s: &str) -> Result<(), ApiError> {
     if !VALID_TASK_STATUSES.contains(&s) { Err(err(StatusCode::BAD_REQUEST, format!("Invalid status '{}'. Must be one of: {}", s, VALID_TASK_STATUSES.join(", ")))) } else { Ok(()) }

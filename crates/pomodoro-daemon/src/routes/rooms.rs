@@ -57,6 +57,8 @@ pub async fn join_room(State(engine): State<AppState>, claims: Claims, Path(id):
 
 #[utoipa::path(post, path = "/api/rooms/{id}/leave", responses((status = 200)), security(("bearer" = [])))]
 pub async fn leave_room(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>) -> Result<StatusCode, ApiError> {
+    let room = db::get_room(&engine.pool, id).await.map_err(internal)?;
+    if room.creator_id == claims.user_id { return Err(err(StatusCode::BAD_REQUEST, "Room creator cannot leave — delete the room instead")); }
     db::leave_room(&engine.pool, id, claims.user_id).await.map_err(internal)?;
     engine.notify(ChangeEvent::Rooms);
     Ok(StatusCode::NO_CONTENT)
@@ -68,6 +70,7 @@ pub async fn kick_member(State(engine): State<AppState>, claims: Claims, Path((i
         return Err(err(StatusCode::FORBIDDEN, "Admin only"));
     }
     let uid = db::get_user_id_by_username(&engine.pool, &username).await.map_err(|_| err(StatusCode::NOT_FOUND, "User not found"))?;
+    if uid == claims.user_id { return Err(err(StatusCode::BAD_REQUEST, "Cannot kick yourself")); }
     db::leave_room(&engine.pool, id, uid).await.map_err(internal)?;
     Ok(StatusCode::NO_CONTENT)
 }
@@ -131,6 +134,7 @@ pub async fn accept_estimate(State(engine): State<AppState>, claims: Claims, Pat
     }
     if req.value < 0.0 || req.value > 10000.0 { return Err(err(StatusCode::BAD_REQUEST, "Estimate value must be 0-10000")); }
     let room = db::get_room(&engine.pool, id).await.map_err(internal)?;
+    if room.status != "revealed" { return Err(err(StatusCode::BAD_REQUEST, "Votes must be revealed before accepting")); }
     let task_id = room.current_task_id.ok_or_else(|| err(StatusCode::BAD_REQUEST, "No active vote"))?;
     let task = db::accept_estimate(&engine.pool, id, task_id, req.value, &room.estimation_unit).await.map_err(internal)?;
     // Auto-advance: find next unestimated leaf task (O(n) with pre-computed set)

@@ -57,6 +57,12 @@ pub async fn remove_team_member(State(engine): State<AppState>, claims: Claims, 
     if !db::is_team_admin(&engine.pool, id, claims.user_id).await.map_err(internal)? && claims.role != "root" {
         return Err(err(StatusCode::FORBIDDEN, "Team admin only"));
     }
+    // Prevent removing the last admin
+    if user_id == claims.user_id {
+        let admin_count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM team_members WHERE team_id = ? AND role = 'admin'")
+            .bind(id).fetch_one(&engine.pool).await.map_err(internal)?;
+        if admin_count.0 <= 1 { return Err(err(StatusCode::BAD_REQUEST, "Cannot remove the last team admin")); }
+    }
     db::remove_team_member(&engine.pool, id, user_id).await.map_err(internal)?;
     Ok(StatusCode::NO_CONTENT)
 }

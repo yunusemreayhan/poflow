@@ -17,31 +17,31 @@ Tests: 275 backend, 154 frontend
 
 ## Confirmed Bugs (25)
 
-- [ ] **B1.** `compare_sprints` SQL `SUM(CASE WHEN ... THEN 1 ELSE 0 END)` returns NULL for empty sprints — sqlx decode to `i64` fails with 500. Needs `COALESCE(..., 0)`.
-- [ ] **B2.** `update_task` missing empty-title validation — `create_task` checks `trim().is_empty()` but update only checks `len() > 500`. Can set title to empty string.
-- [ ] **B3.** `import_tasks_json` on rollback returns `created: N` where N > 0 — misleading since no tasks were actually created after rollback.
-- [ ] **B4.** `get_sprint_tasks` missing `deleted_at IS NULL` filter — soft-deleted tasks appear on sprint boards.
-- [ ] **B5.** `get_task_detail` recursive CTE missing `deleted_at IS NULL` — soft-deleted children appear in task detail tree.
-- [ ] **B6.** `search_tasks_fts` FTS5 path missing `t.deleted_at IS NULL` filter on JOIN — soft-deleted tasks appear in search results.
-- [ ] **B7.** `end_session` has no status check — already-completed sessions can be ended again, overwriting `ended_at` and `duration_s`.
-- [ ] **B8.** `parse_timestamp` silently returns `Utc::now()` on parse failure — corrupted `started_at` produces wrong duration instead of error.
-- [ ] **B9.** `recover_interrupted` sets `ended_at` but not `duration_s` — recovered sessions have NULL duration, breaking time stats.
-- [ ] **B10.** `update_profile` changes username before validating password — if password change fails, username is already committed. Should validate password first or use transaction.
-- [ ] **B11.** `update_config` — `theme`, `estimation_mode`, `notify_desktop`, `notify_sound` fields silently ignored for non-root users (never persisted to `user_configs`).
-- [ ] **B12.** App.tsx: `showShortcuts` state declared twice, shortcuts overlay rendered 3 times — duplicate modals appear.
-- [ ] **B13.** App.tsx: `useStore.getState().engine?.status` called during render — timer indicator dot in sidebar is stale, never re-renders on status change.
-- [ ] **B14.** TaskNode: `useShallow` selector includes `tasks` array — every TaskNode re-renders on any task change (O(n²)). Should use `getState()` inside handlers.
-- [ ] **B15.** TaskDetailView: `tasks` variable shadowed — destructured from store then re-declared as local const.
-- [ ] **B16.** api.ts: token refresh uses `savedServers[0]` which may not be current server — wrong refresh token used with multiple saved servers.
-- [ ] **B17.** SprintParts: `Column` useCallback captures stale `touchDrag` — `onTouchEnd` always sees initial `null` value.
-- [ ] **B18.** Timer.tsx: duplicate Space key handler — both Timer.tsx and App.tsx register Space for pause/resume, causing double-toggle.
-- [ ] **B19.** AuthScreen: client-side password validation only checks length, not uppercase+digit — mismatch with placeholder text and backend rules.
-- [ ] **B20.** `delete_user` audit_log entries deleted — destroys audit trail. Should preserve with sentinel user_id.
-- [ ] **B21.** `engine.tick()` drops and re-acquires states lock — race with concurrent start/stop can overwrite new session state.
-- [ ] **B22.** `recurrence` midnight processing uses single `today` value — if loop crosses midnight, tasks may skip a day.
-- [ ] **B23.** `reserved_username` list includes "root" but seed user is created as "root" — inconsistent.
-- [ ] **B24.** Multiple components use native `confirm()` instead of store's `showConfirm` — may not work in Tauri WebView. (Rooms.tsx, TaskDetailParts.tsx, SettingsParts.tsx)
-- [ ] **B25.** `get_descendant_ids` doesn't filter `deleted_at IS NULL` — soft-deleted descendants included in tree walks for delete/restore/epic snapshots.
+- [x] **B1.** `compare_sprints` SQL `SUM(CASE WHEN ... THEN 1 ELSE 0 END)` returns NULL for empty sprints — sqlx decode to `i64` fails with 500. Needs `COALESCE(..., 0)`.
+- [x] **B2.** `update_task` missing empty-title validation — `create_task` checks `trim().is_empty()` but update only checks `len() > 500`. Can set title to empty string.
+- [x] **B3.** `import_tasks_json` on rollback returns `created: N` where N > 0 — misleading since no tasks were actually created after rollback.
+- [x] **B4.** `get_sprint_tasks` missing `deleted_at IS NULL` filter — soft-deleted tasks appear on sprint boards.
+- [x] **B5.** `get_task_detail` recursive CTE missing `deleted_at IS NULL` — soft-deleted children appear in task detail tree.
+- [x] **B6.** `search_tasks_fts` FTS5 path missing `t.deleted_at IS NULL` filter on JOIN — soft-deleted tasks appear in search results.
+- [x] **B7.** `end_session` has no status check — already-completed sessions can be ended again, overwriting `ended_at` and `duration_s`.
+- [x] **B8.** `parse_timestamp` silently returns `Utc::now()` on parse failure — corrupted `started_at` produces wrong duration instead of error.
+- [x] **B9.** `recover_interrupted` sets `ended_at` but not `duration_s` — recovered sessions have NULL duration, breaking time stats.
+- [x] **B10.** `update_profile` changes username before validating password — if password change fails, username is already committed. Should validate password first or use transaction.
+- [x] **B11.** `update_config` — `theme`, `estimation_mode`, `notify_desktop`, `notify_sound` fields silently ignored for non-root users (never persisted to `user_configs`).
+- [x] **B12.** App.tsx: `showShortcuts` state declared twice, shortcuts overlay rendered 3 times — duplicate modals appear.
+- [x] **B13.** App.tsx: `useStore.getState().engine?.status` called during render — timer indicator dot in sidebar is stale, never re-renders on status change.
+- [x] **B14.** TaskNode: `useShallow` selector includes `tasks` array — every TaskNode re-renders on any task change (O(n²)). Should use `getState()` inside handlers.
+- [x] **B15.** TaskDetailView: `tasks` variable shadowed — destructured from store then re-declared as local const.
+- [x] **B16.** api.ts: token refresh uses `savedServers[0]` which may not be current server — wrong refresh token used with multiple saved servers.
+- [x] **B17.** SprintParts: `Column` useCallback captures stale `touchDrag` — `onTouchEnd` always sees initial `null` value.
+- [x] **B18.** Timer.tsx: duplicate Space key handler — both Timer.tsx and App.tsx register Space for pause/resume, causing double-toggle.
+- [x] **B19.** AuthScreen: client-side password validation only checks length, not uppercase+digit — mismatch with placeholder text and backend rules.
+- [x] **B20.** `delete_user` audit_log entries deleted — destroys audit trail. Should preserve with sentinel user_id.
+- [x] **B21.** `engine.tick()` drops and re-acquires states lock — race with concurrent start/stop can overwrite new session state.
+- [x] **B22.** `recurrence` midnight processing uses single `today` value — if loop crosses midnight, tasks may skip a day.
+- [x] **B23.** `reserved_username` list includes "root" but seed user is created as "root" — inconsistent.
+- [x] **B24.** Multiple components use native `confirm()` instead of store's `showConfirm` — may not work in Tauri WebView. (Rooms.tsx, TaskDetailParts.tsx, SettingsParts.tsx)
+- [x] **B25.** `get_descendant_ids` doesn't filter `deleted_at IS NULL` — soft-deleted descendants included in tree walks for delete/restore/epic snapshots.
 
 ## Business Logic (10)
 

@@ -8,7 +8,7 @@ pub async fn log_burn(State(engine): State<AppState>, claims: Claims, Path(id): 
     if pts < 0.0 || hrs < 0.0 { return Err(err(StatusCode::BAD_REQUEST, "Points and hours must be non-negative")); }
     if pts > 1000.0 || hrs > 24.0 { return Err(err(StatusCode::BAD_REQUEST, "Points max 1000, hours max 24")); }
     let sprint = db::get_sprint(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Sprint not found"))?;
-    if sprint.status == "completed" { return Err(err(StatusCode::BAD_REQUEST, "Cannot log burns on completed sprints")); }
+    if sprint.status != "active" { return Err(err(StatusCode::BAD_REQUEST, "Can only log burns on active sprints")); }
     // Verify task exists and is not soft-deleted
     let task = db::get_task(&engine.pool, req.task_id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Task not found"))?;
     if task.deleted_at.is_some() { return Err(err(StatusCode::BAD_REQUEST, "Cannot log burns on deleted tasks")); }
