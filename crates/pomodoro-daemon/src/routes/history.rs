@@ -317,7 +317,7 @@ pub async fn schedule_suggestions(State(engine): State<AppState>, claims: Claims
 
     // Average sessions per day
     let (avg_daily,): (f64,) = sqlx::query_as(
-        "SELECT COALESCE(AVG(cnt), 0) FROM (SELECT COUNT(*) as cnt FROM sessions WHERE user_id = ? AND status = 'completed' AND session_type = 'work' GROUP BY date(started_at))")
+        "SELECT COALESCE(AVG(cnt), 0.0) FROM (SELECT COUNT(*) as cnt FROM sessions WHERE user_id = ? AND status = 'completed' AND session_type = 'work' GROUP BY date(started_at))")
         .bind(claims.user_id).fetch_one(&engine.pool).await.map_err(internal)?;
 
     // Day of week patterns

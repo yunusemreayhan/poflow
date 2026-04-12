@@ -45,7 +45,9 @@ pub struct UpdateTaskRequest {
     #[serde(default)]
     pub work_duration_minutes: Option<Option<i64>>,
     pub expected_updated_at: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_optional_nullable_f64")]
     pub estimate_optimistic: Option<Option<f64>>,
+    #[serde(default, deserialize_with = "deserialize_optional_nullable_f64")]
     pub estimate_pessimistic: Option<Option<f64>>,
 }
 #[derive(Deserialize, utoipa::ToSchema)]
@@ -151,6 +153,11 @@ impl From<sqlx::Error> for ApiError {
 }
 
 pub fn deserialize_optional_nullable<'de, D>(deserializer: D) -> Result<Option<Option<String>>, D::Error>
+where D: serde::Deserializer<'de> {
+    Ok(Some(Option::deserialize(deserializer)?))
+}
+
+pub fn deserialize_optional_nullable_f64<'de, D>(deserializer: D) -> Result<Option<Option<f64>>, D::Error>
 where D: serde::Deserializer<'de> {
     Ok(Some(Option::deserialize(deserializer)?))
 }

@@ -76,7 +76,7 @@ pub async fn join_session(State(engine): State<AppState>, claims: Claims, Path(s
     // Verify session exists and is active
     let session: (String, i64) = sqlx::query_as("SELECT status, user_id FROM sessions WHERE id = ?")
         .bind(session_id).fetch_one(&engine.pool).await.map_err(|_| err(StatusCode::NOT_FOUND, "Session not found"))?;
-    if session.0 != "active" { return Err(err(StatusCode::BAD_REQUEST, "Session is not active")); }
+    if session.0 != "running" { return Err(err(StatusCode::BAD_REQUEST, "Session is not active")); }
     // PF15: Prevent joining own session
     if session.1 == claims.user_id { return Err(err(StatusCode::BAD_REQUEST, "Cannot join your own session")); }
     sqlx::query("INSERT OR IGNORE INTO session_participants (session_id, user_id, joined_at) VALUES (?, ?, ?)")

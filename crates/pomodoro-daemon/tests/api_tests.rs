@@ -5691,3 +5691,589 @@ async fn flow_history_user_scoped() {
         assert_eq!(user, "histdev", "Non-root user saw another user's session");
     }
 }
+
+// ========== F4: iCal Export ==========
+
+#[tokio::test]
+async fn test_ical_export() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    // Create task with due date
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"ical task","due_date":"2026-06-15"})))).await.unwrap();
+    assert_eq!(resp.status(), 201);
+    // Export iCal
+    let resp = app.clone().oneshot(auth_req("GET", "/api/export/ical", &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let bytes = resp.into_body().collect().await.unwrap().to_bytes();
+    let ical = String::from_utf8(bytes.to_vec()).unwrap();
+    assert!(ical.contains("BEGIN:VCALENDAR"));
+    assert!(ical.contains("ical task"));
+    assert!(ical.contains("20260615"));
+    assert!(ical.contains("END:VCALENDAR"));
+}
+
+// ========== F6: Estimation Accuracy ==========
+
+#[tokio::test]
+async fn test_estimation_accuracy() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    // Create and complete a task with estimates
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"est task","estimated":5})))).await.unwrap();
+    let task_id = body_json(resp).await["id"].as_i64().unwrap();
+    app.clone().oneshot(auth_req("PUT", &format!("/api/tasks/{}", task_id), &tok, Some(json!({"status":"completed","actual":4})))).await.unwrap();
+    // Get accuracy
+    let resp = app.clone().oneshot(auth_req("GET", "/api/analytics/estimation-accuracy", &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let data = body_json(resp).await;
+    assert!(data["total_tasks"].as_f64().unwrap() >= 1.0);
+    assert!(data["accuracy_pct"].as_f64().is_some());
+    assert!(data["over_estimated"].is_number());
+    assert!(data["under_estimated"].is_number());
+    assert!(data["by_project"].is_array());
+}
+
+#[tokio::test]
+async fn test_estimation_accuracy_project_filter() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"proj task","estimated":3,"project":"alpha"})))).await.unwrap();
+    let id = body_json(resp).await["id"].as_i64().unwrap();
+    app.clone().oneshot(auth_req("PUT", &format!("/api/tasks/{}", id), &tok, Some(json!({"status":"completed","actual":3})))).await.unwrap();
+    let resp = app.clone().oneshot(auth_req("GET", "/api/analytics/estimation-accuracy?project=alpha", &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let data = body_json(resp).await;
+    assert!(data["total_tasks"].as_f64().unwrap() >= 1.0);
+}
+
+// ========== F8: Focus Score ==========
+
+#[tokio::test]
+async fn test_focus_score() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("GET", "/api/analytics/focus-score", &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let data = body_json(resp).await;
+    assert!(data["score"].is_number());
+    // When no sessions exist, returns minimal response
+    assert!(data["components"].is_object());
+}
+
+// ========== F7: Sprint Retro Report ==========
+
+#[tokio::test]
+async fn test_sprint_retro_report() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    // Create sprint
+    let resp = app.clone().oneshot(auth_req("POST", "/api/sprints", &tok, Some(json!({"name":"retro sprint"})))).await.unwrap();
+    let sid = body_json(resp).await["id"].as_i64().unwrap();
+    // Create task and add to sprint
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"retro task","estimated":3})))).await.unwrap();
+    let tid = body_json(resp).await["id"].as_i64().unwrap();
+    app.clone().oneshot(auth_req("POST", &format!("/api/sprints/{}/tasks", sid), &tok, Some(json!({"task_ids":[tid]})))).await.unwrap();
+    // Get retro report
+    let resp = app.clone().oneshot(auth_req("GET", &format!("/api/sprints/{}/retro-report", sid), &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let data = body_json(resp).await;
+    assert_eq!(data["tasks"]["total"], 1);
+    assert!(data["sprint"]["name"].as_str().unwrap().contains("retro"));
+    assert!(data["members"].is_array());
+    assert!(data["scope_changes"].is_number());
+}
+
+#[tokio::test]
+async fn test_sprint_retro_report_not_found() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("GET", "/api/sprints/99999/retro-report", &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 404);
+}
+
+// ========== F9: Activity Feed ==========
+
+#[tokio::test]
+async fn test_activity_feed() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    // Create a task to generate audit entries
+    app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"feed task"})))).await.unwrap();
+    let resp = app.clone().oneshot(auth_req("GET", "/api/feed", &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let data = body_json(resp).await;
+    assert!(data.as_array().unwrap().len() > 0);
+    assert!(data[0]["type"].is_string());
+    assert!(data[0]["created_at"].is_string());
+}
+
+#[tokio::test]
+async fn test_activity_feed_with_filters() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"feed filter task"})))).await.unwrap();
+    // Filter by type
+    let resp = app.clone().oneshot(auth_req("GET", "/api/feed?types=audit&limit=5", &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let data = body_json(resp).await;
+    assert!(data.as_array().unwrap().len() <= 5);
+    for item in data.as_array().unwrap() { assert_eq!(item["type"], "audit"); }
+}
+
+#[tokio::test]
+async fn test_activity_feed_invalid_since() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("GET", "/api/feed?since=garbage", &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 400);
+}
+
+// ========== F10: Threaded Comments ==========
+
+#[tokio::test]
+async fn test_threaded_comments() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"thread task"})))).await.unwrap();
+    let tid = body_json(resp).await["id"].as_i64().unwrap();
+    // Add root comment
+    let resp = app.clone().oneshot(auth_req("POST", &format!("/api/tasks/{}/comments", tid), &tok, Some(json!({"content":"root comment"})))).await.unwrap();
+    assert_eq!(resp.status(), 201);
+    let root_id = body_json(resp).await["id"].as_i64().unwrap();
+    // Add reply
+    let resp = app.clone().oneshot(auth_req("POST", &format!("/api/tasks/{}/comments", tid), &tok, Some(json!({"content":"reply","parent_id":root_id})))).await.unwrap();
+    assert_eq!(resp.status(), 201);
+    let reply = body_json(resp).await;
+    assert_eq!(reply["parent_id"], root_id);
+    // List comments — both should be there
+    let resp = app.clone().oneshot(auth_req("GET", &format!("/api/tasks/{}/comments", tid), &tok, None)).await.unwrap();
+    let comments = body_json(resp).await;
+    assert_eq!(comments.as_array().unwrap().len(), 2);
+    let reply_comment = comments.as_array().unwrap().iter().find(|c| c["parent_id"].as_i64() == Some(root_id)).unwrap();
+    assert_eq!(reply_comment["content"], "reply");
+}
+
+// ========== F13: Task Links + GitHub Webhook ==========
+
+#[tokio::test]
+async fn test_task_links_crud() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"link task"})))).await.unwrap();
+    let tid = body_json(resp).await["id"].as_i64().unwrap();
+    // Add link
+    let resp = app.clone().oneshot(auth_req("POST", &format!("/api/tasks/{}/links", tid), &tok, Some(json!({"link_type":"pr","url":"https://github.com/test/pr/1","title":"Fix bug"})))).await.unwrap();
+    assert_eq!(resp.status(), 201);
+    // List links
+    let resp = app.clone().oneshot(auth_req("GET", &format!("/api/tasks/{}/links", tid), &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let links = body_json(resp).await;
+    assert_eq!(links.as_array().unwrap().len(), 1);
+    assert_eq!(links[0]["link_type"], "pr");
+    assert_eq!(links[0]["title"], "Fix bug");
+}
+
+#[tokio::test]
+async fn test_task_link_url_too_long() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"link task2"})))).await.unwrap();
+    let tid = body_json(resp).await["id"].as_i64().unwrap();
+    let long_url = "https://example.com/".to_string() + &"a".repeat(2000);
+    let resp = app.clone().oneshot(auth_req("POST", &format!("/api/tasks/{}/links", tid), &tok, Some(json!({"link_type":"pr","url":long_url,"title":"x"})))).await.unwrap();
+    assert_eq!(resp.status(), 400);
+}
+
+#[tokio::test]
+async fn test_github_webhook_links_commits() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    // Create task #1
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"webhook task"})))).await.unwrap();
+    let tid = body_json(resp).await["id"].as_i64().unwrap();
+    // Send GitHub webhook payload referencing the task
+    let payload = json!({
+        "commits": [{"id": "abc1234567", "message": format!("Fix #{} — resolve bug", tid), "url": "https://github.com/test/commit/abc1234567"}],
+        "repository": {"full_name": "test/repo"}
+    });
+    let resp = app.clone().oneshot(json_req("POST", "/api/integrations/github", Some(payload))).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    // Verify link was created
+    let resp = app.clone().oneshot(auth_req("GET", &format!("/api/tasks/{}/links", tid), &tok, None)).await.unwrap();
+    let links = body_json(resp).await;
+    assert_eq!(links.as_array().unwrap().len(), 1);
+    assert_eq!(links[0]["link_type"], "commit");
+    assert!(links[0]["title"].as_str().unwrap().contains("abc1234"));
+}
+
+#[tokio::test]
+async fn test_github_webhook_invalid_json() {
+    let app = app().await;
+    let req = Request::builder().method("POST").uri("/api/integrations/github")
+        .header("content-type", "application/json")
+        .header("x-forwarded-for", "10.99.0.1")
+        .body(Body::from("not json")).unwrap();
+    let resp = app.oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), 400);
+}
+
+// ========== F19: Automation Rules ==========
+
+#[tokio::test]
+async fn test_automation_rules_crud() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    // Create rule
+    let resp = app.clone().oneshot(auth_req("POST", "/api/automations", &tok, Some(json!({
+        "name": "Auto close", "trigger_event": "task.status_changed",
+        "action_json": "{\"set_status\":\"archived\"}"
+    })))).await.unwrap();
+    assert_eq!(resp.status(), 201);
+    let rule = body_json(resp).await;
+    let rule_id = rule["id"].as_i64().unwrap();
+    assert_eq!(rule["name"], "Auto close");
+    assert_eq!(rule["enabled"], 1);
+    // List rules
+    let resp = app.clone().oneshot(auth_req("GET", "/api/automations", &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    assert_eq!(body_json(resp).await.as_array().unwrap().len(), 1);
+    // Toggle
+    let resp = app.clone().oneshot(auth_req("PUT", &format!("/api/automations/{}/toggle", rule_id), &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    // Delete
+    let resp = app.clone().oneshot(auth_req("DELETE", &format!("/api/automations/{}", rule_id), &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 204);
+    // Verify deleted
+    let resp = app.clone().oneshot(auth_req("GET", "/api/automations", &tok, None)).await.unwrap();
+    assert_eq!(body_json(resp).await.as_array().unwrap().len(), 0);
+}
+
+#[tokio::test]
+async fn test_automation_invalid_trigger() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("POST", "/api/automations", &tok, Some(json!({
+        "name": "Bad", "trigger_event": "invalid.trigger", "action_json": "{}"
+    })))).await.unwrap();
+    assert_eq!(resp.status(), 400);
+}
+
+#[tokio::test]
+async fn test_automation_invalid_json_fields() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("POST", "/api/automations", &tok, Some(json!({
+        "name": "Bad JSON", "trigger_event": "task.status_changed", "action_json": "not json"
+    })))).await.unwrap();
+    assert_eq!(resp.status(), 400);
+}
+
+#[tokio::test]
+async fn test_automation_empty_name() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("POST", "/api/automations", &tok, Some(json!({
+        "name": "", "trigger_event": "task.status_changed", "action_json": "{}"
+    })))).await.unwrap();
+    assert_eq!(resp.status(), 400);
+}
+
+// ========== F11: Shared Timer Sessions ==========
+
+#[tokio::test]
+async fn test_shared_session_join() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    // Register second user
+    let reg_resp = app.clone().oneshot(json_req("POST", "/api/auth/register", Some(json!({"username":"joiner_f11","password":"Pass1234"})))).await.unwrap();
+    assert_eq!(reg_resp.status(), 200);
+    let resp = app.clone().oneshot(json_req("POST", "/api/auth/login", Some(json!({"username":"joiner_f11","password":"Pass1234"})))).await.unwrap();
+    assert_eq!(resp.status(), 200, "Login failed");
+    let tok2 = body_json(resp).await["token"].as_str().unwrap().to_string();
+    // Root starts a timer
+    let resp = app.clone().oneshot(auth_req("POST", "/api/timer/start", &tok, Some(json!({})))).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let state = body_json(resp).await;
+    let session_id = state["current_session_id"].as_i64().expect("current_session_id should be set after start");
+    // Second user joins
+    let resp = app.clone().oneshot(auth_req("POST", &format!("/api/timer/join/{}", session_id), &tok2, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    // List participants
+    let resp = app.clone().oneshot(auth_req("GET", &format!("/api/timer/participants/{}", session_id), &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let participants = body_json(resp).await;
+    assert_eq!(participants.as_array().unwrap().len(), 1);
+    assert_eq!(participants[0]["username"], "joiner_f11");
+}
+
+#[tokio::test]
+async fn test_shared_session_cannot_join_own() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("POST", "/api/timer/start", &tok, Some(json!({})))).await.unwrap();
+    let session_id = body_json(resp).await["current_session_id"].as_i64().unwrap();
+    let resp = app.clone().oneshot(auth_req("POST", &format!("/api/timer/join/{}", session_id), &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 400);
+}
+
+#[tokio::test]
+async fn test_shared_session_not_found() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("POST", "/api/timer/join/99999", &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 404);
+}
+
+// ========== F12: User Presence ==========
+
+#[tokio::test]
+async fn test_user_presence() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("GET", "/api/users/presence", &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let data = body_json(resp).await;
+    assert!(data.as_array().unwrap().len() >= 1);
+    let root = data.as_array().unwrap().iter().find(|u| u["username"] == "root").unwrap();
+    assert!(root["user_id"].is_number());
+    assert!(root["online"].is_boolean());
+}
+
+// ========== F14: Slack Integration ==========
+
+#[tokio::test]
+async fn test_slack_integration_valid() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("POST", "/api/integrations/slack", &tok, Some(json!({
+        "webhook_url": "https://hooks.slack.com/services/T00/B00/xxx"
+    })))).await.unwrap();
+    assert_eq!(resp.status(), 201);
+}
+
+#[tokio::test]
+async fn test_slack_integration_invalid_url() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("POST", "/api/integrations/slack", &tok, Some(json!({
+        "webhook_url": "https://evil.com/steal"
+    })))).await.unwrap();
+    assert_eq!(resp.status(), 400);
+}
+
+#[tokio::test]
+async fn test_slack_integration_url_too_long() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let long = "https://hooks.slack.com/".to_string() + &"a".repeat(500);
+    let resp = app.clone().oneshot(auth_req("POST", "/api/integrations/slack", &tok, Some(json!({"webhook_url": long})))).await.unwrap();
+    assert_eq!(resp.status(), 400);
+}
+
+// ========== F20: Weekly Digest ==========
+
+#[tokio::test]
+async fn test_weekly_digest() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("GET", "/api/reports/weekly-digest", &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let data = body_json(resp).await;
+    assert_eq!(data["period"], "last_7_days");
+    assert!(data["focus_hours"].is_number());
+    assert!(data["sessions"].is_number());
+    assert!(data["tasks_completed"].is_number());
+    assert!(data["upcoming_due"].is_array());
+}
+
+// ========== F21: Auto-Prioritization ==========
+
+#[tokio::test]
+async fn test_priority_suggestions() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    // Create overdue task
+    app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"overdue","due_date":"2020-01-01"})))).await.unwrap();
+    let resp = app.clone().oneshot(auth_req("GET", "/api/suggestions/priorities", &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let data = body_json(resp).await;
+    assert!(data.as_array().unwrap().len() >= 1);
+    let suggestion = &data[0];
+    assert!(suggestion["suggested_priority"].as_i64().unwrap() >= 4);
+    assert!(suggestion["reasons"].as_array().unwrap().iter().any(|r| r.as_str().unwrap().contains("Overdue")));
+}
+
+// ========== F22: Achievements ==========
+
+#[tokio::test]
+async fn test_achievements_list() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("GET", "/api/achievements", &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let data = body_json(resp).await;
+    assert!(data.as_array().unwrap().len() >= 6); // 6 achievement types defined
+    for a in data.as_array().unwrap() {
+        assert!(a["type"].is_string());
+        assert!(a["description"].is_string());
+        assert!(a["unlocked"].is_boolean());
+    }
+}
+
+#[tokio::test]
+async fn test_achievements_check() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("POST", "/api/achievements/check", &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let data = body_json(resp).await;
+    assert!(data.is_array());
+}
+
+// ========== F23: Leaderboard ==========
+
+#[tokio::test]
+async fn test_leaderboard() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("GET", "/api/leaderboard", &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let data = body_json(resp).await;
+    assert!(data.as_array().unwrap().len() >= 1);
+    assert!(data[0]["username"].is_string());
+    assert!(data[0]["hours"].is_number());
+    assert!(data[0]["sessions"].is_number());
+}
+
+#[tokio::test]
+async fn test_leaderboard_periods() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    for period in &["week", "month", "year"] {
+        let resp = app.clone().oneshot(auth_req("GET", &format!("/api/leaderboard?period={}", period), &tok, None)).await.unwrap();
+        assert_eq!(resp.status(), 200);
+    }
+}
+
+// ========== F25: PERT Estimates ==========
+
+#[tokio::test]
+async fn test_pert_estimates() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    // Create task
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"pert task"})))).await.unwrap();
+    let tid = body_json(resp).await["id"].as_i64().unwrap();
+    // Update with PERT estimates
+    let resp = app.clone().oneshot(auth_req("PUT", &format!("/api/tasks/{}", tid), &tok, Some(json!({
+        "estimate_optimistic": 2.0, "estimate_pessimistic": 10.0
+    })))).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let task = body_json(resp).await;
+    assert_eq!(task["estimate_optimistic"], 2.0);
+    assert_eq!(task["estimate_pessimistic"], 10.0);
+    // Verify on GET
+    let resp = app.clone().oneshot(auth_req("GET", &format!("/api/tasks/{}", tid), &tok, None)).await.unwrap();
+    let detail = body_json(resp).await;
+    assert_eq!(detail["task"]["estimate_optimistic"], 2.0);
+    assert_eq!(detail["task"]["estimate_pessimistic"], 10.0);
+}
+
+#[tokio::test]
+async fn test_pert_estimates_null_clear() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"pert null"})))).await.unwrap();
+    let tid = body_json(resp).await["id"].as_i64().unwrap();
+    // Set then clear
+    app.clone().oneshot(auth_req("PUT", &format!("/api/tasks/{}", tid), &tok, Some(json!({"estimate_optimistic": 5.0})))).await.unwrap();
+    let resp = app.clone().oneshot(auth_req("PUT", &format!("/api/tasks/{}", tid), &tok, Some(json!({"estimate_optimistic": null})))).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let task = body_json(resp).await;
+    assert!(task["estimate_optimistic"].is_null());
+}
+
+#[tokio::test]
+async fn test_pert_copied_on_duplicate() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"pert dup"})))).await.unwrap();
+    let tid = body_json(resp).await["id"].as_i64().unwrap();
+    app.clone().oneshot(auth_req("PUT", &format!("/api/tasks/{}", tid), &tok, Some(json!({"estimate_optimistic": 1.0, "estimate_pessimistic": 8.0})))).await.unwrap();
+    // Duplicate
+    let resp = app.clone().oneshot(auth_req("POST", &format!("/api/tasks/{}/duplicate", tid), &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 201);
+    let dup_id = body_json(resp).await["id"].as_i64().unwrap();
+    // Verify PERT copied
+    let resp = app.clone().oneshot(auth_req("GET", &format!("/api/tasks/{}", dup_id), &tok, None)).await.unwrap();
+    let detail = body_json(resp).await;
+    assert_eq!(detail["task"]["estimate_optimistic"], 1.0);
+    assert_eq!(detail["task"]["estimate_pessimistic"], 8.0);
+}
+
+// ========== F3: Smart Scheduling ==========
+
+#[tokio::test]
+async fn test_schedule_suggestions() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("GET", "/api/suggestions/schedule", &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let data = body_json(resp).await;
+    assert!(data["peak_hours"].is_array());
+    assert!(data["avg_daily_sessions"].is_number());
+    assert!(data["best_days"].is_array());
+    assert!(data["task_suggestions"].is_array());
+}
+
+// ========== Cross-feature: Feed with comments ==========
+
+#[tokio::test]
+async fn test_feed_includes_comments() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"feed comment task"})))).await.unwrap();
+    let tid = body_json(resp).await["id"].as_i64().unwrap();
+    app.clone().oneshot(auth_req("POST", &format!("/api/tasks/{}/comments", tid), &tok, Some(json!({"content":"test comment for feed"})))).await.unwrap();
+    let resp = app.clone().oneshot(auth_req("GET", "/api/feed?types=comment", &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let data = body_json(resp).await;
+    assert!(data.as_array().unwrap().iter().any(|i| i["type"] == "comment"));
+}
+
+// ========== Cross-feature: Automation ownership ==========
+
+#[tokio::test]
+async fn test_automation_ownership() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    // Register second user
+    app.clone().oneshot(json_req("POST", "/api/auth/register", Some(json!({"username":"autouser","password":"Pass1234"})))).await.unwrap();
+    let resp = app.clone().oneshot(json_req("POST", "/api/auth/login", Some(json!({"username":"autouser","password":"Pass1234"})))).await.unwrap();
+    let tok2 = body_json(resp).await["token"].as_str().unwrap().to_string();
+    // User creates rule
+    let resp = app.clone().oneshot(auth_req("POST", "/api/automations", &tok2, Some(json!({
+        "name": "User rule", "trigger_event": "task.due_approaching", "action_json": "{}"
+    })))).await.unwrap();
+    let rule_id = body_json(resp).await["id"].as_i64().unwrap();
+    // Root can delete (is_owner_or_root)
+    let resp = app.clone().oneshot(auth_req("DELETE", &format!("/api/automations/{}", rule_id), &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 204);
+}
+
+// ========== Cross-feature: iCal excludes deleted tasks ==========
+
+#[tokio::test]
+async fn test_ical_excludes_deleted() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"deleted ical","due_date":"2026-12-25"})))).await.unwrap();
+    let tid = body_json(resp).await["id"].as_i64().unwrap();
+    // Delete the task
+    app.clone().oneshot(auth_req("DELETE", &format!("/api/tasks/{}", tid), &tok, None)).await.unwrap();
+    // Export iCal
+    let resp = app.clone().oneshot(auth_req("GET", "/api/export/ical", &tok, None)).await.unwrap();
+    let bytes = resp.into_body().collect().await.unwrap().to_bytes();
+    let ical = String::from_utf8(bytes.to_vec()).unwrap();
+    assert!(!ical.contains("deleted ical"));
+}
