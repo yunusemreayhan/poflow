@@ -44,7 +44,13 @@ fn secret() -> &'static [u8] {
             if f.read_exact(&mut buf).is_ok() { got_entropy = true; }
         }
         if !got_entropy {
-            panic!("FATAL: /dev/urandom unavailable and no JWT secret configured. Set POMODORO_JWT_SECRET env var or ensure /dev/urandom is accessible.");
+            // Fallback: hash-based entropy (weaker but avoids panic)
+            use sha2::{Sha256, Digest};
+            let seed = format!("jwt-init-{}-{}", chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0), std::process::id());
+            let hash = Sha256::digest(seed.as_bytes());
+            buf[..32].copy_from_slice(&hash);
+            buf[32..64].copy_from_slice(&Sha256::digest(&hash));
+            tracing::warn!("Using hash-based JWT secret — /dev/urandom unavailable. Set POMODORO_JWT_SECRET for production.");
         }
         if let Some(parent) = secret_path.parent() { std::fs::create_dir_all(parent).ok(); }
         std::fs::write(&secret_path, &buf).ok();
@@ -152,6 +158,12 @@ impl<S: Send + Sync> FromRequestParts<S> for Claims {
             let claims = verify_token(token).map_err(|_| axum::http::StatusCode::UNAUTHORIZED)?;
             // Reject refresh tokens used as access tokens
             if claims.typ == "refresh" { return Err(axum::http::StatusCode::UNAUTHORIZED); }
+            // Reject tokens from deleted users
+            if let Some(pool) = AUTH_POOL.get() {
+                let exists: Option<(i64,)> = sqlx::query_as("SELECT id FROM users WHERE id = ?")
+                    .bind(claims.user_id).fetch_optional(pool).await.unwrap_or(None);
+                if exists.is_none() { return Err(axum::http::StatusCode::UNAUTHORIZED); }
+            }
             Ok(claims)
         }
     }

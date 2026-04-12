@@ -96,14 +96,27 @@ pub(crate) fn sse_tickets() -> &'static tokio::sync::Mutex<HashMap<String, (i64,
 
 #[utoipa::path(post, path = "/api/timer/ticket", responses((status = 200)), security(("bearer" = [])))]
 pub async fn create_sse_ticket(claims: Claims) -> ApiResult<serde_json::Value> {
-    // Use /dev/urandom for cryptographic randomness
+    // Use /dev/urandom for cryptographic randomness, fallback to hash-based
     let ticket = {
         let mut buf = [0u8; 24];
-        use std::io::Read;
-        let mut f = std::fs::File::open("/dev/urandom")
-            .expect("FATAL: /dev/urandom unavailable for SSE ticket generation");
-        f.read_exact(&mut buf).expect("FATAL: failed to read /dev/urandom");
-        buf.iter().map(|b| format!("{:02x}", b)).collect::<String>()
+        let got = (|| -> Result<(), std::io::Error> {
+            use std::io::Read;
+            let mut f = std::fs::File::open("/dev/urandom")?;
+            f.read_exact(&mut buf)?;
+            Ok(())
+        })().is_ok();
+        if got {
+            buf.iter().map(|b| format!("{:02x}", b)).collect::<String>()
+        } else {
+            use sha2::{Sha256, Digest};
+            static CTR: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+            let seed = format!("sse{}{}{}",
+                chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0),
+                claims.user_id,
+                CTR.fetch_add(1, std::sync::atomic::Ordering::Relaxed));
+            let hash = Sha256::digest(seed.as_bytes());
+            hash.iter().map(|b| format!("{:02x}", b)).collect::<String>()
+        }
     };
     let mut tickets = sse_tickets().lock().await;
     let now = std::time::Instant::now();
