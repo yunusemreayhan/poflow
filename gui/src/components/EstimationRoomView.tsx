@@ -39,7 +39,7 @@ export default function EstimationRoomView({ roomId, onBack }: { roomId: number;
   useEffect(() => {
     if (myVote?.value != null) setSelectedCard(myVote.value);
     else setSelectedCard(null);
-  }, [state?.room.current_task_id]);
+  }, [state?.room.current_task_id, state?.votes]);
 
   if (!state) return <div className="p-8 text-white/40">Loading...</div>;
 

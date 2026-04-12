@@ -79,7 +79,12 @@ impl Config {
     pub fn save(&self) -> Result<()> {
         let path = Self::config_path();
         let tmp = path.with_extension("toml.tmp");
-        std::fs::write(&tmp, toml::to_string_pretty(self)?)?;
+        let data = toml::to_string_pretty(self)?;
+        {
+            let f = std::fs::File::create(&tmp)?;
+            std::io::Write::write_all(&mut &f, data.as_bytes())?;
+            f.sync_all()?;
+        }
         #[cfg(unix)] {
             use std::os::unix::fs::PermissionsExt;
             std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o600)).ok();

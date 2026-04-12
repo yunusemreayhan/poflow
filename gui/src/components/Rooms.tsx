@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Eye, Check, Crown, Trash2, Plus, X, Edit3 } from "lucide-react";
 import { apiCall } from "../store/api";
+import type { Room } from "../store/api";
 import { useStore } from "../store/store";
 import TaskList from "./TaskList";
 import EstimationRoomView from "./EstimationRoomView";

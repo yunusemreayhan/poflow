@@ -21,9 +21,9 @@ pub async fn get_descendant_ids(pool: &Pool, root_ids: &[i64]) -> Result<Vec<i64
     let placeholders: String = root_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
     let sql = format!(
         "WITH RECURSIVE descendants AS (\
-            SELECT id FROM tasks WHERE id IN ({ph}) \
+            SELECT id, 0 as depth FROM tasks WHERE id IN ({ph}) \
             UNION ALL \
-            SELECT t.id FROM tasks t JOIN descendants d ON t.parent_id = d.id\
+            SELECT t.id, d.depth + 1 FROM tasks t JOIN descendants d ON t.parent_id = d.id WHERE d.depth < 50\
         ) SELECT id FROM descendants",
         ph = placeholders
     );

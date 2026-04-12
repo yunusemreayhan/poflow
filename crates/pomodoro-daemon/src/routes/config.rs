@@ -15,6 +15,7 @@ pub async fn update_config(State(engine): State<AppState>, claims: Claims, Json(
     if cfg.long_break_interval == 0 || cfg.long_break_interval > 20 { return Err(err(StatusCode::BAD_REQUEST, "long_break_interval must be 1-20")); }
     if cfg.daily_goal > 50 { return Err(err(StatusCode::BAD_REQUEST, "daily_goal must be 0-50")); }
     if !["hours", "points"].contains(&cfg.estimation_mode.as_str()) { return Err(err(StatusCode::BAD_REQUEST, "estimation_mode must be 'hours' or 'points'")); }
+    if !["dark", "light"].contains(&cfg.theme.as_str()) { return Err(err(StatusCode::BAD_REQUEST, "theme must be 'dark' or 'light'")); }
     // Save per-user overrides
     let uc = db::UserConfig {
         user_id: claims.user_id,

@@ -31,7 +31,7 @@ export default function AuditLog() {
     <div className="space-y-4">
       <div className="flex items-center gap-3">
         <h2 className="text-sm font-semibold text-[var(--color-text)]">{t.auditLog}</h2>
-        <select value={filter} onChange={e => setFilter(e.target.value)} aria-label="Filter audit log"
+        <select value={filter} onChange={e => setFilter(e.target.value)}
           className="text-xs px-2 py-1 rounded bg-[var(--color-surface)] border border-white/10 text-[var(--color-text)]"
           aria-label="Filter by entity type">
           <option value="">All</option>

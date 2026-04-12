@@ -11,7 +11,12 @@ pub async fn list_templates(State(engine): State<AppState>, claims: Claims) -> A
 #[utoipa::path(post, path = "/api/templates", responses((status = 201)), security(("bearer" = [])))]
 pub async fn create_template(State(engine): State<AppState>, claims: Claims, Json(req): Json<CreateTemplateRequest>) -> Result<(StatusCode, Json<db::TaskTemplate>), ApiError> {
     if req.name.trim().is_empty() { return Err(err(StatusCode::BAD_REQUEST, "Name required")); }
+    if req.name.len() > 200 { return Err(err(StatusCode::BAD_REQUEST, "Name too long (max 200 chars)")); }
     let data = serde_json::to_string(&req.data).map_err(internal)?;
+    if data.len() > 65536 { return Err(err(StatusCode::BAD_REQUEST, "Template data too large (max 64KB)")); }
+    let count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM task_templates WHERE user_id = ?")
+        .bind(claims.user_id).fetch_one(&engine.pool).await.map_err(internal)?;
+    if count.0 >= 100 { return Err(err(StatusCode::BAD_REQUEST, "Template limit reached (max 100)")); }
     let t = db::create_template(&engine.pool, claims.user_id, req.name.trim(), &data).await.map_err(internal)?;
     Ok((StatusCode::CREATED, Json(t)))
 }

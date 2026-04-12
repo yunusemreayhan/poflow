@@ -465,13 +465,13 @@ function SummaryView({ detail }: { detail: SprintDetail }) {
       )}
       <div>
         <div className="text-xs text-white/50 mb-1 font-medium">Team Breakdown</div>
-        {Object.entries(byUser).map(([user, { total, done }]) => (
+        {Object.entries(byUser).map(([user, { total: uTotal, done: uDone }]) => (
           <div key={user} className="flex items-center gap-2 py-1">
             <span className="text-xs text-white/70 w-24 truncate">👤 {user}</span>
             <div className="flex-1 h-2 bg-white/5 rounded-full overflow-hidden">
-              <div className="h-full bg-[var(--color-accent)] rounded-full" style={{ width: `${total > 0 ? (done / total) * 100 : 0}%` }} />
+              <div className="h-full bg-[var(--color-accent)] rounded-full" style={{ width: `${uTotal > 0 ? (uDone / uTotal) * 100 : 0}%` }} />
             </div>
-            <span className="text-[10px] text-white/40">{done}/{total}</span>
+            <span className="text-[10px] text-white/40">{uDone}/{uTotal}</span>
           </div>
         ))}
       </div>
