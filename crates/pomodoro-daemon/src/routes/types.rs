@@ -145,7 +145,7 @@ where D: serde::Deserializer<'de> {
 }
 
 pub fn is_owner_or_root(task_user_id: i64, claims: &crate::auth::Claims) -> bool {
-    claims.user_id == task_user_id || claims.role == "root"
+    crate::auth::is_owner_or_root(task_user_id, claims)
 }
 
 pub const VALID_TASK_STATUSES: &[&str] = &["backlog", "active", "in_progress", "completed", "done", "estimated", "archived"];

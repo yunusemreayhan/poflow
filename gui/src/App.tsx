@@ -3,8 +3,8 @@ import { motion, AnimatePresence, MotionConfig } from "framer-motion";
 import { Timer as TimerIcon, ListTodo, BarChart3, Settings as SettingsIcon, Wifi, WifiOff, Code2, LogOut, Users, Zap, Sun, Moon, RefreshCw } from "lucide-react";
 import { useStore } from "./store/store";
 import { useT } from "./i18n";
-import type { EngineState } from "./store/api";
 import { apiCall } from "./store/api";
+import { useSseConnection } from "./hooks/useSseConnection";
 import Timer from "./components/Timer";
 import TaskList from "./components/TaskList";
 import History from "./components/History";
@@ -148,84 +148,12 @@ export default function App() {
     useStore.getState().restoreAuth();
   }, []);
 
+  useSseConnection(token);
+
   useEffect(() => {
     if (!token) return;
     poll();
     loadTasks();
-
-    // SSE for real-time timer + data change notifications
-    // Use ticket exchange to avoid JWT in URL (logged in server access logs)
-    const url = useStore.getState().serverUrl;
-    let sseInstance: EventSource | null = null;
-    let unmounted = false;
-
-    const connectSse = async () => {
-      try {
-        const resp = await apiCall<{ ticket: string }>("POST", "/api/timer/ticket");
-        if (unmounted) return;
-        sseInstance = new EventSource(`${url}/api/timer/sse?ticket=${encodeURIComponent(resp.ticket)}`);
-      } catch {
-        // Ticket exchange failed — SSE unavailable, rely on polling fallback
-        return;
-      }
-
-      sseInstance.addEventListener("timer", (e) => {
-        try {
-          const engine = JSON.parse(e.data) as EngineState;
-          useStore.setState({ engine, connected: true, error: null });
-        } catch { /* ignore */ }
-      });
-
-    // Debounce change events — rapid mutations coalesce into single reload
-    const pending = new Set<string>();
-    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-    const flushChanges = () => {
-      if (pending.has("Tasks")) useStore.getState().loadTasks();
-      if (pending.has("Sprints")) {
-        useStore.getState().loadTasks();
-        window.dispatchEvent(new CustomEvent("sse-sprints"));
-      }
-      if (pending.has("Rooms")) {
-        window.dispatchEvent(new CustomEvent("sse-rooms"));
-      }
-      pending.clear();
-    };
-
-      sseInstance.addEventListener("change", (e) => {
-        try {
-          const kind = JSON.parse(e.data) as string;
-          pending.add(kind);
-          if (debounceTimer) clearTimeout(debounceTimer);
-          debounceTimer = setTimeout(flushChanges, 300);
-        } catch { /* ignore */ }
-      });
-
-      sseInstance.onerror = () => {
-        useStore.setState({ connected: false });
-        sseInstance?.close();
-        sseInstance = null;
-        // Exponential backoff reconnect: 1s, 2s, 4s, 8s, max 30s
-        const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
-        reconnectAttempts++;
-        if (!unmounted) setTimeout(connectSse, delay);
-      };
-      sseInstance.onopen = () => { useStore.setState({ connected: true }); reconnectAttempts = 0; };
-    };
-    let reconnectAttempts = 0;
-    connectSse();
-
-    // Fallback: poll timer if SSE drops
-    const timerFallback = setInterval(() => {
-      if (!sseInstance || sseInstance.readyState !== EventSource.OPEN) poll();
-    }, 2000);
-    const taskSafety = setInterval(loadTasks, 30000);
-
-    return () => {
-      unmounted = true;
-      sseInstance?.close();
-      clearInterval(timerFallback);
-      clearInterval(taskSafety);
-    };
   }, [token]);
 
   // Global keyboard shortcuts (#37)

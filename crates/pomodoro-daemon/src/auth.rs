@@ -168,3 +168,8 @@ impl<S: Send + Sync> FromRequestParts<S> for Claims {
         }
     }
 }
+
+/// Check if the authenticated user owns the resource or is root
+pub fn is_owner_or_root(resource_user_id: i64, claims: &Claims) -> bool {
+    claims.user_id == resource_user_id || claims.role == "root"
+}
