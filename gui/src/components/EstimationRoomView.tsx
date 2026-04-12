@@ -41,6 +41,20 @@ export default function EstimationRoomView({ roomId, onBack }: { roomId: number;
     else setSelectedCard(null);
   }, [state?.room.current_task_id, state?.votes]);
 
+  // F9: Discussion timer — tracks time spent on current task
+  const [discussionStart, setDiscussionStart] = useState<number | null>(null);
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    if (state?.room.status === "voting" && state?.room.current_task_id) {
+      setDiscussionStart(prev => prev ?? Date.now());
+    } else { setDiscussionStart(null); setElapsed(0); }
+  }, [state?.room.status, state?.room.current_task_id]);
+  useEffect(() => {
+    if (!discussionStart) return;
+    const id = setInterval(() => setElapsed(Math.floor((Date.now() - discussionStart) / 1000)), 1000);
+    return () => clearInterval(id);
+  }, [discussionStart]);
+
   if (!state) return <div className="p-8 text-white/40">Loading...</div>;
 
   const { room, members, current_task, votes, vote_history } = state;
@@ -166,6 +180,7 @@ export default function EstimationRoomView({ roomId, onBack }: { roomId: number;
                   <>
                     <div className="text-lg font-semibold text-white mb-2 flex items-center gap-2">
                       {current_task.title}
+                      {elapsed > 0 && <span className="text-xs font-mono text-white/30">{Math.floor(elapsed / 60)}:{String(elapsed % 60).padStart(2, "0")}</span>}
                       {isAdmin && <button onClick={() => { setEditTitle(current_task.title); setEditDesc(current_task.description || ""); setEditingTask(true); }}
                         className="text-white/20 hover:text-white/50"><Edit3 size={14} /></button>}
                     </div>

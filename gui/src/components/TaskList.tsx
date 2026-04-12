@@ -18,6 +18,18 @@ export default function TaskList({ selectMode, onSelect, selectedTaskId, votedTa
   const { tasks, createTask, teamScope, username } = useStore();
   const [newTitle, setNewTitle] = useState("");
   const [filter, setFilter] = useState<"all" | "active" | "mine">("all");
+  // F10: Saved filters
+  const [savedFilters, setSavedFilters] = useState<{ name: string; search: string; filter: string }[]>(() => {
+    try { return JSON.parse(localStorage.getItem("pomo_saved_filters") || "[]"); } catch { return []; }
+  });
+  const saveCurrentFilter = () => {
+    if (!search.trim()) return;
+    const name = prompt("Filter name:");
+    if (!name) return;
+    const next = [...savedFilters, { name, search, filter }];
+    setSavedFilters(next);
+    localStorage.setItem("pomo_saved_filters", JSON.stringify(next));
+  };
   const [viewStack, setViewStack] = useState<number[]>([]);
   const [search, setSearch] = useState("");
   const [bulkSelected, setBulkSelected] = useState<Set<number>>(new Set());
@@ -98,6 +110,14 @@ export default function TaskList({ selectMode, onSelect, selectedTaskId, votedTa
           value={newTitle}
           onChange={(e) => setNewTitle(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleAddRoot()}
+          onPaste={(e) => {
+            const text = e.clipboardData.getData("text");
+            const lines = text.split("\n").map(l => l.replace(/^[-*•]\s*/, "").trim()).filter(Boolean);
+            if (lines.length > 1) {
+              e.preventDefault();
+              lines.forEach(l => createTask(l));
+            }
+          }}
           placeholder="New project or top-level task..."
           aria-label="New project or top-level task"
           data-new-task-input
@@ -124,6 +144,7 @@ export default function TaskList({ selectMode, onSelect, selectedTaskId, votedTa
             <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
               <span className="text-[10px] text-white/30">{sorted.length} results</span>
               <button onClick={() => setSearch("")} className="text-white/30 hover:text-white/60 text-xs" aria-label="Clear search">✕</button>
+              <button onClick={saveCurrentFilter} className="text-white/30 hover:text-[var(--color-accent)] text-xs" title="Save filter">💾</button>
             </div>
           )}
         </div>
@@ -143,6 +164,18 @@ export default function TaskList({ selectMode, onSelect, selectedTaskId, votedTa
         <button onClick={() => setViewMode(v => v === "tree" ? "table" : "tree")} title={viewMode === "tree" ? "Table view" : "Tree view"}
           className="shrink-0 px-2 py-1 rounded-full text-xs bg-white/5 text-white/40 hover:text-white/60">{viewMode === "tree" ? "☰" : "🌳"}</button>
       </div>
+      {savedFilters.length > 0 && (
+        <div className="flex gap-1 flex-wrap">
+          {savedFilters.map((sf, i) => (
+            <button key={i} onClick={() => { setSearch(sf.search); setFilter(sf.filter as any); }}
+              className="text-[10px] px-2 py-0.5 rounded-full bg-white/5 text-white/40 hover:text-white/60 flex items-center gap-1">
+              {sf.name}
+              <span onClick={e => { e.stopPropagation(); const next = savedFilters.filter((_, j) => j !== i); setSavedFilters(next); localStorage.setItem("pomo_saved_filters", JSON.stringify(next)); }}
+                className="hover:text-red-400">✕</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Bulk actions toolbar */}
       {!selectMode && bulkSelected.size > 0 && (

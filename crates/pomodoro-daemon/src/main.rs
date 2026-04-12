@@ -56,6 +56,7 @@ use utoipa_swagger_ui::SwaggerUi;
         routes::carryover_sprint,
         routes::export_room_history,
         routes::import_tasks_json,
+        routes::user_hours_report,
     ),
     components(schemas(
         db::Task, db::Session, db::Comment, db::User, db::TaskDetail, db::SessionWithPath, db::DayStat, db::TaskAssignee,

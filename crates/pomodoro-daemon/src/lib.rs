@@ -72,6 +72,7 @@ pub fn build_router(engine: Arc<engine::Engine>) -> Router {
         .route("/api/tasks/{id}/burn-total", get(routes::get_task_burn_total))
         .route("/api/tasks/{id}/burn-users", get(routes::get_task_burn_users))
         .route("/api/history", get(routes::get_history))
+        .route("/api/reports/user-hours", get(routes::user_hours_report))
         .route("/api/stats", get(routes::get_stats))
         .route("/api/config", get(routes::get_config).put(routes::update_config))
         .route("/api/profile", put(routes::update_profile))

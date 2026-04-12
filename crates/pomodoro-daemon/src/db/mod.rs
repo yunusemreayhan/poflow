@@ -375,6 +375,17 @@ async fn migrate(pool: &Pool) -> Result<()> {
     if !applied_set.contains(&7) {
         sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (7, ?)").bind(&now_str()).execute(pool).await.ok();
     }
+    // Migration 8: FTS5 full-text search index on tasks
+    if !applied_set.contains(&8) {
+        sqlx::query("CREATE VIRTUAL TABLE IF NOT EXISTS tasks_fts USING fts5(title, description, tags, project, content='tasks', content_rowid='id')").execute(pool).await.ok();
+        // Populate from existing data
+        sqlx::query("INSERT OR IGNORE INTO tasks_fts(rowid, title, description, tags, project) SELECT id, COALESCE(title,''), COALESCE(description,''), COALESCE(tags,''), COALESCE(project,'') FROM tasks WHERE deleted_at IS NULL").execute(pool).await.ok();
+        // Triggers to keep FTS in sync
+        sqlx::query("CREATE TRIGGER IF NOT EXISTS tasks_fts_insert AFTER INSERT ON tasks BEGIN INSERT INTO tasks_fts(rowid, title, description, tags, project) VALUES (new.id, COALESCE(new.title,''), COALESCE(new.description,''), COALESCE(new.tags,''), COALESCE(new.project,'')); END").execute(pool).await.ok();
+        sqlx::query("CREATE TRIGGER IF NOT EXISTS tasks_fts_update AFTER UPDATE ON tasks BEGIN UPDATE tasks_fts SET title=COALESCE(new.title,''), description=COALESCE(new.description,''), tags=COALESCE(new.tags,''), project=COALESCE(new.project,'') WHERE rowid=new.id; END").execute(pool).await.ok();
+        sqlx::query("CREATE TRIGGER IF NOT EXISTS tasks_fts_delete AFTER DELETE ON tasks BEGIN DELETE FROM tasks_fts WHERE rowid=old.id; END").execute(pool).await.ok();
+        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (8, ?)").bind(&now_str()).execute(pool).await.ok();
+    }
 
     sqlx::query("CREATE TABLE IF NOT EXISTS task_attachments (
         id          INTEGER PRIMARY KEY AUTOINCREMENT,
