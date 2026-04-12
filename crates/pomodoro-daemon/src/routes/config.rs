@@ -26,9 +26,9 @@ pub async fn update_config(State(engine): State<AppState>, claims: Claims, Json(
         auto_start_breaks: Some(if cfg.auto_start_breaks { 1 } else { 0 }),
         auto_start_work: Some(if cfg.auto_start_work { 1 } else { 0 }),
         daily_goal: Some(cfg.daily_goal as i64),
-        theme: None,
-        notify_desktop: None,
-        notify_sound: None,
+        theme: Some(cfg.theme.clone()),
+        notify_desktop: Some(if cfg.notification_enabled { 1 } else { 0 }),
+        notify_sound: Some(if cfg.sound_enabled { 1 } else { 0 }),
     };
     db::set_user_config(&engine.pool, claims.user_id, &uc).await.map_err(internal)?;
     engine.invalidate_user_config_cache(claims.user_id).await;

@@ -156,7 +156,7 @@ pub async fn update_session_note(State(engine): State<AppState>, claims: Claims,
 pub async fn update_task(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>, Json(req): Json<UpdateTaskRequest>) -> ApiResult<db::Task> {
     let task = db::get_task(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Task not found"))?;
     if !is_owner_or_root(task.user_id, &claims) { return Err(err(StatusCode::FORBIDDEN, "Not owner")); }
-    if let Some(ref t) = req.title { if t.len() > 500 { return Err(err(StatusCode::BAD_REQUEST, "Title too long (max 500)")); } }
+    if let Some(ref t) = req.title { if t.trim().is_empty() { return Err(err(StatusCode::BAD_REQUEST, "Title cannot be empty")); } if t.len() > 500 { return Err(err(StatusCode::BAD_REQUEST, "Title too long (max 500)")); } }
     if let Some(ref d) = req.description { if d.as_ref().map_or(false, |d| d.len() > 10000) { return Err(err(StatusCode::BAD_REQUEST, "Description too long")); } }
     if let Some(ref s) = req.status { validate_task_status(s)?; }
     if let Some(p) = req.priority { if p < 1 || p > 5 { return Err(err(StatusCode::BAD_REQUEST, "Priority must be 1-5")); } }

@@ -177,7 +177,7 @@ pub async fn import_tasks_json(State(engine): State<AppState>, claims: Claims, J
     let mut errors = Vec::new();
     match import_tree(&mut tx, claims.user_id, &req.tasks, None, &mut created, 0).await {
         Ok(()) => { tx.commit().await.map_err(internal)?; }
-        Err(e) => { tx.rollback().await.ok(); errors.push(e); }
+        Err(e) => { tx.rollback().await.ok(); created = 0; errors.push(e); }
     }
     engine.notify(ChangeEvent::Tasks);
     Ok(Json(serde_json::json!({ "created": created, "errors": errors })))

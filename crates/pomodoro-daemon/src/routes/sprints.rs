@@ -207,7 +207,7 @@ pub async fn compare_sprints(State(engine): State<AppState>, _claims: Claims, Qu
     let (sa, sb) = tokio::join!(db::get_sprint(pool, q.a), db::get_sprint(pool, q.b));
     let sa = sa.map_err(|_| err(StatusCode::NOT_FOUND, "Sprint A not found"))?;
     let sb = sb.map_err(|_| err(StatusCode::NOT_FOUND, "Sprint B not found"))?;
-    let count_sql = "SELECT COUNT(*), SUM(CASE WHEN t.status IN ('completed','done') THEN 1 ELSE 0 END) FROM sprint_tasks st JOIN tasks t ON st.task_id = t.id WHERE st.sprint_id = ? AND t.deleted_at IS NULL";
+    let count_sql = "SELECT COUNT(*), COALESCE(SUM(CASE WHEN t.status IN ('completed','done') THEN 1 ELSE 0 END), 0) FROM sprint_tasks st JOIN tasks t ON st.task_id = t.id WHERE st.sprint_id = ? AND t.deleted_at IS NULL";
     let (ca, cb) = tokio::join!(
         sqlx::query_as::<_, (i64, i64)>(count_sql).bind(q.a).fetch_one(pool),
         sqlx::query_as::<_, (i64, i64)>(count_sql).bind(q.b).fetch_one(pool)

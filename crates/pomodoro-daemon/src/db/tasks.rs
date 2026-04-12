@@ -196,9 +196,9 @@ pub async fn search_tasks_fts(pool: &Pool, query: &str, limit: i64, user_id: Opt
     }
     let fts = format!("\"{}\"", query.replace('"', "\"\""));
     let (sql, needs_uid) = if user_id.is_some() {
-        ("SELECT f.rowid, snippet(tasks_fts, 0, '<mark>', '</mark>', '...', 32), snippet(tasks_fts, 1, '<mark>', '</mark>', '...', 48) FROM tasks_fts f JOIN tasks t ON t.id = f.rowid WHERE tasks_fts MATCH ? AND t.user_id = ? ORDER BY rank LIMIT ?".to_string(), true)
+        ("SELECT f.rowid, snippet(tasks_fts, 0, '<mark>', '</mark>', '...', 32), snippet(tasks_fts, 1, '<mark>', '</mark>', '...', 48) FROM tasks_fts f JOIN tasks t ON t.id = f.rowid WHERE tasks_fts MATCH ? AND t.user_id = ? AND t.deleted_at IS NULL ORDER BY rank LIMIT ?".to_string(), true)
     } else {
-        ("SELECT rowid, snippet(tasks_fts, 0, '<mark>', '</mark>', '...', 32), snippet(tasks_fts, 1, '<mark>', '</mark>', '...', 48) FROM tasks_fts WHERE tasks_fts MATCH ? ORDER BY rank LIMIT ?".to_string(), false)
+        ("SELECT f.rowid, snippet(tasks_fts, 0, '<mark>', '</mark>', '...', 32), snippet(tasks_fts, 1, '<mark>', '</mark>', '...', 48) FROM tasks_fts f JOIN tasks t ON t.id = f.rowid WHERE tasks_fts MATCH ? AND t.deleted_at IS NULL ORDER BY rank LIMIT ?".to_string(), false)
     };
     let mut q = sqlx::query_as::<_, (i64, String, String)>(&sql);
     q = q.bind(&fts);

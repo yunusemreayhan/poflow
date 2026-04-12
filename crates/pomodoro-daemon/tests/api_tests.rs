@@ -900,7 +900,7 @@ async fn test_delete_task_cascades_burns_and_sprint_tasks() {
     app.clone().oneshot(auth_req("DELETE", &format!("/api/tasks/{}", tid), &tok, None)).await.unwrap();
 
     let resp = app.clone().oneshot(auth_req("GET", &format!("/api/sprints/{}/tasks", sid), &tok, None)).await.unwrap();
-    assert_eq!(body_json(resp).await.as_array().unwrap().len(), 1); // task still linked
+    assert_eq!(body_json(resp).await.as_array().unwrap().len(), 0); // B4: soft-deleted task filtered out
     let resp = app.clone().oneshot(auth_req("GET", &format!("/api/sprints/{}/burns", sid), &tok, None)).await.unwrap();
     assert_eq!(body_json(resp).await.as_array().unwrap().len(), 1); // burn still exists
 

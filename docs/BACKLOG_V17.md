@@ -8,12 +8,12 @@ Tests: 275 backend, 154 frontend
 
 ## Security (6)
 
-- [ ] **S1.** Webhook secret encryption uses XOR with no IV/nonce — deterministic, trivially reversible. Should use AES-GCM or ChaCha20-Poly1305 with random nonce. (Won't-fix carried from v15 — requires crypto dep + migration. Re-evaluate.)
-- [ ] **S2.** `derive_key()` still falls back to `b"default-key"` when both env var and `.jwt_secret` file are missing — server should refuse to start instead of running with a hardcoded key.
-- [ ] **S3.** `restore_backup` overwrites live DB while pool connections are open — causes data corruption. Pool still reads/writes old file descriptors. Must either restart server automatically or refuse to restore while running.
-- [ ] **S4.** `extract_ip` trusts `x-real-ip`/`x-forwarded-for` unconditionally — any client can spoof IP to bypass rate limiting when not behind a reverse proxy.
-- [ ] **S5.** `refresh_token` has TOCTOU race — two concurrent requests with same refresh token can both pass `is_revoked` check before either revokes it, issuing two valid token pairs.
-- [ ] **S6.** `health` endpoint exposes `db_size_bytes`, `schema_version`, `active_timers`, heartbeat details without authentication — leaks operational info.
+- [x] **S1.** Webhook secret encryption uses XOR with no IV/nonce — deterministic, trivially reversible. Should use AES-GCM or ChaCha20-Poly1305 with random nonce. (Won't-fix carried from v15 — requires crypto dep + migration. Re-evaluate.)
+- [x] **S2.** `derive_key()` still falls back to `b"default-key"` when both env var and `.jwt_secret` file are missing — server should refuse to start instead of running with a hardcoded key.
+- [x] **S3.** `restore_backup` overwrites live DB while pool connections are open — causes data corruption. Pool still reads/writes old file descriptors. Must either restart server automatically or refuse to restore while running.
+- [x] **S4.** `extract_ip` trusts `x-real-ip`/`x-forwarded-for` unconditionally — any client can spoof IP to bypass rate limiting when not behind a reverse proxy.
+- [x] **S5.** `refresh_token` has TOCTOU race — two concurrent requests with same refresh token can both pass `is_revoked` check before either revokes it, issuing two valid token pairs.
+- [x] **S6.** `health` endpoint exposes `db_size_bytes`, `schema_version`, `active_timers`, heartbeat details without authentication — leaks operational info.
 
 ## Confirmed Bugs (25)
 

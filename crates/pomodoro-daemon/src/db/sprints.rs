@@ -72,7 +72,7 @@ pub async fn get_sprint_task_entries(pool: &Pool, sprint_id: i64) -> Result<Vec<
 }
 
 pub async fn get_sprint_tasks(pool: &Pool, sprint_id: i64) -> Result<Vec<Task>> {
-    Ok(sqlx::query_as::<_, Task>(&format!("{} JOIN sprint_tasks st ON t.id = st.task_id WHERE st.sprint_id = ? ORDER BY t.sort_order", super::tasks::TASK_SELECT))
+    Ok(sqlx::query_as::<_, Task>(&format!("{} JOIN sprint_tasks st ON t.id = st.task_id WHERE st.sprint_id = ? AND t.deleted_at IS NULL ORDER BY t.sort_order", super::tasks::TASK_SELECT))
         .bind(sprint_id).fetch_all(pool).await?)
 }
 

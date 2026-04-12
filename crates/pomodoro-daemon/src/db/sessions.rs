@@ -19,13 +19,14 @@ pub async fn create_session(pool: &Pool, user_id: i64, task_id: Option<i64>, ses
 fn parse_timestamp(s: &str) -> NaiveDateTime {
     NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S%.f")
         .or_else(|_| NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S"))
-        .unwrap_or_else(|_| Utc::now().naive_utc())
+        .unwrap_or_else(|e| { tracing::warn!("Failed to parse timestamp '{}': {}", s, e); Utc::now().naive_utc() })
 }
 
 pub async fn end_session(pool: &Pool, id: i64, status: &str) -> Result<Session> {
     let now = now_str();
-    let started_at: (String,) = sqlx::query_as("SELECT started_at FROM sessions WHERE id = ?").bind(id).fetch_one(pool).await?;
-    let started = parse_timestamp(&started_at.0);
+    let row: (String, String) = sqlx::query_as("SELECT started_at, status FROM sessions WHERE id = ?").bind(id).fetch_one(pool).await?;
+    if row.1 != "running" { return Err(anyhow::anyhow!("Session is not running (status: {})", row.1)); }
+    let started = parse_timestamp(&row.0);
     let duration = (Utc::now().naive_utc() - started).num_seconds();
     sqlx::query("UPDATE sessions SET status=?, ended_at=?, duration_s=? WHERE id=?")
         .bind(status).bind(&now).bind(duration).bind(id).execute(pool).await?;
@@ -46,8 +47,12 @@ pub async fn recover_interrupted(pool: &Pool) -> Result<Vec<Session>> {
     let sessions: Vec<Session> = sqlx::query_as(&format!("{} WHERE s.status = 'running'", SESSION_SELECT)).fetch_all(pool).await?;
     if !sessions.is_empty() {
         let now = now_str();
-        sqlx::query("UPDATE sessions SET status='interrupted', ended_at=? WHERE status='running'")
-            .bind(&now).execute(pool).await?;
+        for s in &sessions {
+            let started = parse_timestamp(&s.started_at);
+            let duration = (Utc::now().naive_utc() - started).num_seconds();
+            sqlx::query("UPDATE sessions SET status='interrupted', ended_at=?, duration_s=? WHERE id=?")
+                .bind(&now).bind(duration).bind(s.id).execute(pool).await?;
+        }
     }
     Ok(sessions)
 }

@@ -33,8 +33,8 @@ pub async fn get_task_detail(pool: &Pool, id: i64) -> Result<TaskDetail> {
         "WITH RECURSIVE descendants AS (\
             SELECT id FROM tasks WHERE id = ? \
             UNION ALL \
-            SELECT t.id FROM tasks t JOIN descendants d ON t.parent_id = d.id\
-        ) {select} WHERE t.id IN (SELECT id FROM descendants) ORDER BY t.sort_order ASC, t.id ASC",
+            SELECT t.id FROM tasks t JOIN descendants d ON t.parent_id = d.id WHERE t.deleted_at IS NULL\
+        ) {select} WHERE t.id IN (SELECT id FROM descendants) AND t.deleted_at IS NULL ORDER BY t.sort_order ASC, t.id ASC",
         select = TASK_SELECT
     )).bind(id).fetch_all(pool).await?;
 
