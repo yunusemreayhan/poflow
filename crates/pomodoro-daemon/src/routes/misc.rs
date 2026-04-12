@@ -167,8 +167,8 @@ pub async fn sse_timer(State(engine): State<AppState>, Query(q): Query<SseQuery>
                     let state = timer_rx.borrow().clone();
                     // B5: Only send events for this user (removed == 0 check that leaked idle states)
                     if state.current_user_id == user_id {
-                        let fresh = engine.get_state(user_id).await;
-                        if let Ok(json) = serde_json::to_string(&fresh) {
+                        // P3: Use in-memory state directly instead of re-fetching from DB on every tick
+                        if let Ok(json) = serde_json::to_string(&state) {
                             yield Ok(axum::response::sse::Event::default().event("timer").data(json));
                         }
                     }

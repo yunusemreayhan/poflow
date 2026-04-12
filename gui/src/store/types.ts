@@ -22,6 +22,7 @@ export interface Task {
   updated_at: string;
   attachment_count: number;
   deleted_at: string | null;
+  work_duration_minutes: number | null;
 }
 
 export interface Session {
@@ -109,7 +110,7 @@ export interface RoomVote { id: number; room_id: number; task_id: number; userna
 export interface VoteResult { task_id: number; task_title: string; votes: { id: number; room_id: number; task_id: number; user_id: number; username: string; value: number | null; created_at: string }[]; average: number; consensus: boolean; }
 export interface RoomState { room: Room; members: RoomMember[]; current_task: Task | null; votes: RoomVoteView[]; tasks: Task[]; vote_history: VoteResult[]; }
 
-export interface Sprint { id: number; name: string; project: string | null; goal: string | null; status: string; start_date: string | null; end_date: string | null; retro_notes: string | null; created_by: string; created_at: string; updated_at: string; }
+export interface Sprint { id: number; name: string; project: string | null; goal: string | null; status: string; start_date: string | null; end_date: string | null; retro_notes: string | null; capacity_hours: number | null; created_by: string; created_at: string; updated_at: string; }
 export interface SprintTask { sprint_id: number; task_id: number; added_by: string; added_at: string; }
 export interface SprintDailyStat { id: number; sprint_id: number; date: string; total_points: number; done_points: number; total_hours: number; done_hours: number; total_tasks: number; done_tasks: number; }
 export interface SprintDetail { sprint: Sprint; tasks: Task[]; stats: SprintDailyStat[]; }

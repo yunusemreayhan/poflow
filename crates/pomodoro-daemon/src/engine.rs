@@ -153,7 +153,13 @@ impl Engine {
 
         let phase = phase.unwrap_or(TimerPhase::Work);
         let duration_s = match phase {
-            TimerPhase::Work => config.work_duration_min * 60,
+            TimerPhase::Work => {
+                // B1: Use per-task work duration override if set
+                let task_override = if let Some(tid) = task_id {
+                    db::get_task(&self.pool, tid).await.ok().and_then(|t| t.work_duration_minutes).map(|m| m as u32 * 60)
+                } else { None };
+                task_override.unwrap_or(config.work_duration_min * 60)
+            }
             TimerPhase::ShortBreak => config.short_break_min * 60,
             TimerPhase::LongBreak => config.long_break_min * 60,
             TimerPhase::Idle => return Ok(state.clone()),

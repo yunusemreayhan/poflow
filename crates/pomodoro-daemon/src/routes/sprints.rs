@@ -40,6 +40,12 @@ pub async fn update_sprint(State(engine): State<AppState>, claims: Claims, Path(
     if req.goal.as_ref().and_then(|o| o.as_ref()).map_or(false, |g| g.len() > 1000) { return Err(err(StatusCode::BAD_REQUEST, "Goal too long (max 1000)")); }
     if req.retro_notes.as_ref().and_then(|o| o.as_ref()).map_or(false, |r| r.len() > 10000) { return Err(err(StatusCode::BAD_REQUEST, "Retro notes too long (max 10000)")); }
     if req.status.is_some() { return Err(err(StatusCode::BAD_REQUEST, "Use /start or /complete endpoints to change sprint status")); }
+    // V1: Validate date ordering on update (resolve effective dates from request or existing sprint)
+    {
+        let eff_start = req.start_date.as_ref().map(|o| o.as_deref()).unwrap_or(sprint.start_date.as_deref());
+        let eff_end = req.end_date.as_ref().map(|o| o.as_deref()).unwrap_or(sprint.end_date.as_deref());
+        if let (Some(s), Some(e)) = (eff_start, eff_end) { if e < s { return Err(err(StatusCode::BAD_REQUEST, "end_date must be on or after start_date")); } }
+    }
     if let Some(ref expected) = req.expected_updated_at {
         if *expected != sprint.updated_at {
             return Err(err(StatusCode::CONFLICT, "Sprint was modified by another user. Please refresh and try again."));
