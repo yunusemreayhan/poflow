@@ -146,6 +146,11 @@ export default function EpicBurndown() {
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
+              <table className="sr-only">
+                <caption>Epic burndown data</caption>
+                <thead><tr><th>Date</th><th>Remaining</th><th>Done</th></tr></thead>
+                <tbody>{chartData.map(d => <tr key={d.date}><td>{d.date}</td><td>{d.remaining}</td><td>{d.done}</td></tr>)}</tbody>
+              </table>
               {(() => {
                 const last = detail.snapshots[detail.snapshots.length - 1];
                 const pct = last.total_points > 0 ? Math.round((last.done_points / last.total_points) * 100) : 0;

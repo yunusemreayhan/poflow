@@ -58,6 +58,22 @@ export default function Timer() {
     }
     prevPhaseRef.current = phase;
   }, [phase]);
+
+  // Keyboard shortcuts: Space = start/pause/resume, Escape = stop
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.target as HTMLElement)?.tagName === "INPUT" || (e.target as HTMLElement)?.tagName === "TEXTAREA" || (e.target as HTMLElement)?.tagName === "SELECT") return;
+      if (e.code === "Space") {
+        e.preventDefault();
+        if (status === "Idle") start(selectedTaskId);
+        else if (status === "Running") pause();
+        else if (status === "Paused") resume();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [status, selectedTaskId, start, pause, resume]);
+
   const isIdle = status === "Idle";
   const isActive = isRunning || isPaused;
 
