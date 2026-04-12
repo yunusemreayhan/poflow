@@ -99,6 +99,9 @@ export default function Dashboard() {
 
       {/* BL9: Team workload view */}
       <WorkloadView tasks={tasks} sprints={sprints} />
+
+      {/* BL19: Project stats */}
+      <ProjectStats tasks={tasks} />
     </div>
   );
 }
@@ -247,6 +250,36 @@ function WorkloadView({ tasks, sprints }: { tasks: import("../store/api").Task[]
             <div className="h-full bg-[var(--color-accent)] rounded-full" style={{ width: `${(hours / maxHrs) * 100}%` }} />
           </div>
           <span className="text-[10px] text-white/30 w-24 text-right">{hours.toFixed(1)}h · {points}pt · {count}t</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// BL19: Project-level stats
+function ProjectStats({ tasks }: { tasks: import("../store/api").Task[] }) {
+  const projects = useMemo(() => {
+    const map: Record<string, { total: number; done: number; hours: number }> = {};
+    for (const t of tasks) {
+      const p = t.project || "(no project)";
+      if (!map[p]) map[p] = { total: 0, done: 0, hours: 0 };
+      map[p].total++;
+      if (t.status === "completed" || t.status === "done") map[p].done++;
+      map[p].hours += t.estimated_hours;
+    }
+    return Object.entries(map).filter(([, v]) => v.total > 1).sort((a, b) => b[1].total - a[1].total).slice(0, 8);
+  }, [tasks]);
+  if (projects.length === 0) return null;
+  return (
+    <div className="glass p-3 rounded-lg">
+      <div className="text-xs text-white/40 mb-2">Projects</div>
+      {projects.map(([name, { total, done, hours }]) => (
+        <div key={name} className="flex items-center gap-2 py-0.5">
+          <span className="text-xs text-white/50 w-28 truncate">{name}</span>
+          <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
+            <div className="h-full bg-[var(--color-accent)] rounded-full" style={{ width: `${total > 0 ? (done / total) * 100 : 0}%` }} />
+          </div>
+          <span className="text-[10px] text-white/30 w-20 text-right">{done}/{total} · {hours.toFixed(0)}h</span>
         </div>
       ))}
     </div>

@@ -40,6 +40,15 @@ export default function TaskList({ selectMode, onSelect, selectedTaskId, votedTa
   const [treeKey, setTreeKey] = useState(0);
   const [tableSort, setTableSort] = useState<"title" | "status" | "priority" | "estimated" | "due" | "user">("title");
   const [bulkSprints, setBulkSprints] = useState<{ id: number; name: string }[]>([]);
+  // BL12: FTS5 search results with highlights
+  const [ftsResults, setFtsResults] = useState<{ id: number; title: string; snippet: string }[] | null>(null);
+  useEffect(() => {
+    if (search.trim().length < 2) { setFtsResults(null); return; }
+    const timer = setTimeout(() => {
+      apiCall<typeof ftsResults>("GET", `/api/tasks/search?q=${encodeURIComponent(search)}&limit=20`).then(setFtsResults).catch(() => setFtsResults(null));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   useEffect(() => {
     if (bulkSelected.size > 0 && bulkSprints.length === 0) {
@@ -181,6 +190,20 @@ export default function TaskList({ selectMode, onSelect, selectedTaskId, votedTa
               <span onClick={e => { e.stopPropagation(); const next = savedFilters.filter((_, j) => j !== i); setSavedFilters(next); localStorage.setItem("pomo_saved_filters", JSON.stringify(next)); }}
                 className="hover:text-red-400">✕</span>
             </button>
+          ))}
+        </div>
+      )}
+
+      {/* BL12: FTS5 search results with highlighted snippets */}
+      {ftsResults && ftsResults.length > 0 && (
+        <div className="bg-[var(--color-surface)] rounded-lg border border-white/5 p-2 space-y-1">
+          <div className="text-[10px] text-white/30 mb-1">Search results ({ftsResults.length})</div>
+          {ftsResults.map(r => (
+            <div key={r.id} className="text-xs text-white/60 py-0.5 cursor-pointer hover:text-white/80"
+              onClick={() => { setSearch(""); setFtsResults(null); setViewStack([r.id]); }}>
+              <span dangerouslySetInnerHTML={{ __html: r.title }} />
+              {r.snippet && <span className="text-white/30 ml-2" dangerouslySetInnerHTML={{ __html: r.snippet }} />}
+            </div>
           ))}
         </div>
       )}
