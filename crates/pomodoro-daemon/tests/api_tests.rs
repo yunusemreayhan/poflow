@@ -6277,3 +6277,551 @@ async fn test_ical_excludes_deleted() {
     let ical = String::from_utf8(bytes.to_vec()).unwrap();
     assert!(!ical.contains("deleted ical"));
 }
+
+// ===========================================================================
+// Thorough task status transition and assignment tests
+// ===========================================================================
+
+// Helper: create a task and return (id, json)
+async fn create_task_h(app: &axum::Router, tok: &str, title: &str) -> (i64, Value) {
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", tok, Some(json!({"title": title})))).await.unwrap();
+    assert_eq!(resp.status(), 201, "create task '{}' failed", title);
+    let j = body_json(resp).await;
+    (j["id"].as_i64().unwrap(), j)
+}
+
+// Helper: update task status and return (status_code, body)
+async fn set_status(app: &axum::Router, tok: &str, tid: i64, status: &str) -> (u16, Value) {
+    let resp = app.clone().oneshot(auth_req("PUT", &format!("/api/tasks/{}", tid), tok, Some(json!({"status": status})))).await.unwrap();
+    let sc = resp.status().as_u16();
+    let body = body_json(resp).await;
+    (sc, body)
+}
+
+// Helper: get assignees for a task
+async fn get_assignees(app: &axum::Router, tok: &str, tid: i64) -> Vec<String> {
+    let resp = app.clone().oneshot(auth_req("GET", &format!("/api/tasks/{}/assignees", tid), tok, None)).await.unwrap();
+    let j = body_json(resp).await;
+    j.as_array().unwrap().iter().map(|v| v.as_str().unwrap().to_string()).collect()
+}
+
+// ---- 1. Every valid status transition ----
+
+#[tokio::test]
+async fn test_all_valid_status_transitions() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+
+    // All 8 valid statuses
+    let statuses = ["backlog", "active", "in_progress", "blocked", "completed", "done", "estimated", "archived"];
+
+    // Test every possible transition between all statuses (8×8 = 64 transitions)
+    // The system allows any valid status → any valid status (no state machine restrictions)
+    for from in &statuses {
+        for to in &statuses {
+            let title = format!("trans_{}_{}", from, to);
+            let (tid, task) = create_task_h(&app, &tok, &title).await;
+            assert_eq!(task["status"], "backlog");
+
+            // First set to the 'from' status (unless it's already backlog)
+            if *from != "backlog" {
+                let (sc, body) = set_status(&app, &tok, tid, from).await;
+                assert_eq!(sc, 200, "Failed to set initial status to '{}' for task {}", from, tid);
+                assert_eq!(body["status"].as_str().unwrap(), *from);
+            }
+
+            // Now transition to 'to' status
+            let (sc, body) = set_status(&app, &tok, tid, to).await;
+            assert_eq!(sc, 200, "Transition {}→{} failed with status {}", from, to, sc);
+            assert_eq!(body["status"].as_str().unwrap(), *to, "Expected status '{}' after {}→{}", to, from, to);
+        }
+    }
+}
+
+// ---- Specific transitions the user reported as failing ----
+
+#[tokio::test]
+async fn test_specific_failing_transitions() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+
+    // backlog → in_progress (WIP)
+    let (tid, _) = create_task_h(&app, &tok, "wip_test").await;
+    let (sc, body) = set_status(&app, &tok, tid, "in_progress").await;
+    assert_eq!(sc, 200);
+    assert_eq!(body["status"], "in_progress");
+
+    // in_progress → done
+    let (sc, body) = set_status(&app, &tok, tid, "done").await;
+    assert_eq!(sc, 200);
+    assert_eq!(body["status"], "done");
+
+    // in_progress → blocked
+    let (tid2, _) = create_task_h(&app, &tok, "block_test").await;
+    set_status(&app, &tok, tid2, "in_progress").await;
+    let (sc, body) = set_status(&app, &tok, tid2, "blocked").await;
+    assert_eq!(sc, 200);
+    assert_eq!(body["status"], "blocked");
+
+    // blocked → active
+    let (sc, body) = set_status(&app, &tok, tid2, "active").await;
+    assert_eq!(sc, 200);
+    assert_eq!(body["status"], "active");
+
+    // completed → backlog (reopen)
+    let (tid3, _) = create_task_h(&app, &tok, "reopen_test").await;
+    set_status(&app, &tok, tid3, "completed").await;
+    let (sc, body) = set_status(&app, &tok, tid3, "backlog").await;
+    assert_eq!(sc, 200);
+    assert_eq!(body["status"], "backlog");
+
+    // archived → active (unarchive)
+    let (tid4, _) = create_task_h(&app, &tok, "unarchive_test").await;
+    set_status(&app, &tok, tid4, "archived").await;
+    let (sc, body) = set_status(&app, &tok, tid4, "active").await;
+    assert_eq!(sc, 200);
+    assert_eq!(body["status"], "active");
+
+    // estimated → in_progress
+    let (tid5, _) = create_task_h(&app, &tok, "est_to_wip").await;
+    set_status(&app, &tok, tid5, "estimated").await;
+    let (sc, body) = set_status(&app, &tok, tid5, "in_progress").await;
+    assert_eq!(sc, 200);
+    assert_eq!(body["status"], "in_progress");
+}
+
+// ---- Invalid status rejected ----
+
+#[tokio::test]
+async fn test_invalid_status_rejected() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let (tid, _) = create_task_h(&app, &tok, "invalid_status").await;
+
+    for bad in &["", "pending", "wip", "ACTIVE", "Active", "in-progress", "todo", "cancelled"] {
+        let (sc, _) = set_status(&app, &tok, tid, bad).await;
+        assert_eq!(sc, 400, "Status '{}' should be rejected but got {}", bad, sc);
+    }
+}
+
+// ---- 2. Assigning/unassigning users in every status ----
+
+#[tokio::test]
+async fn test_assign_in_every_status() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let user_tok = register_user(&app, "assignee_tester").await;
+    let _ = user_tok; // just need the user to exist
+
+    let statuses = ["backlog", "active", "in_progress", "blocked", "completed", "done", "estimated", "archived"];
+
+    for status in &statuses {
+        let title = format!("assign_in_{}", status);
+        let (tid, _) = create_task_h(&app, &tok, &title).await;
+        if *status != "backlog" {
+            set_status(&app, &tok, tid, status).await;
+        }
+
+        // Assign user
+        let resp = app.clone().oneshot(auth_req("POST", &format!("/api/tasks/{}/assignees", tid), &tok,
+            Some(json!({"username": "assignee_tester"})))).await.unwrap();
+        assert_eq!(resp.status().as_u16(), 200, "Assign in '{}' status failed", status);
+
+        // Verify assigned
+        let assignees = get_assignees(&app, &tok, tid).await;
+        assert!(assignees.contains(&"assignee_tester".to_string()), "Assignee not found in '{}' status", status);
+
+        // Unassign
+        let resp = app.clone().oneshot(auth_req("DELETE", &format!("/api/tasks/{}/assignees/assignee_tester", tid), &tok, None)).await.unwrap();
+        assert_eq!(resp.status().as_u16(), 204, "Unassign in '{}' status failed", status);
+
+        // Verify unassigned
+        let assignees = get_assignees(&app, &tok, tid).await;
+        assert!(!assignees.contains(&"assignee_tester".to_string()), "Assignee still present after unassign in '{}' status", status);
+    }
+}
+
+// ---- 3. Moving tasks between statuses while they have assignees ----
+
+#[tokio::test]
+async fn test_status_change_preserves_assignees() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    register_user(&app, "persist_user").await;
+
+    let (tid, _) = create_task_h(&app, &tok, "assignee_persist").await;
+
+    // Assign user
+    app.clone().oneshot(auth_req("POST", &format!("/api/tasks/{}/assignees", tid), &tok,
+        Some(json!({"username": "persist_user"})))).await.unwrap();
+
+    // Walk through multiple status transitions and verify assignee persists
+    let transitions = ["active", "in_progress", "blocked", "active", "completed", "backlog", "done", "archived", "backlog"];
+    for status in &transitions {
+        let (sc, body) = set_status(&app, &tok, tid, status).await;
+        assert_eq!(sc, 200, "Transition to '{}' failed", status);
+        assert_eq!(body["status"].as_str().unwrap(), *status);
+
+        let assignees = get_assignees(&app, &tok, tid).await;
+        assert!(assignees.contains(&"persist_user".to_string()),
+            "Assignee lost after transition to '{}'", status);
+    }
+}
+
+// ---- 4. Bulk status changes with mixed statuses ----
+
+#[tokio::test]
+async fn test_bulk_status_change_mixed() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+
+    // Create tasks in different statuses
+    let (t1, _) = create_task_h(&app, &tok, "bulk_backlog").await;
+    let (t2, _) = create_task_h(&app, &tok, "bulk_active").await;
+    set_status(&app, &tok, t2, "active").await;
+    let (t3, _) = create_task_h(&app, &tok, "bulk_wip").await;
+    set_status(&app, &tok, t3, "in_progress").await;
+    let (t4, _) = create_task_h(&app, &tok, "bulk_blocked").await;
+    set_status(&app, &tok, t4, "blocked").await;
+
+    // Bulk move all to completed
+    let resp = app.clone().oneshot(auth_req("PUT", "/api/tasks/bulk-status", &tok,
+        Some(json!({"task_ids": [t1, t2, t3, t4], "status": "completed"})))).await.unwrap();
+    assert_eq!(resp.status().as_u16(), 204);
+
+    // Verify all are completed
+    for tid in [t1, t2, t3, t4] {
+        let resp = app.clone().oneshot(auth_req("GET", &format!("/api/tasks/{}", tid), &tok, None)).await.unwrap();
+        let body = body_json(resp).await;
+        assert_eq!(body["task"]["status"], "completed", "Task {} not completed after bulk update", tid);
+    }
+
+    // Bulk move all to backlog (reopen)
+    let resp = app.clone().oneshot(auth_req("PUT", "/api/tasks/bulk-status", &tok,
+        Some(json!({"task_ids": [t1, t2, t3, t4], "status": "backlog"})))).await.unwrap();
+    assert_eq!(resp.status().as_u16(), 204);
+
+    for tid in [t1, t2, t3, t4] {
+        let resp = app.clone().oneshot(auth_req("GET", &format!("/api/tasks/{}", tid), &tok, None)).await.unwrap();
+        assert_eq!(body_json(resp).await["task"]["status"], "backlog");
+    }
+}
+
+#[tokio::test]
+async fn test_bulk_status_invalid_rejected() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let (t1, _) = create_task_h(&app, &tok, "bulk_invalid").await;
+
+    let resp = app.clone().oneshot(auth_req("PUT", "/api/tasks/bulk-status", &tok,
+        Some(json!({"task_ids": [t1], "status": "invalid_status"})))).await.unwrap();
+    assert_eq!(resp.status().as_u16(), 400);
+}
+
+#[tokio::test]
+async fn test_bulk_status_empty_ids() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+
+    let resp = app.clone().oneshot(auth_req("PUT", "/api/tasks/bulk-status", &tok,
+        Some(json!({"task_ids": [], "status": "completed"})))).await.unwrap();
+    assert_eq!(resp.status().as_u16(), 204);
+}
+
+// ---- 5. Edge cases ----
+
+#[tokio::test]
+async fn test_double_assign_same_user() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    register_user(&app, "double_assign_user").await;
+
+    let (tid, _) = create_task_h(&app, &tok, "double_assign").await;
+
+    // First assign
+    let resp = app.clone().oneshot(auth_req("POST", &format!("/api/tasks/{}/assignees", tid), &tok,
+        Some(json!({"username": "double_assign_user"})))).await.unwrap();
+    assert_eq!(resp.status().as_u16(), 200);
+
+    // Second assign (same user) — should succeed (INSERT OR IGNORE)
+    let resp = app.clone().oneshot(auth_req("POST", &format!("/api/tasks/{}/assignees", tid), &tok,
+        Some(json!({"username": "double_assign_user"})))).await.unwrap();
+    assert!(resp.status().is_success(), "Double assign failed: {}", resp.status());
+
+    // Should still have exactly one entry
+    let assignees = get_assignees(&app, &tok, tid).await;
+    assert_eq!(assignees.len(), 1);
+    assert_eq!(assignees[0], "double_assign_user");
+}
+
+#[tokio::test]
+async fn test_assign_nonexistent_user() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let (tid, _) = create_task_h(&app, &tok, "assign_ghost").await;
+
+    let resp = app.clone().oneshot(auth_req("POST", &format!("/api/tasks/{}/assignees", tid), &tok,
+        Some(json!({"username": "nonexistent_user_xyz"})))).await.unwrap();
+    assert_eq!(resp.status().as_u16(), 404);
+}
+
+#[tokio::test]
+async fn test_unassign_nonexistent_user() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let (tid, _) = create_task_h(&app, &tok, "unassign_ghost").await;
+
+    let resp = app.clone().oneshot(auth_req("DELETE", &format!("/api/tasks/{}/assignees/nonexistent_user_xyz", tid), &tok, None)).await.unwrap();
+    assert_eq!(resp.status().as_u16(), 404);
+}
+
+#[tokio::test]
+async fn test_assign_to_deleted_task() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    register_user(&app, "assign_deleted_user").await;
+
+    let (tid, _) = create_task_h(&app, &tok, "will_delete").await;
+    // Soft delete
+    app.clone().oneshot(auth_req("DELETE", &format!("/api/tasks/{}", tid), &tok, None)).await.unwrap();
+
+    // Try to assign — task is soft-deleted, get_task should still find it
+    // but the task has deleted_at set
+    let resp = app.clone().oneshot(auth_req("POST", &format!("/api/tasks/{}/assignees", tid), &tok,
+        Some(json!({"username": "assign_deleted_user"})))).await.unwrap();
+    // This should succeed since soft-deleted tasks still exist in DB
+    // (the route doesn't check deleted_at)
+    let sc = resp.status().as_u16();
+    assert!(sc == 200 || sc == 404, "Unexpected status {} for assign to deleted task", sc);
+}
+
+#[tokio::test]
+async fn test_status_same_as_current() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let (tid, _) = create_task_h(&app, &tok, "same_status").await;
+
+    // Set to backlog (already backlog) — should succeed as no-op
+    let (sc, body) = set_status(&app, &tok, tid, "backlog").await;
+    assert_eq!(sc, 200);
+    assert_eq!(body["status"], "backlog");
+}
+
+#[tokio::test]
+async fn test_multiple_assignees() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    register_user(&app, "multi_a1").await;
+    register_user(&app, "multi_a2").await;
+    register_user(&app, "multi_a3").await;
+
+    let (tid, _) = create_task_h(&app, &tok, "multi_assign").await;
+
+    for u in &["multi_a1", "multi_a2", "multi_a3"] {
+        let resp = app.clone().oneshot(auth_req("POST", &format!("/api/tasks/{}/assignees", tid), &tok,
+            Some(json!({"username": u})))).await.unwrap();
+        assert_eq!(resp.status().as_u16(), 200, "Assign {} failed", u);
+    }
+
+    let assignees = get_assignees(&app, &tok, tid).await;
+    assert_eq!(assignees.len(), 3);
+
+    // Remove middle one
+    let resp = app.clone().oneshot(auth_req("DELETE", &format!("/api/tasks/{}/assignees/multi_a2", tid), &tok, None)).await.unwrap();
+    assert_eq!(resp.status().as_u16(), 204);
+
+    let assignees = get_assignees(&app, &tok, tid).await;
+    assert_eq!(assignees.len(), 2);
+    assert!(!assignees.contains(&"multi_a2".to_string()));
+}
+
+// ---- Non-owner assignment permissions ----
+
+#[tokio::test]
+async fn test_non_owner_cannot_assign() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let user_tok = register_user(&app, "non_owner_assigner").await;
+    register_user(&app, "target_assignee").await;
+
+    // Root creates a task
+    let (tid, _) = create_task_h(&app, &tok, "root_task_assign").await;
+
+    // Non-owner tries to assign — should fail
+    let resp = app.clone().oneshot(auth_req("POST", &format!("/api/tasks/{}/assignees", tid), &user_tok,
+        Some(json!({"username": "target_assignee"})))).await.unwrap();
+    assert_eq!(resp.status().as_u16(), 403);
+}
+
+#[tokio::test]
+async fn test_assignee_can_self_unassign() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let user_tok = register_user(&app, "self_unassigner").await;
+
+    let (tid, _) = create_task_h(&app, &tok, "self_unassign_task").await;
+
+    // Root assigns user
+    app.clone().oneshot(auth_req("POST", &format!("/api/tasks/{}/assignees", tid), &tok,
+        Some(json!({"username": "self_unassigner"})))).await.unwrap();
+
+    // User unassigns themselves — should succeed
+    let resp = app.clone().oneshot(auth_req("DELETE", &format!("/api/tasks/{}/assignees/self_unassigner", tid), &user_tok, None)).await.unwrap();
+    assert_eq!(resp.status().as_u16(), 204);
+
+    let assignees = get_assignees(&app, &tok, tid).await;
+    assert!(!assignees.contains(&"self_unassigner".to_string()));
+}
+
+// ---- 6. Sprint board columns reflect status changes ----
+
+#[tokio::test]
+async fn test_sprint_board_columns_reflect_statuses() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+
+    // Create sprint
+    let resp = app.clone().oneshot(auth_req("POST", "/api/sprints", &tok, Some(json!({"name":"BoardTest"})))).await.unwrap();
+    let sid = body_json(resp).await["id"].as_i64().unwrap();
+
+    // Start sprint
+    app.clone().oneshot(auth_req("POST", &format!("/api/sprints/{}/start", sid), &tok, None)).await.unwrap();
+
+    // Create tasks in various statuses
+    let (t_backlog, _) = create_task_h(&app, &tok, "board_backlog").await;
+    let (t_active, _) = create_task_h(&app, &tok, "board_active").await;
+    set_status(&app, &tok, t_active, "active").await;
+    let (t_wip, _) = create_task_h(&app, &tok, "board_wip").await;
+    set_status(&app, &tok, t_wip, "in_progress").await;
+    let (t_blocked, _) = create_task_h(&app, &tok, "board_blocked").await;
+    set_status(&app, &tok, t_blocked, "blocked").await;
+    let (t_completed, _) = create_task_h(&app, &tok, "board_completed").await;
+    set_status(&app, &tok, t_completed, "completed").await;
+    let (t_done, _) = create_task_h(&app, &tok, "board_done").await;
+    set_status(&app, &tok, t_done, "done").await;
+    let (t_estimated, _) = create_task_h(&app, &tok, "board_estimated").await;
+    set_status(&app, &tok, t_estimated, "estimated").await;
+
+    // Add all to sprint
+    let all_ids = vec![t_backlog, t_active, t_wip, t_blocked, t_completed, t_done, t_estimated];
+    app.clone().oneshot(auth_req("POST", &format!("/api/sprints/{}/tasks", sid), &tok,
+        Some(json!({"task_ids": all_ids})))).await.unwrap();
+
+    // Get board
+    let resp = app.clone().oneshot(auth_req("GET", &format!("/api/sprints/{}/board", sid), &tok, None)).await.unwrap();
+    assert_eq!(resp.status().as_u16(), 200);
+    let board = body_json(resp).await;
+
+    // Verify column assignments match the board logic:
+    // todo: backlog, estimated, and anything not in other columns
+    // in_progress: in_progress, active
+    // blocked: blocked
+    // done: completed, done
+    let todo_ids: Vec<i64> = board["todo"].as_array().unwrap().iter().map(|t| t["id"].as_i64().unwrap()).collect();
+    let wip_ids: Vec<i64> = board["in_progress"].as_array().unwrap().iter().map(|t| t["id"].as_i64().unwrap()).collect();
+    let blocked_ids: Vec<i64> = board["blocked"].as_array().unwrap().iter().map(|t| t["id"].as_i64().unwrap()).collect();
+    let done_ids: Vec<i64> = board["done"].as_array().unwrap().iter().map(|t| t["id"].as_i64().unwrap()).collect();
+
+    assert!(todo_ids.contains(&t_backlog), "backlog task should be in todo column");
+    assert!(todo_ids.contains(&t_estimated), "estimated task should be in todo column");
+    assert!(wip_ids.contains(&t_active), "active task should be in in_progress column");
+    assert!(wip_ids.contains(&t_wip), "in_progress task should be in in_progress column");
+    assert!(blocked_ids.contains(&t_blocked), "blocked task should be in blocked column");
+    assert!(done_ids.contains(&t_completed), "completed task should be in done column");
+    assert!(done_ids.contains(&t_done), "done task should be in done column");
+
+    // Now move a task from todo to in_progress and verify board updates
+    set_status(&app, &tok, t_backlog, "in_progress").await;
+
+    let resp = app.clone().oneshot(auth_req("GET", &format!("/api/sprints/{}/board", sid), &tok, None)).await.unwrap();
+    let board = body_json(resp).await;
+    let wip_ids: Vec<i64> = board["in_progress"].as_array().unwrap().iter().map(|t| t["id"].as_i64().unwrap()).collect();
+    let todo_ids: Vec<i64> = board["todo"].as_array().unwrap().iter().map(|t| t["id"].as_i64().unwrap()).collect();
+    assert!(wip_ids.contains(&t_backlog), "moved task should now be in in_progress column");
+    assert!(!todo_ids.contains(&t_backlog), "moved task should no longer be in todo column");
+
+    // Move from blocked to done
+    set_status(&app, &tok, t_blocked, "done").await;
+    let resp = app.clone().oneshot(auth_req("GET", &format!("/api/sprints/{}/board", sid), &tok, None)).await.unwrap();
+    let board = body_json(resp).await;
+    let done_ids: Vec<i64> = board["done"].as_array().unwrap().iter().map(|t| t["id"].as_i64().unwrap()).collect();
+    let blocked_ids: Vec<i64> = board["blocked"].as_array().unwrap().iter().map(|t| t["id"].as_i64().unwrap()).collect();
+    assert!(done_ids.contains(&t_blocked), "unblocked task should be in done column");
+    assert!(!blocked_ids.contains(&t_blocked), "unblocked task should not be in blocked column");
+}
+
+// ---- Bulk status with assignees preserved ----
+
+#[tokio::test]
+async fn test_bulk_status_preserves_assignees() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    register_user(&app, "bulk_assignee").await;
+
+    let (t1, _) = create_task_h(&app, &tok, "bulk_a1").await;
+    let (t2, _) = create_task_h(&app, &tok, "bulk_a2").await;
+
+    // Assign user to both
+    for tid in [t1, t2] {
+        app.clone().oneshot(auth_req("POST", &format!("/api/tasks/{}/assignees", tid), &tok,
+            Some(json!({"username": "bulk_assignee"})))).await.unwrap();
+    }
+
+    // Bulk move to completed
+    app.clone().oneshot(auth_req("PUT", "/api/tasks/bulk-status", &tok,
+        Some(json!({"task_ids": [t1, t2], "status": "completed"})))).await.unwrap();
+
+    // Verify assignees still present
+    for tid in [t1, t2] {
+        let assignees = get_assignees(&app, &tok, tid).await;
+        assert!(assignees.contains(&"bulk_assignee".to_string()),
+            "Assignee lost after bulk status change on task {}", tid);
+    }
+
+    // Bulk move back to backlog
+    app.clone().oneshot(auth_req("PUT", "/api/tasks/bulk-status", &tok,
+        Some(json!({"task_ids": [t1, t2], "status": "backlog"})))).await.unwrap();
+
+    for tid in [t1, t2] {
+        let assignees = get_assignees(&app, &tok, tid).await;
+        assert!(assignees.contains(&"bulk_assignee".to_string()),
+            "Assignee lost after bulk reopen on task {}", tid);
+    }
+}
+
+// ---- Non-owner bulk status rejected ----
+
+#[tokio::test]
+async fn test_bulk_status_non_owner_rejected() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let user_tok = register_user(&app, "bulk_non_owner").await;
+
+    // Root creates tasks
+    let (t1, _) = create_task_h(&app, &tok, "root_bulk_1").await;
+    let (t2, _) = create_task_h(&app, &tok, "root_bulk_2").await;
+
+    // Non-owner tries bulk update
+    let resp = app.clone().oneshot(auth_req("PUT", "/api/tasks/bulk-status", &user_tok,
+        Some(json!({"task_ids": [t1, t2], "status": "completed"})))).await.unwrap();
+    assert_eq!(resp.status().as_u16(), 403);
+}
+
+// ---- Rapid status cycling (stress test) ----
+
+#[tokio::test]
+async fn test_rapid_status_cycling() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let (tid, _) = create_task_h(&app, &tok, "rapid_cycle").await;
+
+    let cycle = ["active", "in_progress", "blocked", "backlog", "estimated",
+                  "in_progress", "done", "backlog", "completed", "archived",
+                  "backlog", "active", "completed"];
+
+    for status in &cycle {
+        let (sc, body) = set_status(&app, &tok, tid, status).await;
+        assert_eq!(sc, 200, "Rapid cycle to '{}' failed", status);
+        assert_eq!(body["status"].as_str().unwrap(), *status);
+    }
+}
