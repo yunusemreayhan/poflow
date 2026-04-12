@@ -60,10 +60,11 @@ export function useSseConnection(token: string | null) {
         sseInstance = null;
         const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
         reconnectAttempts++;
-        if (!unmounted) setTimeout(connectSse, delay);
+        if (!unmounted) reconnectId = setTimeout(connectSse, delay);
       };
       sseInstance.onopen = () => { useStore.setState({ connected: true }); reconnectAttempts = 0; };
     };
+    let reconnectId: ReturnType<typeof setTimeout> | null = null;
     connectSse();
 
     const timerFallback = setInterval(() => {
@@ -74,6 +75,7 @@ export function useSseConnection(token: string | null) {
     return () => {
       unmounted = true;
       sseInstance?.close();
+      if (reconnectId) clearTimeout(reconnectId);
       clearInterval(timerFallback);
       clearInterval(taskSafety);
     };

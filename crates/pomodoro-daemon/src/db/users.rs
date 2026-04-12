@@ -54,6 +54,12 @@ pub async fn delete_user(pool: &Pool, id: i64) -> Result<()> {
     sqlx::query("DELETE FROM room_votes WHERE user_id = ?").bind(id).execute(pool).await?;
     sqlx::query("DELETE FROM audit_log WHERE user_id = ?").bind(id).execute(pool).await?;
     sqlx::query("DELETE FROM webhooks WHERE user_id = ?").bind(id).execute(pool).await?;
+    // B8: Clean up remaining user-related tables
+    sqlx::query("DELETE FROM notifications WHERE user_id = ?").bind(id).execute(pool).await?;
+    sqlx::query("DELETE FROM notification_prefs WHERE user_id = ?").bind(id).execute(pool).await?;
+    sqlx::query("DELETE FROM task_watchers WHERE user_id = ?").bind(id).execute(pool).await?;
+    sqlx::query("DELETE FROM user_configs WHERE user_id = ?").bind(id).execute(pool).await?;
+    sqlx::query("DELETE FROM team_members WHERE user_id = ?").bind(id).execute(pool).await?;
     sqlx::query("UPDATE sessions SET user_id = (SELECT id FROM users WHERE role = 'root' LIMIT 1) WHERE user_id = ?").bind(id).execute(pool).await?;
     sqlx::query("UPDATE tasks SET user_id = (SELECT id FROM users WHERE role = 'root' LIMIT 1) WHERE user_id = ?").bind(id).execute(pool).await?;
     sqlx::query("UPDATE sprint_tasks SET added_by_id = (SELECT id FROM users WHERE role = 'root' LIMIT 1) WHERE added_by_id = ?").bind(id).execute(pool).await?;

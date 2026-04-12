@@ -113,7 +113,7 @@ pub async fn snapshot_sprint(pool: &Pool, sprint_id: i64) -> Result<SprintDailyS
             COALESCE(SUM(CASE WHEN t.status IN ('completed','done') THEN t.remaining_points ELSE 0.0 END),0.0), \
             COALESCE(SUM(t.estimated_hours),0.0), \
             COALESCE(SUM(CASE WHEN t.status IN ('completed','done') THEN t.estimated_hours ELSE 0.0 END),0.0) \
-            FROM sprint_tasks st JOIN tasks t ON st.task_id = t.id WHERE st.sprint_id = ?")
+            FROM sprint_tasks st JOIN tasks t ON st.task_id = t.id WHERE st.sprint_id = ? AND t.deleted_at IS NULL")
         .bind(sprint_id).fetch_one(pool).await?;
     // Upsert: keep latest snapshot per day
     sqlx::query("INSERT INTO sprint_daily_stats (sprint_id, date, total_points, done_points, total_hours, done_hours, total_tasks, done_tasks) VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(sprint_id, date) DO UPDATE SET total_points=excluded.total_points, done_points=excluded.done_points, total_hours=excluded.total_hours, done_hours=excluded.done_hours, total_tasks=excluded.total_tasks, done_tasks=excluded.done_tasks")

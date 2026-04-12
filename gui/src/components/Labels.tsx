@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { apiCall } from "../store/api";
 import { useStore } from "../store/store";
 import { useT } from "../i18n";
@@ -60,11 +60,11 @@ export function TaskLabelPicker({ taskId }: { taskId: number }) {
   const [allLabels, setAllLabels] = useState<Label[]>([]);
   const [taskLabels, setTaskLabels] = useState<Label[]>([]);
 
-  const load = () => {
+  const load = useCallback(() => {
     apiCall<Label[]>("GET", "/api/labels").then(setAllLabels).catch(() => {});
     apiCall<Label[]>("GET", `/api/tasks/${taskId}/labels`).then(setTaskLabels).catch(() => {});
-  };
-  useEffect(load, [taskId]);
+  }, [taskId]);
+  useEffect(load, [load]);
 
   const toggle = async (label: Label) => {
     const has = taskLabels.some(l => l.id === label.id);

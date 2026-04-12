@@ -10,6 +10,8 @@ export function useRoomWebSocket(roomId: number, onState: (s: RoomState) => void
   const unmountedRef = useRef(false);
   const wsRef = useRef<WebSocket | null>(null);
 
+  const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const connect = useCallback(async () => {
     const { serverUrl } = useStore.getState();
     let attempts = 0;
@@ -35,14 +37,14 @@ export function useRoomWebSocket(roomId: number, onState: (s: RoomState) => void
           if (unmountedRef.current) return;
           const delay = Math.min(1000 * Math.pow(2, attempts), 15000);
           attempts++;
-          setTimeout(tryConnect, delay);
+          reconnectTimer.current = setTimeout(tryConnect, delay);
         };
         ws.onerror = () => ws?.close();
       } catch {
         if (!unmountedRef.current) {
           const delay = Math.min(1000 * Math.pow(2, attempts), 15000);
           attempts++;
-          setTimeout(tryConnect, delay);
+          reconnectTimer.current = setTimeout(tryConnect, delay);
         }
       }
     };
@@ -53,6 +55,6 @@ export function useRoomWebSocket(roomId: number, onState: (s: RoomState) => void
   useEffect(() => {
     unmountedRef.current = false;
     connect();
-    return () => { unmountedRef.current = true; wsRef.current?.close(); };
+    return () => { unmountedRef.current = true; wsRef.current?.close(); if (reconnectTimer.current) clearTimeout(reconnectTimer.current); };
   }, [connect]);
 }

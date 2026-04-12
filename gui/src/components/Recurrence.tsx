@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { apiCall } from "../store/api";
 import { useStore } from "../store/store";
 
@@ -17,10 +17,10 @@ export function TaskRecurrence({ taskId }: { taskId: number }) {
   const [pattern, setPattern] = useState("daily");
   const [nextDue, setNextDue] = useState("");
 
-  const load = () => apiCall<Recurrence>("GET", `/api/tasks/${taskId}/recurrence`)
+  const load = useCallback(() => apiCall<Recurrence>("GET", `/api/tasks/${taskId}/recurrence`)
     .then(r => { setRec(r); setPattern(r.pattern); setNextDue(r.next_due); })
-    .catch(() => setRec(null));
-  useEffect(load, [taskId]);
+    .catch(() => setRec(null)), [taskId]);
+  useEffect(load, [load]);
 
   const save = async () => {
     await apiCall("PUT", `/api/tasks/${taskId}/recurrence`, { pattern, next_due: nextDue });

@@ -234,6 +234,6 @@ pub async fn reorder_tasks(pool: &Pool, orders: &[(i64, i64)]) -> Result<()> {
 
 pub async fn get_due_tasks(pool: &Pool, before_date: &str) -> Result<Vec<(i64, String, String)>> {
     Ok(sqlx::query_as(
-        "SELECT id, title, due_date FROM tasks WHERE due_date IS NOT NULL AND due_date <= ? AND status != 'completed' AND status != 'done'"
+        "SELECT id, title, due_date FROM tasks WHERE due_date IS NOT NULL AND due_date <= ? AND status != 'completed' AND status != 'done' AND deleted_at IS NULL"
     ).bind(before_date).fetch_all(pool).await?)
 }

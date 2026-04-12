@@ -82,7 +82,7 @@ pub async fn snapshot_epic_group(pool: &Pool, group_id: i64) -> Result<()> {
     let q = format!("SELECT COUNT(*), COALESCE(SUM(CASE WHEN status='completed' THEN 1 ELSE 0 END),0), \
         COALESCE(SUM(remaining_points),0.0), COALESCE(SUM(CASE WHEN status='completed' THEN remaining_points ELSE 0.0 END),0.0), \
         COALESCE(SUM(estimated_hours),0.0), COALESCE(SUM(CASE WHEN status='completed' THEN estimated_hours ELSE 0.0 END),0.0) \
-        FROM tasks WHERE id IN ({})", placeholders);
+        FROM tasks WHERE id IN ({}) AND deleted_at IS NULL", placeholders);
     let mut qb = sqlx::query_as::<_, (i64, i64, f64, f64, f64, f64)>(&q);
     for id in &all_ids { qb = qb.bind(id); }
     let (total_tasks, done_tasks, total_points, done_points, total_hours, done_hours) = qb.fetch_one(pool).await?;

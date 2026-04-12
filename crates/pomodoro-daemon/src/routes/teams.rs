@@ -75,7 +75,7 @@ pub async fn add_team_root_tasks(State(engine): State<AppState>, claims: Claims,
     if req.task_ids.len() > 500 { return Err(err(StatusCode::BAD_REQUEST, "Too many task IDs (max 500)")); }
     // Batch validate all tasks exist
     let ph = req.task_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
-    let q = format!("SELECT COUNT(*) FROM tasks WHERE id IN ({})", ph);
+    let q = format!("SELECT COUNT(*) FROM tasks WHERE id IN ({}) AND deleted_at IS NULL", ph);
     let mut query = sqlx::query_as::<_, (i64,)>(&q);
     for id in &req.task_ids { query = query.bind(id); }
     let (found,): (i64,) = query.fetch_one(&engine.pool).await.map_err(internal)?;

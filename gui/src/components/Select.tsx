@@ -54,7 +54,7 @@ export default function Select({ value, options, onChange, className = "", place
       const cur = enabledOptions.findIndex(o => o.i === focused);
       const prev = enabledOptions[(cur - 1 + enabledOptions.length) % enabledOptions.length];
       if (prev) setFocused(prev.i);
-    } else if (e.key === "Enter" || e.key === " ") {
+    } else if (e.key === "Enter" || (e.key === " " && (e.target as HTMLElement).tagName !== "INPUT")) {
       e.preventDefault();
       const opt = filtered[focused];
       if (opt && !opt.disabled) { onChange(opt.value); setOpen(false); }

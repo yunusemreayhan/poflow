@@ -143,7 +143,7 @@ function SprintProgress({ sprintId, name, endDate }: { sprintId: number; name: s
   const [board, setBoard] = useState<SprintBoard | null>(null);
   useEffect(() => { apiCall<SprintBoard>("GET", `/api/sprints/${sprintId}/board`).then(setBoard).catch(() => {}); }, [sprintId]);
   const total = board ? board.todo.length + board.in_progress.length + board.blocked.length + board.done.length : 0;
-  const pct = total > 0 ? Math.round((board!.done.length / total) * 100) : 0;
+  const pct = board && total > 0 ? Math.round((board.done.length / total) * 100) : 0;
   const daysLeft = endDate ? Math.max(0, Math.ceil((new Date(endDate).getTime() - Date.now()) / 86400000)) : null;
   return (
     <div className="glass p-3 rounded-lg">

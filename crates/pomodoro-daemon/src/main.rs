@@ -273,6 +273,8 @@ async fn main() -> Result<()> {
                 .bind(&cutoff).execute(&engine_archive.pool).await {
                 tracing::warn!("Auto-archive error: {}", e);
             }
+            // B13: Notify SSE clients about archived tasks
+            engine_archive.notify(crate::engine::ChangeEvent::Tasks);
             engine_archive.heartbeat("auto_archive").await;
         }
     });
