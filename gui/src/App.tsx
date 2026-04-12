@@ -61,6 +61,13 @@ function Sidebar() {
     localStorage.setItem("theme", theme);
   }, [theme]);
 
+  // F16: Sync offline queue when coming back online
+  useEffect(() => {
+    const handler = () => { useStore.getState().syncOfflineQueue(); };
+    window.addEventListener("online", handler);
+    return () => window.removeEventListener("online", handler);
+  }, []);
+
   return (
     <div className="w-[72px] flex flex-col items-center py-5 gap-2 border-r border-white/5 shrink-0">
       {/* Logo */}
@@ -161,7 +168,17 @@ export default function App() {
   const { activeTab, poll, loadTasks, connected, token, toasts, dismissToast, confirmDialog, dismissConfirm, loading, focusMode } = useStore();
   const timerRunning = useStore(s => s.engine?.status === "Running");
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [offline, setOffline] = useState(!navigator.onLine);
   const t = useT();
+
+  // F16: Track online/offline state
+  useEffect(() => {
+    const on = () => setOffline(false);
+    const off = () => setOffline(true);
+    window.addEventListener("online", on);
+    window.addEventListener("offline", off);
+    return () => { window.removeEventListener("online", on); window.removeEventListener("offline", off); };
+  }, []);
 
   useEffect(() => {
     useStore.getState().restoreAuth();
@@ -228,6 +245,7 @@ export default function App() {
         <Sidebar />
       </nav>
       <main id="main-content" className="flex-1 overflow-hidden relative pb-14 md:pb-0">
+        {offline && <div className="bg-yellow-600/80 text-white text-xs text-center py-1 px-2">⚡ Offline — changes will sync when reconnected</div>}
         {focusMode && (
           <button onClick={() => useStore.getState().toggleFocusMode()}
             className="absolute top-2 right-2 z-50 text-xs text-white/30 hover:text-white/60 px-2 py-1 rounded bg-white/5"
@@ -282,7 +300,7 @@ export default function App() {
               <motion.div key={t.id} initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 50 }}
                 role={t.type === "error" ? "alert" : undefined}
                 className={`pointer-events-auto flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium shadow-lg ${
-                  t.type === "error" ? "bg-[var(--color-danger)] text-white" : "bg-[var(--color-success)]/90 text-white"
+                  t.type === "error" ? "bg-[var(--color-danger)] text-white" : t.type === "info" ? "bg-blue-600/90 text-white" : "bg-[var(--color-success)]/90 text-white"
                 }`}>
                 <span className="cursor-pointer" onClick={() => dismissToast(t.id)}>{t.msg}</span>
                 <button onClick={() => dismissToast(t.id)} className="ml-1 text-white/60 hover:text-white" aria-label="Dismiss">×</button>

@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { apiCall, setToken } from "./api";
 import { invoke } from "@tauri-apps/api/core";
 import type { EngineState, Task, DayStat, Session, Config, Comment, TaskDetail, AuthResponse, TaskSprintInfo, BurnTotalEntry, TaskAssignee, Sprint } from "./api";
+import { cacheTasksOffline, getOfflineTasks, enqueueOfflineAction, processSyncQueue } from "../offlineStore";
 
 // Task load timestamp tracked in store
 
@@ -91,8 +92,9 @@ interface Store {
   switchToServer: (server: SavedServer) => Promise<void>;
   removeServer: (url: string, username: string) => void;
   // --- Toast & Dialog ---
-  toasts: { id: number; msg: string; type: "success" | "error"; onUndo?: () => void }[];
-  toast: (msg: string, type?: "success" | "error", onUndo?: () => void) => void;
+  toasts: { id: number; msg: string; type: "success" | "error" | "info"; onUndo?: () => void }[];
+  toast: (msg: string, type?: "success" | "error" | "info", onUndo?: () => void) => void;
+  syncOfflineQueue: () => Promise<void>;
   dismissToast: (id: number) => void;
   // Confirm dialog
   confirmDialog: { msg: string; onConfirm: () => void; confirmLabel?: string } | null;
@@ -135,6 +137,14 @@ export const useStore = create<Store>((set, get) => ({
     // U5: Cap visible toasts at 3
     set(s => ({ toasts: [...s.toasts.slice(-2), { id, msg, type, onUndo }] }));
     setTimeout(() => set(s => ({ toasts: s.toasts.filter(t => t.id !== id) })), onUndo ? 8000 : type === "error" ? 6000 : 3000);
+  },
+  // F16: Sync offline queue when back online
+  syncOfflineQueue: async () => {
+    const token = get().token;
+    if (!token || !navigator.onLine) return;
+    const { synced, failed } = await processSyncQueue(token);
+    if (synced > 0) { get().toast(`Synced ${synced} offline action${synced > 1 ? "s" : ""}`, "success"); get().loadTasks(); }
+    if (failed > 0) get().toast(`${failed} offline action${failed > 1 ? "s" : ""} failed to sync`, "error");
   },
   dismissToast: (id) => set(s => ({ toasts: s.toasts.filter(t => t.id !== id) })),
   confirmDialog: null,
@@ -311,7 +321,20 @@ export const useStore = create<Store>((set, get) => ({
         }
       }
       set({ tasks: tasksChanged ? resp.tasks : prev, taskSprints: ts, taskSprintsMap, burnTotals, allAssignees, taskLabelsMap, tasksLoadedAt: Date.now() });
-    } catch { /* ignore */ }
+      // F16: Cache tasks offline
+      cacheTasksOffline(resp.tasks).catch(() => {});
+    } catch {
+      // F16: Fallback to offline cached tasks
+      if (!navigator.onLine) {
+        try {
+          const offline = await getOfflineTasks() as Task[];
+          if (offline.length > 0) {
+            set({ tasks: offline, tasksLoadedAt: Date.now() });
+            get().toast("Offline mode — showing cached tasks", "info");
+          }
+        } catch { /* ignore */ }
+      }
+    }
     set(s => ({ loading: { ...s.loading, tasks: false } }));
   },
 
@@ -321,6 +344,13 @@ export const useStore = create<Store>((set, get) => ({
       const task = await apiCall<Task>("POST", "/api/tasks", { title, parent_id: parentId, project, priority, estimated });
       if (task) set(s => ({ tasks: [...s.tasks, task] }));
       get().toast("Task created");
+    } catch {
+      // F16: Queue offline
+      if (!navigator.onLine) {
+        const base = get().serverUrl || "";
+        await enqueueOfflineAction("POST", `${base}/api/tasks`, { title, parent_id: parentId, project, priority, estimated });
+        get().toast("Offline — task queued for sync", "info");
+      }
     } finally { set({ mutating: false }); }
   },
 
@@ -334,6 +364,14 @@ export const useStore = create<Store>((set, get) => ({
       if (msg.includes("modified by another")) {
         get().toast("Conflict: task was modified by someone else. Refreshing...", "error");
         get().loadTasks();
+        return;
+      }
+      // F16: Queue offline
+      if (!navigator.onLine) {
+        const base = get().serverUrl || "";
+        await enqueueOfflineAction("PUT", `${base}/api/tasks/${id}`, fields);
+        set(s => ({ tasks: s.tasks.map(t => t.id === id ? { ...t, ...fields as Partial<Task> } : t) }));
+        get().toast("Offline — update queued for sync", "info");
         return;
       }
       throw e;
