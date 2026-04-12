@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Play, Pause, Square, SkipForward, Coffee, MessageSquare } from "lucide-react";
 import { useStore } from "../store/store";
+import { apiCall } from "../store/api";
 import CommentSection from "./CommentSection";
 import Select from "./Select";
 import { useT } from "../i18n";
@@ -52,13 +53,23 @@ export default function Timer() {
   const isPaused = status === "Paused";
 
   // F9: Flash + sound on phase completion
+  // BL14: Session notes prompt after work session
+  const [notePrompt, setNotePrompt] = useState<{ sessionId: number } | null>(null);
+  const [noteText, setNoteText] = useState("");
   const prevPhaseRef = useRef(phase);
+  const prevSessionRef = useRef(engine?.current_session_id);
   useEffect(() => {
     if (prevPhaseRef.current === "Work" && (phase === "ShortBreak" || phase === "LongBreak")) {
       toast("🍅 Session complete!", "success");
+      if (prevSessionRef.current) setNotePrompt({ sessionId: prevSessionRef.current });
+      // BL15: Celebrate when daily goal is reached
+      const dc = engine?.daily_completed ?? 0;
+      const dg = engine?.daily_goal ?? 0;
+      if (dg > 0 && dc >= dg && dc - 1 < dg) toast("🎉 Daily goal reached!", "success");
     }
     prevPhaseRef.current = phase;
-  }, [phase]);
+    prevSessionRef.current = engine?.current_session_id ?? null;
+  }, [phase, engine?.current_session_id]);
 
   // Keyboard shortcuts: Space = start/pause/resume, Escape = stop
   useEffect(() => {
@@ -200,6 +211,32 @@ export default function Timer() {
           ⏱️ Timer owned by {currentTask?.user ?? "user #" + engine?.current_user_id}
         </div>
       )}
+
+      {/* BL14: Session note prompt after work session */}
+      <AnimatePresence>
+        {notePrompt && (
+          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
+            className="glass p-3 w-full max-w-md space-y-2">
+            <div className="text-xs text-white/40">What did you accomplish?</div>
+            <input value={noteText} onChange={e => setNoteText(e.target.value)} autoFocus
+              onKeyDown={e => {
+                if (e.key === "Enter" && noteText.trim()) {
+                  apiCall("PUT", `/api/sessions/${notePrompt.sessionId}/note`, { notes: noteText.trim() });
+                  setNotePrompt(null); setNoteText("");
+                } else if (e.key === "Escape") { setNotePrompt(null); setNoteText(""); }
+              }}
+              placeholder="Quick note... (Enter to save, Esc to skip)"
+              className="w-full bg-white/5 border border-white/10 rounded text-xs text-white px-3 py-2 outline-none focus:border-[var(--color-accent)]" />
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => { setNotePrompt(null); setNoteText(""); }} className="text-[10px] text-white/30 hover:text-white/60">Skip</button>
+              <button onClick={() => {
+                if (noteText.trim()) apiCall("PUT", `/api/sessions/${notePrompt.sessionId}/note`, { notes: noteText.trim() });
+                setNotePrompt(null); setNoteText("");
+              }} className="text-[10px] text-[var(--color-accent)]">Save</button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Controls */}
       <div className="flex items-center gap-5">

@@ -132,6 +132,8 @@ pub async fn add_sprint_tasks(State(engine): State<AppState>, claims: Claims, Pa
     let (found,): (i64,) = query.fetch_one(&engine.pool).await.map_err(internal)?;
     if found != task_ids.len() as i64 { return Err(err(StatusCode::NOT_FOUND, "One or more tasks not found")); }
     let result = db::add_sprint_tasks(&engine.pool, id, &task_ids, claims.user_id).await.map_err(internal)?;
+    // BL8: Audit sprint scope changes
+    db::audit(&engine.pool, claims.user_id, "add_tasks", "sprint", Some(id), Some(&format!("{} tasks added", task_ids.len()))).await.ok();
     if db::get_sprint(&engine.pool, id).await.map(|s| s.status == "active").unwrap_or(false) {
         if let Err(e) = db::snapshot_sprint(&engine.pool, id).await { tracing::warn!("Snapshot failed: {}", e); }
     }
@@ -143,6 +145,8 @@ pub async fn add_sprint_tasks(State(engine): State<AppState>, claims: Claims, Pa
 pub async fn remove_sprint_task(State(engine): State<AppState>, claims: Claims, Path((id, task_id)): Path<(i64, i64)>) -> Result<StatusCode, ApiError> {
     get_owned_sprint(&engine.pool, id, &claims).await?;
     db::remove_sprint_task(&engine.pool, id, task_id).await.map_err(internal)?;
+    // BL8: Audit sprint scope changes
+    db::audit(&engine.pool, claims.user_id, "remove_task", "sprint", Some(id), Some(&format!("task {} removed", task_id))).await.ok();
     if db::get_sprint(&engine.pool, id).await.map(|s| s.status == "active").unwrap_or(false) {
         if let Err(e) = db::snapshot_sprint(&engine.pool, id).await { tracing::warn!("Snapshot failed: {}", e); }
     }

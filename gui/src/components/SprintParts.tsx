@@ -14,6 +14,24 @@ export function BoardView({ board, reload }: { board: SprintBoard; reload: () =>
   const [touchDrag, setTouchDrag] = useState<{ id: number; startX: number } | null>(null);
   // B7: Use store's taskLabelsMap instead of N+1 API calls
   const taskLabels = useStore(s => s.taskLabelsMap);
+  // BL7: Detect blocked tasks (unresolved dependencies)
+  const [blockedBy, setBlockedBy] = useState<Record<number, string[]>>({});
+  useEffect(() => {
+    apiCall<{ task_id: number; depends_on: number }[]>("GET", "/api/dependencies").then(deps => {
+      if (!deps) return;
+      const allTasks = [...board.todo, ...board.in_progress, ...board.blocked, ...board.done];
+      const doneIds = new Set(board.done.map(t => t.id));
+      const taskMap = new Map(allTasks.map(t => [t.id, t.title]));
+      const result: Record<number, string[]> = {};
+      for (const d of deps) {
+        if (taskMap.has(d.task_id) && !doneIds.has(d.depends_on)) {
+          const depTitle = taskMap.get(d.depends_on) || `#${d.depends_on}`;
+          (result[d.task_id] ||= []).push(depTitle);
+        }
+      }
+      setBlockedBy(result);
+    }).catch(() => {});
+  }, [board]);
 
   const WIP_LIMIT = 5;
   const Column = useCallback(({ title, tasks, color, status }: { title: string; tasks: Task[]; color: string; status: string }) => (
@@ -48,6 +66,7 @@ export function BoardView({ board, reload }: { board: SprintBoard; reload: () =>
             className="bg-[var(--color-surface)] p-2 rounded border border-white/5 group cursor-grab active:cursor-grabbing">
             <div className="text-xs text-white/90 truncate">{t.title}</div>
             {taskLabels.get(t.id) && <div className="flex gap-0.5 mt-0.5 flex-wrap">{taskLabels.get(t.id)!.map(l => <span key={l.name} className="text-[8px] px-1 rounded" style={{ background: l.color + "30", color: l.color }}>{l.name}</span>)}</div>}
+            {blockedBy[t.id] && <div className="text-[9px] text-red-400/70 mt-0.5 truncate" title={`Blocked by: ${blockedBy[t.id].join(", ")}`}>🚫 {blockedBy[t.id].length} dep{blockedBy[t.id].length > 1 ? "s" : ""} unresolved</div>}
             <div className="text-[10px] text-white/30 flex gap-1 mt-1">
               {t.estimated_hours > 0 && <span>{t.estimated_hours}h</span>}
               {t.remaining_points > 0 && <span>{t.remaining_points}pt</span>}
@@ -239,6 +258,23 @@ export function SummaryView({ detail }: { detail: SprintDetail }) {
           </div>
         ))}
       </div>
+      {/* BL12: Estimation accuracy — estimate vs actual */}
+      {done.filter(t => t.estimated > 0 && t.actual > 0).length > 0 && (
+        <div>
+          <div className="text-xs text-white/50 mb-1 font-medium">Estimation Accuracy</div>
+          {done.filter(t => t.estimated > 0 && t.actual > 0).map(t => {
+            const ratio = t.actual / t.estimated;
+            const color = ratio <= 1.1 ? "text-green-400" : ratio <= 1.5 ? "text-yellow-400" : "text-red-400";
+            return (
+              <div key={t.id} className="flex items-center gap-2 py-0.5 text-xs">
+                <span className="text-white/50 flex-1 truncate">{t.title}</span>
+                <span className="text-white/30">{t.estimated}→{t.actual}</span>
+                <span className={`${color} w-12 text-right`}>{ratio <= 1 ? "✓" : `+${Math.round((ratio - 1) * 100)}%`}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
       {s.status === "completed" && (
         <div className="bg-[var(--color-surface)] p-3 rounded-lg border border-white/5 space-y-2">
           <div className="text-xs text-white/50 font-medium">Retrospective</div>
