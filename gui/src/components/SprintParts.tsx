@@ -28,9 +28,9 @@ export function BoardView({ board, reload }: { board: SprintBoard; reload: () =>
         {tasks.map(t => (
           <div key={t.id} draggable tabIndex={0}
             onKeyDown={e => {
-              const statusOrder = ["backlog", "in_progress", "completed"];
+              const statusOrder = ["backlog", "in_progress", "blocked", "completed"];
               const curIdx = statusOrder.indexOf(status);
-              if (e.key === "ArrowRight" && curIdx < 2) { e.preventDefault(); changeStatus(t.id, statusOrder[curIdx + 1]); }
+              if (e.key === "ArrowRight" && curIdx < statusOrder.length - 1) { e.preventDefault(); changeStatus(t.id, statusOrder[curIdx + 1]); }
               else if (e.key === "ArrowLeft" && curIdx > 0) { e.preventDefault(); changeStatus(t.id, statusOrder[curIdx - 1]); }
             }}
             onDragStart={e => { e.dataTransfer.setData("text/plain", String(t.id)); (e.target as HTMLElement).style.opacity = "0.4"; }}
@@ -39,9 +39,9 @@ export function BoardView({ board, reload }: { board: SprintBoard; reload: () =>
             onTouchEnd={e => {
               if (!touchDrag || touchDrag.id !== t.id) return;
               const dx = e.changedTouches[0].clientX - touchDrag.startX;
-              const statusOrder = ["backlog", "in_progress", "completed"];
+              const statusOrder = ["backlog", "in_progress", "blocked", "completed"];
               const curIdx = statusOrder.indexOf(status);
-              if (dx > 60 && curIdx < 2) changeStatus(t.id, statusOrder[curIdx + 1]);
+              if (dx > 60 && curIdx < statusOrder.length - 1) changeStatus(t.id, statusOrder[curIdx + 1]);
               else if (dx < -60 && curIdx > 0) changeStatus(t.id, statusOrder[curIdx - 1]);
               setTouchDrag(null);
             }}
@@ -56,6 +56,7 @@ export function BoardView({ board, reload }: { board: SprintBoard; reload: () =>
             <div className="hidden group-hover:flex gap-1 mt-1">
               {title !== "Todo" && <button onClick={() => changeStatus(t.id, "backlog")} className="text-[10px] text-white/30 hover:text-white">→Todo</button>}
               {title !== "In Progress" && <button onClick={() => changeStatus(t.id, "in_progress")} className="text-[10px] text-white/30 hover:text-yellow-400">→WIP</button>}
+              {title !== "Blocked" && <button onClick={() => changeStatus(t.id, "blocked")} className="text-[10px] text-white/30 hover:text-red-400">→Block</button>}
               {title !== "Done" && <button onClick={() => changeStatus(t.id, "completed")} className="text-[10px] text-white/30 hover:text-green-400">→Done</button>}
             </div>
           </div>
@@ -64,7 +65,7 @@ export function BoardView({ board, reload }: { board: SprintBoard; reload: () =>
     </div>
   ), [changeStatus]);
 
-  const total = board.todo.length + board.in_progress.length + board.done.length;
+  const total = board.todo.length + board.in_progress.length + board.blocked.length + board.done.length;
   const pct = total > 0 ? Math.round((board.done.length / total) * 100) : 0;
 
   return (
@@ -79,6 +80,7 @@ export function BoardView({ board, reload }: { board: SprintBoard; reload: () =>
       <div className="flex gap-3">
       <Column title="Todo" tasks={board.todo} color="text-white/60" status="backlog" />
       <Column title="In Progress" tasks={board.in_progress} color="text-yellow-400" status="in_progress" />
+      {board.blocked.length > 0 && <Column title="Blocked" tasks={board.blocked} color="text-red-400" status="blocked" />}
       <Column title="Done" tasks={board.done} color="text-green-400" status="completed" />
       </div>
     </div>

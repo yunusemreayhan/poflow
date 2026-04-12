@@ -123,7 +123,7 @@ pub struct EpicSnapshot {
 pub struct EpicGroupDetail { pub group: EpicGroup, pub task_ids: Vec<i64>, pub snapshots: Vec<EpicSnapshot> }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
-pub struct SprintBoard { pub todo: Vec<Task>, pub in_progress: Vec<Task>, pub done: Vec<Task> }
+pub struct SprintBoard { pub todo: Vec<Task>, pub in_progress: Vec<Task>, pub blocked: Vec<Task>, pub done: Vec<Task> }
 
 #[derive(Debug, Clone, FromRow, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 pub struct TaskSprintInfo { pub task_id: i64, pub sprint_id: i64, pub sprint_name: String, pub sprint_status: String }

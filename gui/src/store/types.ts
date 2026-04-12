@@ -115,7 +115,7 @@ export interface Sprint { id: number; name: string; project: string | null; goal
 export interface SprintTask { sprint_id: number; task_id: number; added_by: string; added_at: string; }
 export interface SprintDailyStat { id: number; sprint_id: number; date: string; total_points: number; done_points: number; total_hours: number; done_hours: number; total_tasks: number; done_tasks: number; }
 export interface SprintDetail { sprint: Sprint; tasks: Task[]; stats: SprintDailyStat[]; }
-export interface SprintBoard { todo: Task[]; in_progress: Task[]; done: Task[]; }
+export interface SprintBoard { todo: Task[]; in_progress: Task[]; blocked: Task[]; done: Task[]; }
 export interface TaskSprintInfo { task_id: number; sprint_id: number; sprint_name: string; sprint_status: string; }
 
 export interface BurnEntry { id: number; sprint_id: number | null; task_id: number; session_id: number | null; user_id: number; username: string; points: number; hours: number; source: string; note: string | null; cancelled: number; cancelled_by_id: number | null; cancelled_by: string | null; created_at: string; }

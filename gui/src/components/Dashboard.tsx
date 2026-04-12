@@ -1,6 +1,7 @@
 import { useStore } from "../store/store";
 import { useMemo, useState, useEffect } from "react";
 import { apiCall } from "../store/api";
+import type { SprintBoard } from "../store/api";
 
 export default function Dashboard() {
   const { tasks, stats, sprints } = useStore();
@@ -55,13 +56,7 @@ export default function Dashboard() {
         );
       })()}
 
-      {activeSprint && (
-        <div className="glass p-3 rounded-lg">
-          <div className="text-xs text-white/40 mb-1">Active Sprint</div>
-          <div className="text-sm text-white/80 font-medium">{activeSprint.name}</div>
-          {activeSprint.end_date && <div className="text-[10px] text-white/30 mt-1">Ends {activeSprint.end_date}</div>}
-        </div>
-      )}
+      {activeSprint && <SprintProgress sprintId={activeSprint.id} name={activeSprint.name} endDate={activeSprint.end_date} />}
 
       {overdue.length > 0 && (
         <div className="glass p-3 rounded-lg border border-red-500/20">
@@ -96,6 +91,9 @@ export default function Dashboard() {
 
       {/* F12: Active timers from other users */}
       <ActiveTimers />
+
+      {/* BL3: Daily standup view */}
+      <StandupView today={today} tasks={tasks} />
     </div>
   );
 }
@@ -128,6 +126,80 @@ function Stat({ label, value }: { label: string; value: string }) {
     <div className="glass p-3 rounded-lg text-center">
       <dd className="text-lg font-bold text-white/80">{value}</dd>
       <dt className="text-[10px] text-white/30">{label}</dt>
+    </div>
+  );
+}
+
+// BL1: Sprint progress widget — shows board status to all team members
+function SprintProgress({ sprintId, name, endDate }: { sprintId: number; name: string; endDate: string | null }) {
+  const [board, setBoard] = useState<SprintBoard | null>(null);
+  useEffect(() => { apiCall<SprintBoard>("GET", `/api/sprints/${sprintId}/board`).then(setBoard).catch(() => {}); }, [sprintId]);
+  const total = board ? board.todo.length + board.in_progress.length + board.blocked.length + board.done.length : 0;
+  const pct = total > 0 ? Math.round((board!.done.length / total) * 100) : 0;
+  const daysLeft = endDate ? Math.max(0, Math.ceil((new Date(endDate).getTime() - Date.now()) / 86400000)) : null;
+  return (
+    <div className="glass p-3 rounded-lg">
+      <div className="flex justify-between items-center mb-2">
+        <div>
+          <div className="text-xs text-white/40">Active Sprint</div>
+          <div className="text-sm text-white/80 font-medium">{name}</div>
+        </div>
+        {daysLeft !== null && <div className="text-xs text-white/30">{daysLeft}d left</div>}
+      </div>
+      {board && total > 0 && (<>
+        <div className="flex items-center gap-2 mb-1">
+          <div className="flex-1 h-2 bg-white/5 rounded-full overflow-hidden">
+            <div className="h-full bg-green-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
+          </div>
+          <span className="text-[10px] text-white/40">{pct}%</span>
+        </div>
+        <div className="flex gap-3 text-[10px] text-white/30">
+          <span>📋 {board.todo.length} todo</span>
+          <span>🔨 {board.in_progress.length} wip</span>
+          {board.blocked.length > 0 && <span>🚫 {board.blocked.length} blocked</span>}
+          <span>✅ {board.done.length} done</span>
+        </div>
+        {board.in_progress.length > 0 && (
+          <div className="mt-2 space-y-0.5">
+            <div className="text-[10px] text-white/30">In Progress:</div>
+            {board.in_progress.slice(0, 3).map(t => (
+              <div key={t.id} className="text-xs text-white/50 truncate">• {t.title} <span className="text-white/20">({t.user})</span></div>
+            ))}
+            {board.in_progress.length > 3 && <div className="text-[10px] text-white/20">+{board.in_progress.length - 3} more</div>}
+          </div>
+        )}
+      </>)}
+    </div>
+  );
+}
+
+// BL3: Daily standup view — yesterday done, today planned, blockers
+function StandupView({ today, tasks }: { today: string; tasks: import("../store/api").Task[] }) {
+  const yesterday = useMemo(() => {
+    const d = new Date(today); d.setDate(d.getDate() - 1); return d.toISOString().slice(0, 10);
+  }, [today]);
+  const byUser = useMemo(() => {
+    const map: Record<string, { done: string[]; wip: string[]; blocked: string[] }> = {};
+    for (const t of tasks) {
+      if (!map[t.user]) map[t.user] = { done: [], wip: [], blocked: [] };
+      if (t.status === "completed" && t.updated_at.startsWith(yesterday)) map[t.user].done.push(t.title);
+      if (t.status === "in_progress" || t.status === "active") map[t.user].wip.push(t.title);
+      if (t.status === "blocked") map[t.user].blocked.push(t.title);
+    }
+    return Object.entries(map).filter(([, v]) => v.done.length + v.wip.length + v.blocked.length > 0);
+  }, [tasks, yesterday]);
+  if (byUser.length === 0) return null;
+  return (
+    <div className="glass p-3 rounded-lg">
+      <div className="text-xs text-white/40 mb-2">Daily Standup</div>
+      {byUser.map(([user, { done, wip, blocked }]) => (
+        <div key={user} className="mb-2 last:mb-0">
+          <div className="text-xs text-[var(--color-accent)]/70 font-medium">@{user}</div>
+          {done.length > 0 && <div className="text-[10px] text-white/40 ml-2">✅ Done: {done.slice(0, 3).join(", ")}{done.length > 3 ? ` +${done.length - 3}` : ""}</div>}
+          {wip.length > 0 && <div className="text-[10px] text-white/40 ml-2">🔨 Working: {wip.slice(0, 3).join(", ")}{wip.length > 3 ? ` +${wip.length - 3}` : ""}</div>}
+          {blocked.length > 0 && <div className="text-[10px] text-red-400/60 ml-2">🚫 Blocked: {blocked.join(", ")}</div>}
+        </div>
+      ))}
     </div>
   );
 }

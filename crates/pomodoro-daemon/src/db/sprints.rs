@@ -75,11 +75,11 @@ pub async fn get_sprint_tasks(pool: &Pool, sprint_id: i64) -> Result<Vec<Task>> 
 
 pub async fn get_sprint_board(pool: &Pool, sprint_id: i64) -> Result<SprintBoard> {
     let tasks = get_sprint_tasks(pool, sprint_id).await?;
-    let (mut todo, mut in_progress, mut done) = (Vec::new(), Vec::new(), Vec::new());
+    let (mut todo, mut in_progress, mut blocked, mut done) = (Vec::new(), Vec::new(), Vec::new(), Vec::new());
     for t in tasks {
-        match t.status.as_str() { "completed" | "done" => done.push(t), "in_progress" | "active" => in_progress.push(t), _ => todo.push(t) }
+        match t.status.as_str() { "completed" | "done" => done.push(t), "blocked" => blocked.push(t), "in_progress" | "active" => in_progress.push(t), _ => todo.push(t) }
     }
-    Ok(SprintBoard { todo, in_progress, done })
+    Ok(SprintBoard { todo, in_progress, blocked, done })
 }
 
 pub async fn get_sprint_detail(pool: &Pool, id: i64) -> Result<SprintDetail> {
