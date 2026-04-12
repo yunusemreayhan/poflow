@@ -287,12 +287,11 @@ export const useStore = create<Store>((set, get) => ({
       // F10: Detect status changes on tasks assigned to current user
       if (tasksChanged && prev.length > 0) {
         const me = get().username;
-        const myAssignments = get().allAssignees;
         const prevMap = new Map(prev.map(t => [t.id, t.status]));
         for (const t of resp.tasks) {
           const oldStatus = prevMap.get(t.id);
           if (oldStatus && oldStatus !== t.status && t.user !== me) {
-            const assigned = myAssignments.get(t.id);
+            const assigned = allAssignees.get(t.id);
             if (assigned?.some(a => a === me)) {
               get().toast(`"${t.title}" → ${t.status} (by ${t.user})`, "success");
             }

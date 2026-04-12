@@ -41,7 +41,7 @@ pub async fn update_sprint(State(engine): State<AppState>, claims: Claims, Path(
     let s = db::update_sprint(&engine.pool, id, req.name.as_deref(),
         req.project.as_ref().map(|o| o.as_deref()),
         req.goal.as_ref().map(|o| o.as_deref()),
-        req.status.as_deref(),
+        None, // B4: Never pass status through update — use /start or /complete
         req.start_date.as_ref().map(|o| o.as_deref()),
         req.end_date.as_ref().map(|o| o.as_deref()),
         req.retro_notes.as_ref().map(|o| o.as_deref()))
