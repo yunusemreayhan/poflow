@@ -127,10 +127,10 @@ Existing feature inventory: 154 API endpoints covering timer, tasks (hierarchica
 F1 (Calendar view) ✅, F2 (Focus heatmap) ✅, F5 (Productivity trends) ✅, F18 (Mobile responsive) ✅, F24 (Kanban board) ✅, F26 (Saved filters) ✅
 
 **Tier 2 — High impact, higher effort:**
-F4 (iCal feed) ✅, F6 (Estimation accuracy) ✅, F8 (Focus score) ✅, F13 (GitHub integration) ✅, F16 (Offline mode), F22 (Streaks) ✅, F28 (CLI client)
+F4 (iCal feed) ✅, F6 (Estimation accuracy) ✅, F8 (Focus score) ✅, F13 (GitHub integration) ✅, F16 (Offline mode), F22 (Streaks) ✅, F28 (CLI client) ✅
 
 **Tier 3 — Nice to have:**
-F3 (Smart scheduling), F7 (Sprint retro analytics) ✅, F9 (Activity feed), F10 (Threaded comments) ✅, F14 (Slack integration), F17 (PWA), F19 (Automation rules), F21 (Auto-prioritization) ✅, F23 (Leaderboard) ✅, F25 (PERT estimates), F27 (Checklists)
+F3 (Smart scheduling) ✅, F7 (Sprint retro analytics) ✅, F9 (Activity feed) ✅, F10 (Threaded comments) ✅, F14 (Slack integration) ✅, F17 (PWA) ✅, F19 (Automation rules) ✅, F21 (Auto-prioritization) ✅, F23 (Leaderboard) ✅, F25 (PERT estimates) ✅, F27 (Checklists) ✅
 
 **Tier 4 — Future vision:**
-F11 (Shared timer), F12 (Presence), F15 (SDK), F20 (Scheduled reports), F29 (Git hooks), F30 (VS Code extension)
+F11 (Shared timer) ✅, F12 (Presence) ✅, F15 (SDK) ✅, F20 (Scheduled reports) ✅, F29 (Git hooks), F30 (VS Code extension)

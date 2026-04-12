@@ -55,6 +55,10 @@ enum Cmd {
     Deps { task_id: i64 },
     /// Export tasks as CSV
     Export,
+    /// Log time on a task
+    Log { task_id: i64, hours: f64, #[arg(short, long)] note: Option<String> },
+    /// Show focus score
+    Score,
     /// List estimation rooms
     Rooms,
     /// Join a room
@@ -72,6 +76,7 @@ async fn api(client: &reqwest::Client, base: &str, token: Option<&str>, method: 
         _ => client.get(&url),
     };
     if let Some(t) = token { req = req.header("Authorization", format!("Bearer {}", t)); }
+    if method != "GET" { req = req.header("x-requested-with", "pomo-cli"); }
     if let Some(b) = body { req = req.json(&b); }
     let resp = req.send().await?;
     let status = resp.status();
@@ -156,6 +161,17 @@ async fn main() -> Result<()> {
         Cmd::Export => {
             let csv = api(&client, base, token, "GET", "/api/export/tasks?format=csv", None).await?;
             print!("{}", csv.as_str().unwrap_or(&csv.to_string()));
+        }
+        Cmd::Log { task_id, hours, note } => {
+            api(&client, base, token, "POST", &format!("/api/tasks/{}/time", task_id), Some(json!({"hours": hours, "description": note}))).await?;
+            println!("Logged {}h on task #{}", hours, task_id);
+        }
+        Cmd::Score => {
+            let score = api(&client, base, token, "GET", "/api/analytics/focus-score", None).await?;
+            println!("Focus Score: {}/100 (streak: {}d)", score["score"], score["streak_days"]);
+            if let Some(c) = score["components"].as_object() {
+                for (k, v) in c { println!("  {}: {}", k, v); }
+            }
         }
         Cmd::Rooms => {
             let rooms = api(&client, base, token, "GET", "/api/rooms", None).await?;
