@@ -26,7 +26,10 @@ pub async fn create_webhook(State(engine): State<AppState>, claims: Claims, Json
             let blocked = ["localhost", "127.0.0.1", "0.0.0.0", "::1", "[::1]"];
             if blocked.contains(&host) || host.starts_with("10.") || host.starts_with("192.168.")
                 || host.starts_with("172.16.") || host.starts_with("172.17.") || host.starts_with("172.18.")
-                || host.starts_with("172.19.") || host.starts_with("172.2") || host.starts_with("172.30.") || host.starts_with("172.31.")
+                || host.starts_with("172.19.") || host.starts_with("172.20.") || host.starts_with("172.21.")
+                || host.starts_with("172.22.") || host.starts_with("172.23.") || host.starts_with("172.24.")
+                || host.starts_with("172.25.") || host.starts_with("172.26.") || host.starts_with("172.27.")
+                || host.starts_with("172.28.") || host.starts_with("172.29.") || host.starts_with("172.30.") || host.starts_with("172.31.")
                 || host.starts_with("169.254.") || host.ends_with(".local") {
                 return Err(err(StatusCode::BAD_REQUEST, "Webhook URL must not point to private/loopback addresses"));
             }

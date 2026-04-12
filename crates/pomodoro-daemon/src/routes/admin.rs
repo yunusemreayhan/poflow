@@ -35,6 +35,8 @@ pub async fn admin_reset_password(State(engine): State<AppState>, claims: Claims
     let hash = tokio::task::spawn_blocking(move || bcrypt::hash(&pw, 12))
         .await.map_err(internal)?.map_err(internal)?;
     db::update_user_password(&engine.pool, id, &hash).await.map_err(internal)?;
+    // S2: Invalidate user cache so existing tokens trigger re-validation
+    auth::invalidate_user_cache(id).await;
     if let Err(e) = db::audit(&engine.pool, claims.user_id, "admin_reset_password", "user", Some(id), None).await { tracing::warn!("Audit log failed: {}", e); }
     Ok(StatusCode::NO_CONTENT)
 }

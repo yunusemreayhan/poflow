@@ -39,6 +39,12 @@ pub async fn upload_attachment(
         .and_then(|v| v.to_str().ok())
         .unwrap_or("application/octet-stream");
 
+    // S3: Block dangerous MIME types that could enable XSS if served inline
+    let mime_lower = mime.to_lowercase();
+    if mime_lower.contains("html") || mime_lower.contains("javascript") || mime_lower.contains("svg") || mime_lower.contains("xml") {
+        return Err(err(StatusCode::BAD_REQUEST, "HTML, JavaScript, SVG, and XML files are not allowed"));
+    }
+
     // Generate unique storage key (portable, collision-resistant)
     let random_hex = {
         use sha2::{Sha256, Digest};

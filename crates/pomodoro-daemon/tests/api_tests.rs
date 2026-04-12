@@ -4319,7 +4319,7 @@ async fn test_attachment_unsafe_mime_forced_octet_stream() {
     let tok = login_root(&app).await;
     let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"T"})))).await.unwrap();
     let tid = body_json(resp).await["id"].as_i64().unwrap();
-    // Upload with HTML content-type
+    // S3: Upload with HTML content-type should be blocked
     let req = Request::builder().method("POST").uri(&format!("/api/tasks/{}/attachments", tid))
         .header("authorization", format!("Bearer {}", tok))
         .header("x-requested-with", "test")
@@ -4327,11 +4327,7 @@ async fn test_attachment_unsafe_mime_forced_octet_stream() {
         .header("content-type", "text/html")
         .body(Body::from("<script>alert(1)</script>")).unwrap();
     let resp = app.clone().oneshot(req).await.unwrap();
-    assert_eq!(resp.status(), 201);
-    let att_id = body_json(resp).await["id"].as_i64().unwrap();
-    // Download should force application/octet-stream
-    let resp = app.clone().oneshot(auth_req("GET", &format!("/api/attachments/{}/download", att_id), &tok, None)).await.unwrap();
-    assert_eq!(resp.headers().get("content-type").unwrap(), "application/octet-stream");
+    assert_eq!(resp.status(), 400);
 }
 
 // ============================================================

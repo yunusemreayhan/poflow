@@ -169,9 +169,20 @@ impl<S: Send + Sync> FromRequestParts<S> for Claims {
                     cache.get(&claims.user_id).map(|t| t.elapsed().as_secs() < 60).unwrap_or(false)
                 };
                 if !cached {
-                    let exists: Option<(i64,)> = sqlx::query_as("SELECT id FROM users WHERE id = ?")
+                    let row: Option<(i64, Option<String>)> = sqlx::query_as("SELECT id, password_changed_at FROM users WHERE id = ?")
                         .bind(claims.user_id).fetch_optional(pool).await.unwrap_or(None);
-                    if exists.is_none() { return Err(axum::http::StatusCode::UNAUTHORIZED); }
+                    match row {
+                        None => return Err(axum::http::StatusCode::UNAUTHORIZED),
+                        Some((_, Some(changed_at))) => {
+                            // S2: Reject tokens issued before password was changed
+                            if let Ok(changed) = chrono::NaiveDateTime::parse_from_str(&changed_at, "%Y-%m-%dT%H:%M:%S%.f")
+                                .or_else(|_| chrono::NaiveDateTime::parse_from_str(&changed_at, "%Y-%m-%dT%H:%M:%S")) {
+                                let changed_ts = changed.and_utc().timestamp() as usize;
+                                if claims.iat < changed_ts { return Err(axum::http::StatusCode::UNAUTHORIZED); }
+                            }
+                        }
+                        _ => {}
+                    }
                     let mut cache = user_cache().write().await;
                     // S2: Prune expired entries when cache grows large
                     if cache.len() > 200 {

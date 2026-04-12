@@ -80,7 +80,8 @@ pub async fn update_user_role(pool: &Pool, id: i64, role: &str) -> Result<User> 
 }
 
 pub async fn update_user_password(pool: &Pool, id: i64, password_hash: &str) -> Result<()> {
-    sqlx::query("UPDATE users SET password_hash = ? WHERE id = ?").bind(password_hash).bind(id).execute(pool).await?;
+    sqlx::query("UPDATE users SET password_hash = ?, password_changed_at = ? WHERE id = ?")
+        .bind(password_hash).bind(now_str()).bind(id).execute(pool).await?;
     Ok(())
 }
 

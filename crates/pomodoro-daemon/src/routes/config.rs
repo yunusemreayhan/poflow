@@ -32,10 +32,16 @@ pub async fn update_config(State(engine): State<AppState>, claims: Claims, Json(
     };
     db::set_user_config(&engine.pool, claims.user_id, &uc).await.map_err(internal)?;
     engine.invalidate_user_config_cache(claims.user_id).await;
-    // Root also updates global config
+    // Root also updates global config (preserve network settings from current config)
     if claims.role == "root" {
-        cfg.save().map_err(internal)?;
-        *engine.config.lock().await = cfg.clone();
+        let mut save_cfg = cfg.clone();
+        let current = engine.config.lock().await;
+        save_cfg.bind_address = current.bind_address.clone();
+        save_cfg.bind_port = current.bind_port;
+        save_cfg.cors_origins = current.cors_origins.clone();
+        drop(current);
+        save_cfg.save().map_err(internal)?;
+        *engine.config.lock().await = save_cfg;
     }
     Ok(Json(cfg))
 }

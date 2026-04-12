@@ -429,6 +429,12 @@ async fn migrate(pool: &Pool) -> Result<()> {
         sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (9, ?)").bind(&now_str()).execute(pool).await.ok();
     }
 
+    // Migration 10: Add password_changed_at to users for token invalidation after password reset
+    if !applied_set.contains(&10) {
+        if let Err(e) = sqlx::query("ALTER TABLE users ADD COLUMN password_changed_at TEXT").execute(pool).await { log_migration_err("ALTER TABLE users ADD COLUMN password_changed_at TEXT", e); }
+        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (10, ?)").bind(&now_str()).execute(pool).await.ok();
+    }
+
     sqlx::query("CREATE TABLE IF NOT EXISTS task_attachments (
         id          INTEGER PRIMARY KEY AUTOINCREMENT,
         task_id     INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,

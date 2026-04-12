@@ -277,6 +277,30 @@ pub async fn bulk_update_status(State(engine): State<AppState>, claims: Claims, 
     let mut q = sqlx::query(&sql).bind(&req.status).bind(crate::db::now_str());
     for id in &req.task_ids { q = q.bind(id); }
     q.execute(&engine.pool).await.map_err(internal)?;
+    // B7: Auto-unblock dependents when bulk-completing tasks
+    if req.status == "completed" {
+        for tid in &req.task_ids {
+            if let Ok(dependents) = db::get_dependents(&engine.pool, *tid).await {
+                for dep_id in dependents {
+                    if let Ok(dep_task) = db::get_task(&engine.pool, dep_id).await {
+                        if dep_task.status == "blocked" {
+                            if let Ok(deps) = db::get_dependencies(&engine.pool, dep_id).await {
+                                let mut all_done = true;
+                                for d in &deps {
+                                    if let Ok(dt) = db::get_task(&engine.pool, *d).await {
+                                        if dt.deleted_at.is_none() && dt.status != "completed" { all_done = false; break; }
+                                    }
+                                }
+                                if all_done {
+                                    db::update_task(&engine.pool, dep_id, None, None, None, None, None, None, None, None, None, Some("backlog"), None, None, None).await.ok();
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
     engine.notify(ChangeEvent::Tasks);
     Ok(StatusCode::NO_CONTENT)
 }
