@@ -117,8 +117,8 @@ export function CsvImport() {
   const processFile = async (file: File) => {
     const text = await file.text();
     try {
-      const resp = await apiCall<{ imported: number }>("POST", "/api/import/tasks", { csv: text });
-      setResult(`Imported ${resp.imported} tasks`);
+      const resp = await apiCall<{ created: number; errors: string[] }>("POST", "/api/import/tasks", { csv: text });
+      setResult(`Imported ${resp.created} tasks${resp.errors?.length ? ` (${resp.errors.length} errors)` : ""}`);
       useStore.getState().loadTasks();
     } catch {
       setResult("Import failed");

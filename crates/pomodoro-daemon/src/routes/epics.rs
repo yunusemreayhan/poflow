@@ -43,7 +43,7 @@ pub async fn add_epic_group_tasks(State(engine): State<AppState>, claims: Claims
     if req.task_ids.is_empty() { return Ok(StatusCode::NO_CONTENT); }
     if req.task_ids.len() > 500 { return Err(err(StatusCode::BAD_REQUEST, "Too many task IDs (max 500)")); }
     let ph = req.task_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
-    let q = format!("SELECT COUNT(*) FROM tasks WHERE id IN ({})", ph);
+    let q = format!("SELECT COUNT(*) FROM tasks WHERE id IN ({}) AND deleted_at IS NULL", ph);
     let mut query = sqlx::query_as::<_, (i64,)>(&q);
     for id in &req.task_ids { query = query.bind(id); }
     let (found,): (i64,) = query.fetch_one(&engine.pool).await.map_err(internal)?;
@@ -82,14 +82,18 @@ pub async fn get_sprint_root_tasks(State(engine): State<AppState>, _claims: Clai
 }
 
 #[utoipa::path(post, path = "/api/sprints/{id}/roots", responses((status = 204)), security(("bearer" = [])))]
-pub async fn add_sprint_root_tasks(State(engine): State<AppState>, _claims: Claims, Path(id): Path<i64>, Json(req): Json<EpicGroupTasksRequest>) -> Result<StatusCode, ApiError> {
+pub async fn add_sprint_root_tasks(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>, Json(req): Json<EpicGroupTasksRequest>) -> Result<StatusCode, ApiError> {
+    let sprint = db::get_sprint(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Sprint not found"))?;
+    if !is_owner_or_root(sprint.created_by_id, &claims) { return Err(err(StatusCode::FORBIDDEN, "Not sprint owner")); }
     for tid in req.task_ids { db::add_sprint_root_task(&engine.pool, id, tid).await.map_err(internal)?; }
     engine.notify(ChangeEvent::Sprints);
     Ok(StatusCode::NO_CONTENT)
 }
 
 #[utoipa::path(delete, path = "/api/sprints/{id}/roots/{task_id}", responses((status = 204)), security(("bearer" = [])))]
-pub async fn remove_sprint_root_task(State(engine): State<AppState>, _claims: Claims, Path((id, task_id)): Path<(i64, i64)>) -> Result<StatusCode, ApiError> {
+pub async fn remove_sprint_root_task(State(engine): State<AppState>, claims: Claims, Path((id, task_id)): Path<(i64, i64)>) -> Result<StatusCode, ApiError> {
+    let sprint = db::get_sprint(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Sprint not found"))?;
+    if !is_owner_or_root(sprint.created_by_id, &claims) { return Err(err(StatusCode::FORBIDDEN, "Not sprint owner")); }
     db::remove_sprint_root_task(&engine.pool, id, task_id).await.map_err(internal)?;
     engine.notify(ChangeEvent::Sprints);
     Ok(StatusCode::NO_CONTENT)

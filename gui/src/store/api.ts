@@ -28,15 +28,18 @@ async function tryRefreshToken(): Promise<boolean> {
   refreshing = (async () => {
     try {
       const { useStore } = await import("./store");
-      const server = useStore.getState().servers?.[0];
+      const state = useStore.getState();
+      const server = state.savedServers?.[0];
       if (!server?.refresh_token) return false;
       const resp = await invoke<{ token: string; refresh_token: string }>("api_call", {
         method: "POST", path: "/api/auth/refresh", body: { refresh_token: server.refresh_token }
       });
       if (resp?.token) {
         await setToken(resp.token);
-        server.token = resp.token;
-        server.refresh_token = resp.refresh_token;
+        const servers = [...state.savedServers];
+        servers[0] = { ...servers[0], token: resp.token, refresh_token: resp.refresh_token };
+        localStorage.setItem("servers", JSON.stringify(servers));
+        useStore.setState({ savedServers: servers, token: resp.token });
         return true;
       }
       return false;

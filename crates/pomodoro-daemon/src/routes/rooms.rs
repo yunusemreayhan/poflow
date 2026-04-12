@@ -78,8 +78,9 @@ pub async fn start_voting(State(engine): State<AppState>, claims: Claims, Path(i
     if !db::is_room_admin(&engine.pool, id, claims.user_id).await.map_err(internal)? && claims.role != "root" {
         return Err(err(StatusCode::FORBIDDEN, "Admin only"));
     }
-    // V8: Verify task exists
-    db::get_task(&engine.pool, req.task_id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Task not found"))?;
+    // V8: Verify task exists and is not soft-deleted
+    let task = db::get_task(&engine.pool, req.task_id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Task not found"))?;
+    if task.deleted_at.is_some() { return Err(err(StatusCode::BAD_REQUEST, "Cannot vote on a deleted task")); }
     db::start_voting(&engine.pool, id, req.task_id).await.map(|r| { engine.notify(ChangeEvent::Rooms); Json(r) }).map_err(internal)
 }
 

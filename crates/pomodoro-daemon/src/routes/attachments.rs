@@ -39,10 +39,12 @@ pub async fn upload_attachment(
         .and_then(|v| v.to_str().ok())
         .unwrap_or("application/octet-stream");
 
-    // Generate unique storage key (portable, no /dev/urandom dependency)
+    // Generate unique storage key (portable, collision-resistant)
     let random_hex = {
         use sha2::{Sha256, Digest};
-        let seed = format!("{}{}{}{}", chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0), task_id, claims.user_id, body.len());
+        static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        let cnt = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let seed = format!("{}{}{}{}{}", chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0), task_id, claims.user_id, body.len(), cnt);
         let hash = Sha256::digest(seed.as_bytes());
         hash[..8].iter().map(|b| format!("{:02x}", b)).collect::<String>()
     };
