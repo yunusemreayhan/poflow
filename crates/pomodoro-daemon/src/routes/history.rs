@@ -9,6 +9,8 @@ pub async fn user_hours_report(State(engine): State<AppState>, claims: Claims, Q
     if claims.role != "root" { return Err(err(StatusCode::FORBIDDEN, "Root only")); }
     let from = q.from.as_deref().unwrap_or("2000-01-01");
     let to = q.to.as_deref().unwrap_or("2099-12-31");
+    if chrono::NaiveDate::parse_from_str(from, "%Y-%m-%d").is_err() { return Err(err(StatusCode::BAD_REQUEST, "from must be YYYY-MM-DD")); }
+    if chrono::NaiveDate::parse_from_str(to, "%Y-%m-%d").is_err() { return Err(err(StatusCode::BAD_REQUEST, "to must be YYYY-MM-DD")); }
     let rows: Vec<(String, f64, i64)> = sqlx::query_as(
         "SELECT u.username, COALESCE(SUM(s.duration_s),0)/3600.0 as hours, COUNT(s.id) as sessions \
          FROM users u LEFT JOIN sessions s ON s.user_id = u.id AND s.status = 'completed' AND s.started_at >= ? AND s.started_at <= ? \
@@ -27,8 +29,9 @@ pub async fn get_history(State(engine): State<AppState>, claims: Claims, Query(q
 }
 
 #[utoipa::path(get, path = "/api/stats", responses((status = 200, body = Vec<db::DayStat>)), security(("bearer" = [])))]
-pub async fn get_stats(State(engine): State<AppState>, _claims: Claims, Query(q): Query<StatsQuery>) -> ApiResult<Vec<db::DayStat>> {
-    db::get_day_stats(&engine.pool, q.days.unwrap_or(30)).await.map(Json).map_err(internal)
+pub async fn get_stats(State(engine): State<AppState>, claims: Claims, Query(q): Query<StatsQuery>) -> ApiResult<Vec<db::DayStat>> {
+    let user_id = if claims.role == "root" { None } else { Some(claims.user_id) };
+    db::get_day_stats(&engine.pool, q.days.unwrap_or(30), user_id).await.map(Json).map_err(internal)
 }
 
 // --- Config ---

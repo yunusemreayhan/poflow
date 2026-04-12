@@ -89,7 +89,10 @@ fn escape_csv(s: &str) -> String {
 }
 
 #[utoipa::path(get, path = "/api/export/burns/{sprint_id}", responses((status = 200)), security(("bearer" = [])))]
-pub async fn export_burns(State(engine): State<AppState>, _claims: Claims, Path(sprint_id): Path<i64>) -> Result<axum::response::Response, ApiError> {
+pub async fn export_burns(State(engine): State<AppState>, claims: Claims, Path(sprint_id): Path<i64>) -> Result<axum::response::Response, ApiError> {
+    // B14: Verify sprint ownership
+    let sprint = db::get_sprint(&engine.pool, sprint_id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Sprint not found"))?;
+    if !is_owner_or_root(sprint.created_by_id, &claims) { return Err(err(StatusCode::FORBIDDEN, "Not sprint owner")); }
     let burns = db::list_burns(&engine.pool, sprint_id).await.map_err(internal)?;
     let mut csv = String::from("created_at,task_id,points,hours,username,source,note\n");
     for b in &burns {

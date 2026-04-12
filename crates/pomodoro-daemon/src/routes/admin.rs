@@ -97,6 +97,8 @@ pub async fn restore_backup(State(engine): State<AppState>, claims: Claims, Json
     let safety = backup_dir.join(format!("pre_restore_{}.db", chrono::Utc::now().format("%Y%m%d_%H%M%S")));
     let safety_str = safety.display().to_string().replace('\'', "''");
     sqlx::query(&format!("VACUUM INTO '{}'", safety_str)).execute(&engine.pool).await.map_err(|e| internal(format!("Safety backup failed: {}", e)))?;
+    // B8: Checkpoint WAL before overwriting to ensure consistency
+    sqlx::query("PRAGMA wal_checkpoint(TRUNCATE)").execute(&engine.pool).await.map_err(|e| internal(format!("WAL checkpoint failed: {}", e)))?;
     // Restore: copy backup over current DB
     let db_path = db::db_path();
     std::fs::copy(&backup_path, &db_path).map_err(|e| internal(format!("Restore failed: {}", e)))?;

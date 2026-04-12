@@ -89,6 +89,7 @@ export interface Config {
   estimation_mode: string;
   leaf_only_mode: boolean;
   theme: string;
+  auto_archive_days: number;
 }
 
 export interface EpicGroup { id: number; name: string; created_by: number; created_at: string; updated_at: string; }

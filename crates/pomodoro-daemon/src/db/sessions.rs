@@ -85,10 +85,14 @@ pub async fn get_history(pool: &Pool, from: &str, to: &str, user_id: Option<i64>
     }).collect())
 }
 
-pub async fn get_day_stats(pool: &Pool, days: i64) -> Result<Vec<DayStat>> {
+pub async fn get_day_stats(pool: &Pool, days: i64, user_id: Option<i64>) -> Result<Vec<DayStat>> {
     let from = (Utc::now().naive_utc() - chrono::Duration::days(days)).format("%Y-%m-%dT00:00:00").to_string();
-    let rows: Vec<Session> = sqlx::query_as(&format!("{} WHERE s.session_type = 'work' AND s.started_at >= ? ORDER BY s.started_at", SESSION_SELECT))
-        .bind(&from).fetch_all(pool).await?;
+    let mut sql = format!("{} WHERE s.session_type = 'work' AND s.started_at >= ?", SESSION_SELECT);
+    if user_id.is_some() { sql.push_str(" AND s.user_id = ?"); }
+    sql.push_str(" ORDER BY s.started_at");
+    let mut query = sqlx::query_as::<_, Session>(&sql).bind(&from);
+    if let Some(uid) = user_id { query = query.bind(uid); }
+    let rows: Vec<Session> = query.fetch_all(pool).await?;
     let mut map: std::collections::BTreeMap<String, DayStat> = std::collections::BTreeMap::new();
     for r in rows {
         let date = r.started_at.get(..10).unwrap_or("").to_string();

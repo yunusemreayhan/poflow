@@ -67,7 +67,7 @@ pub async fn update_sprint(State(engine): State<AppState>, claims: Claims, Path(
 #[utoipa::path(delete, path = "/api/sprints/{id}", responses((status = 204)), security(("bearer" = [])))]
 pub async fn delete_sprint(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>) -> Result<StatusCode, ApiError> {
     get_owned_sprint(&engine.pool, id, &claims).await?;
-    db::delete_sprint(&engine.pool, id).await.map_err(internal);
+    db::delete_sprint(&engine.pool, id).await.map_err(internal)?;
     engine.notify(ChangeEvent::Sprints);
     Ok(StatusCode::NO_CONTENT)
 }

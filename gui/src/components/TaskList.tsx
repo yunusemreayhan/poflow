@@ -22,13 +22,16 @@ export default function TaskList({ selectMode, onSelect, selectedTaskId, votedTa
   const [savedFilters, setSavedFilters] = useState<{ name: string; search: string; filter: string }[]>(() => {
     try { return JSON.parse(localStorage.getItem("pomo_saved_filters") || "[]"); } catch { return []; }
   });
+  const [savingFilter, setSavingFilter] = useState(false);
+  const [filterNameDraft, setFilterNameDraft] = useState("");
   const saveCurrentFilter = () => {
     if (!search.trim()) return;
-    const name = prompt("Filter name:");
-    if (!name) return;
-    const next = [...savedFilters, { name, search, filter }];
+    if (!savingFilter) { setSavingFilter(true); setFilterNameDraft(""); return; }
+    if (!filterNameDraft.trim()) return;
+    const next = [...savedFilters, { name: filterNameDraft.trim(), search, filter }];
     setSavedFilters(next);
     localStorage.setItem("pomo_saved_filters", JSON.stringify(next));
+    setSavingFilter(false);
   };
   const [viewStack, setViewStack] = useState<number[]>([]);
   const [search, setSearch] = useState("");
@@ -145,6 +148,10 @@ export default function TaskList({ selectMode, onSelect, selectedTaskId, votedTa
               <span className="text-[10px] text-white/30">{sorted.length} results</span>
               <button onClick={() => setSearch("")} className="text-white/30 hover:text-white/60 text-xs" aria-label="Clear search">✕</button>
               <button onClick={saveCurrentFilter} className="text-white/30 hover:text-[var(--color-accent)] text-xs" title="Save filter">💾</button>
+              {savingFilter && <input autoFocus value={filterNameDraft} onChange={e => setFilterNameDraft(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") saveCurrentFilter(); if (e.key === "Escape") setSavingFilter(false); }}
+                onBlur={() => setSavingFilter(false)}
+                placeholder="Name..." className="bg-white/10 text-xs text-white/70 rounded px-1 py-0.5 w-20 outline-none" />}
             </div>
           )}
         </div>

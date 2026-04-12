@@ -1,5 +1,20 @@
 use super::*;
 
+// B12: Check FTS5 availability once, fall back to LIKE
+static FTS5_AVAILABLE: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+pub async fn check_fts5(pool: &Pool) -> bool {
+    *FTS5_AVAILABLE.get_or_init(|| {
+        // Can't do async in OnceLock init, so default to true — will be set properly by migrate
+        true
+    })
+}
+pub fn set_fts5_available(v: bool) { FTS5_AVAILABLE.set(v).ok(); }
+fn fts5_ok() -> bool { FTS5_AVAILABLE.get().copied().unwrap_or(false) }
+
+fn search_clause() -> &'static str {
+    if fts5_ok() { " AND t.id IN (SELECT rowid FROM tasks_fts WHERE tasks_fts MATCH ?)" }
+    else { " AND (t.title LIKE ? OR t.tags LIKE ? OR t.description LIKE ?)" }
+}
 
 pub const TASK_SELECT: &str = "SELECT t.id, t.parent_id, t.user_id, u.username as user, t.title, t.description, t.project, t.tags, t.priority, t.estimated, t.actual, t.estimated_hours, t.remaining_points, t.due_date, t.status, t.sort_order, t.created_at, t.updated_at, (SELECT COUNT(*) FROM task_attachments WHERE task_id = t.id) as attachment_count, t.deleted_at, t.work_duration_minutes FROM tasks t JOIN users u ON t.user_id = u.id";
 
@@ -59,7 +74,7 @@ pub async fn list_tasks_paged(pool: &Pool, f: TaskFilter<'_>, limit: i64, offset
     }
     if f.status.is_some() { q.push_str(" AND t.status = ?"); }
     if f.project.is_some() { q.push_str(" AND t.project = ?"); }
-    if f.search.is_some() { q.push_str(" AND t.id IN (SELECT rowid FROM tasks_fts WHERE tasks_fts MATCH ?)"); }
+    if f.search.is_some() { q.push_str(search_clause()); }
     if f.priority.is_some() { q.push_str(" AND t.priority = ?"); }
     if f.due_before.is_some() { q.push_str(" AND t.due_date IS NOT NULL AND t.due_date <= ?"); }
     if f.due_after.is_some() { q.push_str(" AND t.due_date IS NOT NULL AND t.due_date >= ?"); }
@@ -75,7 +90,10 @@ pub async fn list_tasks_paged(pool: &Pool, f: TaskFilter<'_>, limit: i64, offset
     if let Some(a) = f.assignee { query = query.bind(a); }
     if let Some(s) = f.status { query = query.bind(s); }
     if let Some(p) = f.project { query = query.bind(p); }
-    if let Some(s) = f.search { let fts = format!("\"{}\"", s.replace('"', "\"\"")); query = query.bind(fts); }
+    if let Some(s) = f.search {
+        if fts5_ok() { let fts = format!("\"{}\"", s.replace('"', "\"\"")); query = query.bind(fts); }
+        else { let like = format!("%{}%", s); query = query.bind(like.clone()).bind(like.clone()).bind(like); }
+    }
     if let Some(p) = f.priority { query = query.bind(p); }
     if let Some(d) = f.due_before { query = query.bind(d); }
     if let Some(d) = f.due_after { query = query.bind(d); }
@@ -139,7 +157,7 @@ pub async fn count_tasks(pool: &Pool, f: TaskFilter<'_>) -> Result<i64> {
     };
     if f.status.is_some() { q.push_str(" AND t.status = ?"); }
     if f.project.is_some() { q.push_str(" AND t.project = ?"); }
-    if f.search.is_some() { q.push_str(" AND t.id IN (SELECT rowid FROM tasks_fts WHERE tasks_fts MATCH ?)"); }
+    if f.search.is_some() { q.push_str(search_clause()); }
     if f.priority.is_some() { q.push_str(" AND t.priority = ?"); }
     if f.due_before.is_some() { q.push_str(" AND t.due_date IS NOT NULL AND t.due_date <= ?"); }
     if f.due_after.is_some() { q.push_str(" AND t.due_date IS NOT NULL AND t.due_date >= ?"); }
@@ -152,7 +170,10 @@ pub async fn count_tasks(pool: &Pool, f: TaskFilter<'_>) -> Result<i64> {
     if let Some(a) = f.assignee { query = query.bind(a); }
     if let Some(s) = f.status { query = query.bind(s); }
     if let Some(p) = f.project { query = query.bind(p); }
-    if let Some(s) = f.search { let fts = format!("\"{}\"", s.replace('"', "\"\"")); query = query.bind(fts); }
+    if let Some(s) = f.search {
+        if fts5_ok() { let fts = format!("\"{}\"", s.replace('"', "\"\"")); query = query.bind(fts); }
+        else { let like = format!("%{}%", s); query = query.bind(like.clone()).bind(like.clone()).bind(like); }
+    }
     if let Some(p) = f.priority { query = query.bind(p); }
     if let Some(d) = f.due_before { query = query.bind(d); }
     if let Some(d) = f.due_after { query = query.bind(d); }
