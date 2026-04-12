@@ -62,3 +62,16 @@
 - Hierarchical tasks via parent_id with recursive CTEs
 - ETag-based caching for `/api/tasks/full` endpoint
 - Webhook secrets encrypted at rest (XOR + HMAC-derived key)
+
+## Background Tasks
+
+| Task | Interval | Purpose |
+|---|---|---|
+| Timer tick | 1s | Advance running timers, complete sessions, auto-start breaks |
+| Sprint snapshot | 1h | Snapshot burndown data for active sprints and epic groups |
+| Recurrence | 5min | Create recurring task instances when due |
+| Auto-archive | 24h | Archive completed tasks older than 90 days |
+| Attachment cleanup | 24h | Remove orphaned attachment files from disk |
+| Due reminders | 30min | Desktop notifications for tasks due today/tomorrow |
+
+All tasks report heartbeats to `/api/health` via `engine.heartbeat()`.

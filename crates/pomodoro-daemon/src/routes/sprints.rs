@@ -74,8 +74,7 @@ pub async fn delete_sprint(State(engine): State<AppState>, claims: Claims, Path(
 
 #[utoipa::path(post, path = "/api/sprints/{id}/start", responses((status = 200, body = db::Sprint)), security(("bearer" = [])))]
 pub async fn start_sprint(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>) -> ApiResult<db::Sprint> {
-    let sprint = db::get_sprint(&engine.pool, id).await.map_err(internal)?;
-    if !is_owner_or_root(sprint.created_by_id, &claims) { return Err(err(StatusCode::FORBIDDEN, "Not owner")); }
+    let sprint = get_owned_sprint(&engine.pool, id, &claims).await?;
     if sprint.status != "planning" { return Err(err(StatusCode::BAD_REQUEST, format!("Cannot start sprint in '{}' status", sprint.status))); }
     let s = db::update_sprint(&engine.pool, id, None, None, None, Some("active"), None, None, None, None).await.map_err(internal)?;
     db::audit(&engine.pool, claims.user_id, "start", "sprint", Some(id), None).await.ok();
@@ -87,8 +86,7 @@ pub async fn start_sprint(State(engine): State<AppState>, claims: Claims, Path(i
 
 #[utoipa::path(post, path = "/api/sprints/{id}/complete", responses((status = 200, body = db::Sprint)), security(("bearer" = [])))]
 pub async fn complete_sprint(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>) -> ApiResult<db::Sprint> {
-    let sprint = db::get_sprint(&engine.pool, id).await.map_err(internal)?;
-    if !is_owner_or_root(sprint.created_by_id, &claims) { return Err(err(StatusCode::FORBIDDEN, "Not owner")); }
+    let sprint = get_owned_sprint(&engine.pool, id, &claims).await?;
     if sprint.status != "active" { return Err(err(StatusCode::BAD_REQUEST, format!("Cannot complete sprint in '{}' status", sprint.status))); }
     if let Err(e) = db::snapshot_sprint(&engine.pool, id).await { tracing::warn!("Snapshot failed: {}", e); }
     let s = db::update_sprint(&engine.pool, id, None, None, None, Some("completed"), None, None, None, None).await.map_err(internal)?;

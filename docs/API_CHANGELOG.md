@@ -1,6 +1,40 @@
 # API Changelog
 
-## v9 (Current)
+## v11 (Current)
+
+### Bug Fixes
+- Timer start now uses per-task `work_duration_minutes` override.
+- Attachment download verifies task ownership (owner/assignee/root).
+- SSE timer handler uses in-memory state instead of DB query per tick.
+- Sprint update validates `end_date >= start_date`.
+
+### Security
+- SSE/WS ticket creation limited to 5 active tickets per user.
+
+## v10
+
+### New Endpoints
+- `POST /api/import/tasks/json` — Bulk import tasks from nested JSON tree.
+- `POST /api/sprints/{id}/carryover` — Create new sprint with incomplete tasks.
+- `PUT /api/sessions/{id}/note` — Update session notes after completion.
+- `GET /api/rooms/{id}/export` — Export room estimation history as JSON.
+- `POST /api/tasks/{id}/watch` — Subscribe to task updates.
+- `DELETE /api/tasks/{id}/watch` — Unsubscribe from task updates.
+- `GET /api/tasks/{id}/watchers` — List task watchers.
+- `GET /api/watched` — List user's watched task IDs.
+
+### Schema Changes
+- `sprints.capacity_hours` — Optional team capacity in hours.
+- `tasks.work_duration_minutes` — Optional per-task work session duration.
+- `task_watchers` table — Task subscription tracking.
+
+### Other
+- `/api/tasks/full` now includes `labels` array.
+- `/api/health` includes `schema_version`.
+- Backup retention: only last 10 backups kept.
+- Auto-archive: completed tasks older than 90 days archived daily.
+
+## v9
 
 ### New Endpoints
 - `GET /api/tasks/{id}/sessions` — List sessions for a task (max 200).

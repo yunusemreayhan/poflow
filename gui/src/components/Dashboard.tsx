@@ -11,17 +11,17 @@ export default function Dashboard() {
   const activeSprint = sprints.find(s => s.status === "active");
   const overdue = useMemo(() => tasks.filter(t => t.due_date && t.due_date < today && t.status !== "completed" && t.status !== "archived"), [tasks, today]);
   const recentlyUpdated = useMemo(() => [...tasks].sort((a, b) => b.updated_at.localeCompare(a.updated_at)).slice(0, 5), [tasks]);
-  const activeCount = tasks.filter(t => t.status === "active").length;
-  const completedToday = tasks.filter(t => t.status === "completed" && t.updated_at.startsWith(today)).length;
+  const activeCount = useMemo(() => tasks.filter(t => t.status === "active").length, [tasks]);
+  const completedToday = useMemo(() => tasks.filter(t => t.status === "completed" && t.updated_at.startsWith(today)).length, [tasks, today]);
 
   return (
     <div className="space-y-4 p-1">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <dl className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Stat label="Focus today" value={todayStats ? `${Math.round(todayStats.total_focus_s / 60)}m` : "0m"} />
         <Stat label="Sessions" value={String(todayStats?.completed ?? 0)} />
         <Stat label="Active tasks" value={String(activeCount)} />
         <Stat label="Completed today" value={String(completedToday)} />
-      </div>
+      </dl>
 
       {activeSprint && (
         <div className="glass p-3 rounded-lg">
@@ -56,8 +56,8 @@ export default function Dashboard() {
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="glass p-3 rounded-lg text-center">
-      <div className="text-lg font-bold text-white/80">{value}</div>
-      <div className="text-[10px] text-white/30">{label}</div>
+      <dd className="text-lg font-bold text-white/80">{value}</dd>
+      <dt className="text-[10px] text-white/30">{label}</dt>
     </div>
   );
 }

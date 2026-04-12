@@ -12,10 +12,17 @@ pub async fn health(State(engine): State<AppState>) -> Json<serde_json::Value> {
     let heartbeats = engine.heartbeats.lock().await;
     let tasks: serde_json::Map<String, serde_json::Value> = heartbeats.iter().map(|(name, last)| {
         let secs_ago = last.elapsed().as_secs();
-        (name.clone(), serde_json::json!({ "last_heartbeat_secs_ago": secs_ago, "healthy": secs_ago < 120 }))
+        // O1: Use 2x expected interval as health threshold
+        let max_age = match name.as_str() {
+            "tick" => 10, "snapshot" => 7200, "auto_archive" => 172800,
+            _ => 600,
+        };
+        (name.clone(), serde_json::json!({ "last_heartbeat_secs_ago": secs_ago, "healthy": secs_ago < max_age }))
     }).collect();
     drop(heartbeats);
-    Json(serde_json::json!({ "status": if db_ok { "ok" } else { "degraded" }, "db": db_ok, "schema_version": migration_version, "active_timers": active_timers, "background_tasks": tasks }))
+    // O2: Database size
+    let db_size = std::fs::metadata(db::db_path()).map(|m| m.len()).unwrap_or(0);
+    Json(serde_json::json!({ "status": if db_ok { "ok" } else { "degraded" }, "db": db_ok, "db_size_bytes": db_size, "schema_version": migration_version, "active_timers": active_timers, "background_tasks": tasks }))
 }
 
 #[utoipa::path(get, path = "/api/tasks/{id}/votes", responses((status = 200, body = Vec<db::RoomVote>)), security(("bearer" = [])))]

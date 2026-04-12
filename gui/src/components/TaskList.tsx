@@ -185,8 +185,8 @@ export default function TaskList({ selectMode, onSelect, selectedTaskId, votedTa
           <table className="w-full">
             <thead className="sticky top-0 bg-[var(--color-bg)]">
               <tr className="text-white/30 text-left">
-                <th className="py-1 px-1 w-6"></th><th className="py-1 px-2">Title</th><th className="py-1 px-1">Status</th><th className="py-1 px-1">Priority</th>
-                <th className="py-1 px-1">Est</th><th className="py-1 px-1">Due</th><th className="py-1 px-1">Owner</th>
+                <th scope="col" className="py-1 px-1 w-6"></th><th scope="col" className="py-1 px-2">Title</th><th scope="col" className="py-1 px-1">Status</th><th scope="col" className="py-1 px-1">Priority</th>
+                <th scope="col" className="py-1 px-1">Est</th><th scope="col" className="py-1 px-1">Due</th><th scope="col" className="py-1 px-1">Owner</th>
               </tr>
             </thead>
             <tbody>
