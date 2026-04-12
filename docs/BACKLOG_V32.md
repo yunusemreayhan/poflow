@@ -178,31 +178,30 @@ in Swagger UI.
 
 | ID | Severity | Category | Status |
 |----|----------|----------|--------|
-| V32-1 | Medium | Bug | TODO |
-| V32-2 | Medium | Bug | TODO |
+| V32-1 | Medium | Bug | FIXED |
+| V32-2 | Medium | Bug | FIXED |
 | V32-3 | Low | Bug | FALSE POSITIVE |
-| V32-4 | Low | Bug | TODO |
-| V32-5 | Low | Bug | TODO |
-| V32-6 | Low | Bug | TODO |
-| V32-7 | Low | Security | TODO |
-| V32-8 | Low | Security | TODO |
+| V32-4 | Low | Bug | FIXED |
+| V32-5 | Low | Bug | FIXED |
+| V32-6 | Low | Bug | FIXED |
+| V32-7 | Low | Security | FIXED |
+| V32-8 | Low | Security | FIXED |
 | V32-9 | Low | Security | FALSE POSITIVE |
 | V32-10 | Low | Performance | WON'T FIX (indexed counts, fast enough) |
-| V32-11 | Low | Performance | TODO |
+| V32-11 | Low | Performance | FIXED |
 | V32-12 | Low | Performance | WON'T FIX (acceptable for typical use) |
-| V32-13 | Low | Code quality | TODO |
+| V32-13 | Low | Code quality | FIXED |
 | V32-14 | Low | Code quality | FALSE POSITIVE |
-| V32-15 | Low | Missing feature | TODO |
-| V32-16 | Low | Missing feature | TODO |
-| V32-17 | Low | Missing feature | TODO |
+| V32-15 | Low | Missing feature | FIXED |
+| V32-16 | Low | Missing feature | FIXED |
+| V32-17 | Low | Missing feature | FIXED |
 | V32-18 | Low | Missing feature | WON'T FIX (PUT already handles partial) |
 | V32-19 | Low | UX | WON'T FIX (4-column Kanban is standard) |
-| V32-20 | Low | UX | TODO |
-| V32-21 | Low | UX | TODO |
-| V32-22 | Low | Accessibility | TODO |
-| V32-23 | Low | Accessibility | TODO |
-| V32-24 | Low | Documentation | TODO |
-| V32-25 | Low | Documentation | TODO |
+| V32-20 | Low | UX | FIXED |
+| V32-21 | Low | UX | FIXED |
+| V32-22 | Low | Accessibility | FIXED |
+| V32-23 | Low | Accessibility | FIXED |
+| V32-24 | Low | Documentation | FIXED |
+| V32-25 | Low | Documentation | FIXED |
 
-**Total: 25 items** — 2 medium, 23 low
-**To fix: 17** | **Won't fix: 4** | **False positive: 4**
+**Total: 25 items** — 17 fixed, 4 won't fix, 4 false positive

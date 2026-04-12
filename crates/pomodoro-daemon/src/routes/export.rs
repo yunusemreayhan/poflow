@@ -139,6 +139,7 @@ pub async fn import_tasks_csv(State(engine): State<AppState>, claims: Claims, Js
     let idx_description = col_idx("description");
     let idx_tags = col_idx("tags");
     let idx_due_date = col_idx("due_date");
+    let idx_status = col_idx("status");
     for (i, line) in lines.enumerate() {
         let cols = parse_csv_line(line);
         if cols.is_empty() || cols.get(idx_title).map(|s| s.trim().is_empty()).unwrap_or(true) { continue; }
@@ -152,9 +153,11 @@ pub async fn import_tasks_csv(State(engine): State<AppState>, claims: Claims, Js
         let due_date = idx_due_date.and_then(|i| cols.get(i)).map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
         // B3/V1: Validate due_date format
         if let Some(ref d) = due_date { if !valid_date(d) { errors.push(format!("Line {}: invalid due_date '{}'", i + 2, d)); continue; } }
+        // V32-5: Parse and validate status from CSV
+        let status = idx_status.and_then(|i| cols.get(i)).map(|s| s.trim().to_string()).filter(|s| !s.is_empty() && VALID_TASK_STATUSES.contains(&s.as_str())).unwrap_or_else(|| "backlog".to_string());
         let now = db::now_str();
-        if let Err(e) = sqlx::query("INSERT INTO tasks (user_id, title, description, project, tags, priority, estimated, actual, estimated_hours, remaining_points, due_date, status, sort_order, created_at, updated_at) VALUES (?,?,?,?,?,?,?,0,0.0,0.0,?,'backlog',0,?,?)")
-            .bind(claims.user_id).bind(&title).bind(description.as_deref()).bind(project.as_deref()).bind(tags.as_deref()).bind(priority).bind(estimated).bind(due_date.as_deref()).bind(&now).bind(&now)
+        if let Err(e) = sqlx::query("INSERT INTO tasks (user_id, title, description, project, tags, priority, estimated, actual, estimated_hours, remaining_points, due_date, status, sort_order, created_at, updated_at) VALUES (?,?,?,?,?,?,?,0,0.0,0.0,?,?,0,?,?)")
+            .bind(claims.user_id).bind(&title).bind(description.as_deref()).bind(project.as_deref()).bind(tags.as_deref()).bind(priority).bind(estimated).bind(due_date.as_deref()).bind(&status).bind(&now).bind(&now)
             .execute(&mut *tx).await {
             tx.rollback().await.ok();
             // B3: Reset created count since rollback undid all inserts

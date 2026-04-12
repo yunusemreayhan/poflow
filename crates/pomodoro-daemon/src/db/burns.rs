@@ -25,7 +25,8 @@ pub async fn get_burn(pool: &Pool, id: i64) -> Result<BurnEntry> {
 }
 
 pub async fn list_burns(pool: &Pool, sprint_id: i64) -> Result<Vec<BurnEntry>> {
-    Ok(sqlx::query_as::<_, BurnEntry>(&format!("{} WHERE b.sprint_id = ? ORDER BY b.created_at DESC", BURN_SELECT))
+    // V32-17: Cap at 1000 to prevent unbounded responses
+    Ok(sqlx::query_as::<_, BurnEntry>(&format!("{} WHERE b.sprint_id = ? ORDER BY b.created_at DESC LIMIT 1000", BURN_SELECT))
         .bind(sprint_id).fetch_all(pool).await?)
 }
 

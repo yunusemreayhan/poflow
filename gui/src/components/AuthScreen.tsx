@@ -105,7 +105,7 @@ export default function AuthScreen() {
             const s = (password.length >= 8 ? 1 : 0) + (/[A-Z]/.test(password) ? 1 : 0) + (/[0-9]/.test(password) ? 1 : 0) + (/[^A-Za-z0-9]/.test(password) ? 1 : 0);
             const label = ["Weak", "Fair", "Good", "Strong"][Math.min(s, 3)];
             const color = ["#ef4444", "#f59e0b", "#22c55e", "#22c55e"][Math.min(s, 3)];
-            return <div className="flex items-center gap-2 text-xs"><div className="flex-1 h-1 rounded bg-white/10"><div className="h-1 rounded transition-all" style={{ width: `${Math.min(s + 1, 4) * 25}%`, background: color }} /></div><span style={{ color }}>{label}</span></div>;
+            return <div className="flex items-center gap-2 text-xs" role="status" aria-label={`Password strength: ${label}`}><div className="flex-1 h-1 rounded bg-white/10"><div className="h-1 rounded transition-all" style={{ width: `${Math.min(s + 1, 4) * 25}%`, background: color }} /></div><span style={{ color }}>{label}</span></div>;
           })()}
 
           {error && <div role="alert" className="text-xs text-[var(--color-danger)] bg-[var(--color-danger)]/10 rounded-lg px-3 py-2">{error}</div>}

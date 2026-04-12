@@ -1,19 +1,21 @@
 use super::*;
 
 // V29-14: Shared helper for auto-unblocking dependents
+// V32-11: Batch-fetch to reduce N+1 queries
 async fn auto_unblock_dependents(engine: &AppState, task_id: i64) {
     if let Ok(dependents) = db::get_dependents(&engine.pool, task_id).await {
         for dep_id in dependents {
             if let Ok(dep_task) = db::get_task(&engine.pool, dep_id).await {
                 if dep_task.status == "blocked" {
                     if let Ok(deps) = db::get_dependencies(&engine.pool, dep_id).await {
-                        let mut all_done = true;
-                        for d in &deps {
-                            if let Ok(dt) = db::get_task(&engine.pool, *d).await {
-                                if dt.deleted_at.is_none() && dt.status != "completed" { all_done = false; break; }
-                            }
-                        }
-                        if all_done {
+                        // Batch-fetch all dependency statuses in one query
+                        if deps.is_empty() { continue; }
+                        let ph = deps.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+                        let sql = format!("SELECT id FROM tasks WHERE id IN ({}) AND deleted_at IS NULL AND status NOT IN ('completed','done')", ph);
+                        let mut q = sqlx::query_as::<_, (i64,)>(&sql);
+                        for d in &deps { q = q.bind(d); }
+                        let unresolved: Vec<(i64,)> = q.fetch_all(&engine.pool).await.unwrap_or_default();
+                        if unresolved.is_empty() {
                             db::update_task(&engine.pool, dep_id, None, None, None, None, None, None, None, None, None, Some("backlog"), None, None, None, None, None).await.ok();
                         }
                     }
@@ -50,6 +52,10 @@ pub async fn duplicate_task(State(engine): State<AppState>, claims: Claims, Path
     let assignee_ids: Vec<(i64,)> = sqlx::query_as("SELECT user_id FROM task_assignees WHERE task_id = ?")
         .bind(id).fetch_all(&engine.pool).await.unwrap_or_default();
     for (uid,) in assignee_ids { db::add_assignee(&engine.pool, t.id, uid).await.ok(); }
+    // V32-4: Copy dependencies
+    if let Ok(deps) = db::get_dependencies(&engine.pool, id).await {
+        for dep_id in deps { db::add_dependency(&engine.pool, t.id, dep_id).await.ok(); }
+    }
     engine.notify(ChangeEvent::Tasks);
     Ok((StatusCode::CREATED, Json(t)))
 }
@@ -223,8 +229,8 @@ pub async fn update_task(State(engine): State<AppState>, claims: Claims, Path(id
         req.estimate_optimistic, req.estimate_pessimistic)
         .await.map_err(internal)?;
     if let Err(e) = db::audit(&engine.pool, claims.user_id, "update", "task", Some(id), None).await { tracing::warn!("Audit log failed: {}", e); }
-    // BL3: Auto-unblock dependents when task is completed
-    if req.status.as_deref() == Some("completed") {
+    // BL3: Auto-unblock dependents when task is completed or done
+    if req.status.as_deref() == Some("completed") || req.status.as_deref() == Some("done") {
         auto_unblock_dependents(&engine, id).await;
     }
     crate::webhook::dispatch(engine.pool.clone(), "task.updated", serde_json::json!({"id": id}));
@@ -288,8 +294,8 @@ pub async fn bulk_update_status(State(engine): State<AppState>, claims: Claims, 
     let mut q = sqlx::query(&sql).bind(&req.status).bind(crate::db::now_str());
     for id in &req.task_ids { q = q.bind(id); }
     q.execute(&engine.pool).await.map_err(internal)?;
-    // B7: Auto-unblock dependents when bulk-completing tasks
-    if req.status == "completed" {
+    // B7: Auto-unblock dependents when bulk-completing/done tasks
+    if req.status == "completed" || req.status == "done" {
         for tid in &req.task_ids {
             auto_unblock_dependents(&engine, *tid).await;
         }

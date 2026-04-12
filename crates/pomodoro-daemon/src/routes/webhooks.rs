@@ -57,3 +57,31 @@ pub async fn delete_webhook(State(engine): State<AppState>, claims: Claims, Path
     db::delete_webhook(&engine.pool, id, claims.user_id).await.map_err(internal)?;
     Ok(StatusCode::NO_CONTENT)
 }
+
+// V32-15: Update webhook URL/events
+#[derive(Deserialize, utoipa::ToSchema)]
+pub struct UpdateWebhookRequest { pub url: Option<String>, pub events: Option<String>, pub active: Option<bool> }
+
+#[utoipa::path(put, path = "/api/webhooks/{id}", responses((status = 200)), security(("bearer" = [])))]
+pub async fn update_webhook(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>, Json(req): Json<UpdateWebhookRequest>) -> ApiResult<db::Webhook> {
+    let wh: (i64,) = sqlx::query_as("SELECT user_id FROM webhooks WHERE id = ?")
+        .bind(id).fetch_one(&engine.pool).await.map_err(|_| err(StatusCode::NOT_FOUND, "Webhook not found"))?;
+    if !is_owner_or_root(wh.0, &claims) { return Err(err(StatusCode::FORBIDDEN, "Not owner")); }
+    if let Some(ref url) = req.url {
+        if !url.starts_with("http://") && !url.starts_with("https://") { return Err(err(StatusCode::BAD_REQUEST, "URL must start with http:// or https://")); }
+    }
+    let mut sql_parts = Vec::new();
+    if req.url.is_some() { sql_parts.push("url = ?"); }
+    if req.events.is_some() { sql_parts.push("events = ?"); }
+    if req.active.is_some() { sql_parts.push("active = ?"); }
+    if sql_parts.is_empty() { return Err(err(StatusCode::BAD_REQUEST, "No fields to update")); }
+    let sql = format!("UPDATE webhooks SET {} WHERE id = ? AND user_id = ?", sql_parts.join(", "));
+    let mut q = sqlx::query(&sql);
+    if let Some(ref url) = req.url { q = q.bind(url); }
+    if let Some(ref events) = req.events { q = q.bind(events); }
+    if let Some(active) = req.active { q = q.bind(if active { 1i64 } else { 0 }); }
+    q = q.bind(id).bind(claims.user_id);
+    q.execute(&engine.pool).await.map_err(internal)?;
+    let updated = sqlx::query_as::<_, db::Webhook>("SELECT * FROM webhooks WHERE id = ?").bind(id).fetch_one(&engine.pool).await.map_err(internal)?;
+    Ok(Json(updated))
+}

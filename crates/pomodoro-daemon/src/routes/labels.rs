@@ -11,7 +11,9 @@ pub async fn list_labels(State(engine): State<AppState>, _claims: Claims) -> Api
 }
 
 #[utoipa::path(post, path = "/api/labels", responses((status = 201)), security(("bearer" = [])))]
-pub async fn create_label(State(engine): State<AppState>, _claims: Claims, Json(req): Json<CreateLabelRequest>) -> Result<(StatusCode, Json<db::Label>), ApiError> {
+pub async fn create_label(State(engine): State<AppState>, claims: Claims, Json(req): Json<CreateLabelRequest>) -> Result<(StatusCode, Json<db::Label>), ApiError> {
+    // V32-7: Root-only for consistency with delete/update
+    if claims.role != "root" { return Err(err(StatusCode::FORBIDDEN, "Only root can create labels")); }
     if req.name.trim().is_empty() { return Err(err(StatusCode::BAD_REQUEST, "Label name cannot be empty")); }
     if req.name.len() > 100 { return Err(err(StatusCode::BAD_REQUEST, "Label name too long (max 100)")); }
     let color = req.color.as_deref().unwrap_or("#6366f1");
@@ -40,7 +42,8 @@ pub async fn update_label(State(engine): State<AppState>, claims: Claims, Path(i
     if !color.starts_with('#') || !matches!(color.len(), 4 | 7) || !color[1..].chars().all(|c| c.is_ascii_hexdigit()) {
         return Err(err(StatusCode::BAD_REQUEST, "Color must be #RGB or #RRGGBB hex format"));
     }
-    db::update_label(&engine.pool, id, req.name.trim(), color).await.map(Json).map_err(internal)
+    db::update_label(&engine.pool, id, req.name.trim(), color).await.map(Json)
+        .map_err(|e| if e.to_string().contains("not found") { err(StatusCode::NOT_FOUND, "Label not found") } else { internal(e) })
 }
 
 #[utoipa::path(put, path = "/api/tasks/{id}/labels/{label_id}", responses((status = 204)), security(("bearer" = [])))]

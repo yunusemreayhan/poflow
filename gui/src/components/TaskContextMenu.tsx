@@ -37,8 +37,16 @@ interface CtxMenuProps {
 export default function TaskContextMenu(p: CtxMenuProps) {
   const tl = useT();
   const [ctxSub, setCtxSub] = useState<string | null>(null);
+  const [reparentSearch, setReparentSearch] = useState<string | null>(null);
   const { task: t, pos, node, isOwner, assignees, ctxSprints, ctxUsers, ctxBurnUsers, taskSprints, config } = p;
   const close = p.onClose;
+  const allTasks = useStore(s => s.tasks);
+
+  // V32-21: Check if candidateId is a descendant of taskId (prevent circular reparent)
+  const isDescendant = (candidateId: number, taskId: number, tasks: Task[]): boolean => {
+    const children = tasks.filter(t => t.parent_id === taskId);
+    return children.some(c => c.id === candidateId || isDescendant(candidateId, c.id, tasks));
+  };
 
   return (
     <>
@@ -172,6 +180,21 @@ export default function TaskContextMenu(p: CtxMenuProps) {
           await p.updateTask(t.id, { parent_id: null });
           close();
         }} className="w-full text-left px-3 py-1.5 text-white/60 hover:bg-white/5 flex items-center gap-2">⬆ Move to root</button>}
+        {/* V32-21: Reparent under another task */}
+        {!reparentSearch ? (
+          <button role="menuitem" onClick={() => setReparentSearch("")} className="w-full text-left px-3 py-1.5 text-white/60 hover:bg-white/5 flex items-center gap-2">📎 Move under...</button>
+        ) : (
+          <div className="px-3 py-1">
+            <input autoFocus value={reparentSearch} onChange={e => setReparentSearch(e.target.value)} placeholder="Search parent..."
+              className="w-full bg-white/5 border border-white/10 rounded px-2 py-1 text-xs text-white outline-none" onClick={e => e.stopPropagation()} />
+            <div className="max-h-24 overflow-y-auto mt-1">
+              {allTasks.filter(c => c.id !== t.id && !isDescendant(c.id, t.id, allTasks) && c.title.toLowerCase().includes(reparentSearch.toLowerCase())).slice(0, 8).map(c => (
+                <button key={c.id} role="menuitem" onClick={async () => { await p.updateTask(t.id, { parent_id: c.id }); close(); }}
+                  className="w-full text-left text-xs text-white/50 hover:text-white/80 py-0.5 truncate">→ {c.title}</button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="border-t border-white/5 my-1" />
         <button role="menuitem" onClick={() => { p.start(t.id); close(); }}

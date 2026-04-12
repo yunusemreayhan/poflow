@@ -348,7 +348,7 @@ export default function App() {
       {/* F18: Mobile bottom tab bar — visible on small screens */}
       {!focusMode && (
         <nav aria-label="Mobile navigation" className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[var(--color-bg)] border-t border-white/5 flex justify-around py-1 safe-bottom">
-          {TABS.filter(t => ["timer","tasks","kanban","dashboard","sprints","settings"].includes(t.id)).map(tab => {
+          {TABS.filter(t => ["timer","tasks","kanban","dashboard","sprints","rooms","history","settings"].includes(t.id)).map(tab => {
             const Icon = tab.icon;
             const active = activeTab === tab.id;
             return (

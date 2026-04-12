@@ -31,6 +31,23 @@ pub async fn delete_template(State(engine): State<AppState>, claims: Claims, Pat
     Ok(StatusCode::NO_CONTENT)
 }
 
+// V32-16: Update template name/data
+#[utoipa::path(put, path = "/api/templates/{id}", responses((status = 200)), security(("bearer" = [])))]
+pub async fn update_template(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>, Json(req): Json<CreateTemplateRequest>) -> ApiResult<db::TaskTemplate> {
+    let tmpl: (i64,) = sqlx::query_as("SELECT user_id FROM task_templates WHERE id = ?")
+        .bind(id).fetch_one(&engine.pool).await.map_err(|_| err(StatusCode::NOT_FOUND, "Template not found"))?;
+    if !is_owner_or_root(tmpl.0, &claims) { return Err(err(StatusCode::FORBIDDEN, "Not owner")); }
+    if req.name.trim().is_empty() { return Err(err(StatusCode::BAD_REQUEST, "Name required")); }
+    if req.name.len() > 200 { return Err(err(StatusCode::BAD_REQUEST, "Name too long (max 200 chars)")); }
+    let data = serde_json::to_string(&req.data).map_err(internal)?;
+    if data.len() > 65536 { return Err(err(StatusCode::BAD_REQUEST, "Template data too large (max 64KB)")); }
+    sqlx::query("UPDATE task_templates SET name = ?, data = ? WHERE id = ?")
+        .bind(req.name.trim()).bind(&data).bind(id).execute(&engine.pool).await.map_err(internal)?;
+    let updated = sqlx::query_as::<_, db::TaskTemplate>("SELECT * FROM task_templates WHERE id = ?")
+        .bind(id).fetch_one(&engine.pool).await.map_err(internal)?;
+    Ok(Json(updated))
+}
+
 // F11: Instantiate template with variable resolution
 #[utoipa::path(post, path = "/api/templates/{id}/instantiate", responses((status = 201)), security(("bearer" = [])))]
 pub async fn instantiate_template(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>) -> Result<(StatusCode, Json<db::Task>), ApiError> {

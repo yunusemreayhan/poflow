@@ -62,10 +62,8 @@ pub enum ChangeEvent {
 pub struct Engine {
     /// Per-user timer states
     ///
-    /// LOCK ORDERING: Prefer `config` before `states` to prevent deadlocks.
-    /// Exception: pause()/resume()/get_state() acquire `states` first, then
-    /// `config` only in the fallback path (no user state). This is safe because
-    /// the config lock is short-lived and never held across an await point.
+    /// LOCK ORDERING: Always acquire `config` before `states` to prevent deadlocks.
+    /// All methods follow this convention (V32-1).
     pub states: Arc<Mutex<HashMap<i64, EngineState>>>,
     pub config: Arc<Mutex<Config>>,
     pub pool: Pool,
@@ -191,10 +189,12 @@ impl Engine {
     }
 
     pub async fn pause(&self, user_id: i64) -> anyhow::Result<EngineState> {
+        // V32-1: Acquire config before states to match lock ordering convention
+        let config = self.config.lock().await.clone();
         let mut states = self.states.lock().await;
         let state = match states.get_mut(&user_id) {
             Some(s) => s,
-            None => return Ok(Self::idle_state(user_id, &*self.config.lock().await)),
+            None => return Ok(Self::idle_state(user_id, &config)),
         };
         if state.status == TimerStatus::Running {
             state.status = TimerStatus::Paused;
@@ -205,10 +205,12 @@ impl Engine {
     }
 
     pub async fn resume(&self, user_id: i64) -> anyhow::Result<EngineState> {
+        // V32-1: Acquire config before states to match lock ordering convention
+        let config = self.config.lock().await.clone();
         let mut states = self.states.lock().await;
         let state = match states.get_mut(&user_id) {
             Some(s) => s,
-            None => return Ok(Self::idle_state(user_id, &*self.config.lock().await)),
+            None => return Ok(Self::idle_state(user_id, &config)),
         };
         if state.status == TimerStatus::Paused {
             state.status = TimerStatus::Running;
@@ -219,10 +221,12 @@ impl Engine {
     }
 
     pub async fn stop(&self, user_id: i64) -> anyhow::Result<EngineState> {
+        // V32-1: Acquire config before states to match lock ordering convention
+        let config = self.config.lock().await.clone();
         let mut states = self.states.lock().await;
         let state = match states.get_mut(&user_id) {
             Some(s) => s,
-            None => return Ok(Self::idle_state(user_id, &*self.config.lock().await)),
+            None => return Ok(Self::idle_state(user_id, &config)),
         };
         Self::stop_session(&self.pool, state, "interrupted").await;
         let preserved = (state.session_count, state.daily_completed, state.daily_goal, state.duration_s);

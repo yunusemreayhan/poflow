@@ -105,6 +105,9 @@ interface Store {
   toggleFocusMode: () => void;
 }
 
+// V32-6: Monotonic toast ID counter
+let toastCounter = 0;
+
 export const useStore = create<Store>((set, get) => ({
   engine: null,
   tasks: [],
@@ -133,7 +136,8 @@ export const useStore = create<Store>((set, get) => ({
   savedServers: loadServers(),
   toasts: [],
   toast: (msg, type = "success", onUndo) => {
-    const id = (Date.now() % 1_000_000_000) * 1000 + Math.floor(Math.random() * 1000);
+    // V32-6: Monotonic counter to prevent ID collisions
+    const id = ++toastCounter;
     // U5: Cap visible toasts at 3
     set(s => ({ toasts: [...s.toasts.slice(-2), { id, msg, type, onUndo }] }));
     setTimeout(() => set(s => ({ toasts: s.toasts.filter(t => t.id !== id) })), onUndo ? 8000 : type === "error" ? 6000 : 3000);
@@ -221,6 +225,7 @@ export const useStore = create<Store>((set, get) => ({
   },
 
   switchToServer: async (server) => {
+    set({ mutating: true }); // V32-20: Show loading during server switch
     localStorage.setItem("serverUrl", server.url);
     await invoke("set_connection", { baseUrl: server.url });
     await setToken(server.token);
@@ -235,6 +240,7 @@ export const useStore = create<Store>((set, get) => ({
       set({ token: null, username: null, role: null });
       get().toast("Session expired — please log in again", "error");
     }
+    set({ mutating: false }); // V32-20
   },
 
   removeServer: (url, username) => {

@@ -79,12 +79,12 @@ export default function TaskNode({ node, depth, onView, selectMode, onSelect, se
         initial={{ opacity: 0, x: -10 }}
         animate={{ opacity: 1, x: 0 }}
         draggable
-        onDragStart={(e: React.DragEvent) => {
+        onDragStart={((e: React.DragEvent) => {
           e.dataTransfer?.setData("text/plain", String(t.id));
           e.dataTransfer.effectAllowed = "move";
           setTimeout(() => { if (e.target) (e.target as HTMLElement).style.opacity = "0.4"; }, 0);
-        }}
-        onDragEnd={(e: React.DragEvent) => { if (e.target) (e.target as HTMLElement).style.opacity = "1"; }}
+        }) as any}
+        onDragEnd={((e: React.DragEvent) => { if (e.target) (e.target as HTMLElement).style.opacity = "1"; }) as any}
         onDragOver={(e: React.DragEvent) => {
           e.preventDefault();
           const rect = e.currentTarget.getBoundingClientRect();

@@ -201,6 +201,11 @@ pub async fn add_task_link(State(engine): State<AppState>, claims: Claims, Path(
     if !is_owner_or_root(task.user_id, &claims) { return Err(err(StatusCode::FORBIDDEN, "Not owner")); }
     if req.url.len() > 2000 { return Err(err(StatusCode::BAD_REQUEST, "URL too long")); }
     if req.title.len() > 500 { return Err(err(StatusCode::BAD_REQUEST, "Title too long")); }
+    // V32-8: Validate link_type
+    const VALID_LINK_TYPES: &[&str] = &["commit", "pr", "issue", "url", "doc", "design"];
+    if !VALID_LINK_TYPES.contains(&req.link_type.as_str()) {
+        return Err(err(StatusCode::BAD_REQUEST, format!("Invalid link_type '{}'. Must be one of: {}", req.link_type, VALID_LINK_TYPES.join(", "))));
+    }
     sqlx::query("INSERT INTO task_links (task_id, link_type, url, title, created_at) VALUES (?, ?, ?, ?, ?)")
         .bind(id).bind(&req.link_type).bind(&req.url).bind(&req.title).bind(db::now_str())
         .execute(&engine.pool).await.map_err(internal)?;

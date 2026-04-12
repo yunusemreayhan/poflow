@@ -86,6 +86,8 @@ use utoipa_swagger_ui::SwaggerUi;
         routes::list_automations, routes::create_automation, routes::delete_automation, routes::toggle_automation,
         routes::user_presence, routes::create_slack_integration,
         routes::join_session, routes::session_participants,
+        // V32-24/25: Previously unregistered endpoints
+        routes::update_label, routes::duplicate_task, routes::update_webhook, routes::update_template,
     ),
     components(schemas(
         db::Task, db::Session, db::Comment, db::User, db::TaskDetail, db::SessionWithPath, db::DayStat, db::TaskAssignee,

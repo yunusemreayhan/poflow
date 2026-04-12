@@ -33,8 +33,9 @@ pub async fn delete_label(pool: &Pool, id: i64) -> Result<()> {
 }
 
 pub async fn update_label(pool: &Pool, id: i64, name: &str, color: &str) -> Result<Label> {
-    sqlx::query("UPDATE labels SET name = ?, color = ? WHERE id = ?")
+    let rows = sqlx::query("UPDATE labels SET name = ?, color = ? WHERE id = ?")
         .bind(name).bind(color).bind(id).execute(pool).await?;
+    if rows.rows_affected() == 0 { return Err(anyhow::anyhow!("Label not found")); }
     Ok(sqlx::query_as::<_, Label>("SELECT * FROM labels WHERE id = ?").bind(id).fetch_one(pool).await?)
 }
 
