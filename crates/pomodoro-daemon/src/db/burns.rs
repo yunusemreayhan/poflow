@@ -71,21 +71,6 @@ pub async fn find_task_active_sprint(pool: &Pool, task_id: i64) -> Result<Option
     Ok(row.map(|(id,)| id))
 }
 
-#[derive(Debug, Clone, FromRow, serde::Serialize, serde::Deserialize)]
-pub struct UserConfig {
-    pub user_id: i64,
-    pub work_duration_min: Option<i64>,
-    pub short_break_min: Option<i64>,
-    pub long_break_min: Option<i64>,
-    pub long_break_interval: Option<i64>,
-    pub auto_start_breaks: Option<i64>,
-    pub auto_start_work: Option<i64>,
-    pub daily_goal: Option<i64>,
-    pub theme: Option<String>,
-    pub notify_desktop: Option<i64>,
-    pub notify_sound: Option<i64>,
-}
-
 pub async fn get_user_config(pool: &Pool, user_id: i64) -> Result<Option<UserConfig>> {
     Ok(sqlx::query_as::<_, UserConfig>("SELECT * FROM user_configs WHERE user_id = ?").bind(user_id).fetch_optional(pool).await?)
 }

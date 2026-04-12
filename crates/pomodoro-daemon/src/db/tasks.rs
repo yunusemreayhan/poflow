@@ -52,14 +52,11 @@ pub async fn list_tasks_paged(pool: &Pool, f: TaskFilter<'_>, limit: i64, offset
         Some(get_descendant_ids(pool, &rids).await?)
     } else { None };
 
-    let assignee_task_ids: Option<Vec<i64>> = if let Some(username) = f.assignee {
-        let rows: Vec<(i64,)> = sqlx::query_as(
-            "SELECT ta.task_id FROM task_assignees ta JOIN users u ON ta.user_id = u.id WHERE u.username = ?"
-        ).bind(username).fetch_all(pool).await?;
-        Some(rows.into_iter().map(|r| r.0).collect())
-    } else { None };
-
+    // P2: Use JOIN for assignee filter instead of pre-fetching IDs
     let mut q = format!("{} WHERE t.deleted_at IS NULL", TASK_SELECT);
+    if f.assignee.is_some() {
+        q = format!("{} JOIN task_assignees _ta ON _ta.task_id = t.id JOIN users _au ON _au.id = _ta.user_id WHERE t.deleted_at IS NULL AND _au.username = ?", TASK_SELECT);
+    }
     if f.status.is_some() { q.push_str(" AND t.status = ?"); }
     if f.project.is_some() { q.push_str(" AND t.project = ?"); }
     if f.search.is_some() { q.push_str(" AND (t.title LIKE ? OR t.tags LIKE ? OR t.description LIKE ?)"); }
@@ -67,11 +64,6 @@ pub async fn list_tasks_paged(pool: &Pool, f: TaskFilter<'_>, limit: i64, offset
     if f.due_before.is_some() { q.push_str(" AND t.due_date IS NOT NULL AND t.due_date <= ?"); }
     if f.due_after.is_some() { q.push_str(" AND t.due_date IS NOT NULL AND t.due_date >= ?"); }
     if f.user_id.is_some() { q.push_str(" AND t.user_id = ?"); }
-    if let Some(ref ids) = assignee_task_ids {
-        if ids.is_empty() { return Ok(vec![]); }
-        let ph: String = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
-        q.push_str(&format!(" AND t.id IN ({})", ph));
-    }
     if let Some(ref ids) = team_scope {
         let ph: String = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
         q.push_str(&format!(" AND t.id IN ({})", ph));
@@ -79,6 +71,8 @@ pub async fn list_tasks_paged(pool: &Pool, f: TaskFilter<'_>, limit: i64, offset
     q.push_str(" ORDER BY t.sort_order ASC, t.id ASC LIMIT ? OFFSET ?");
 
     let mut query = sqlx::query_as::<_, Task>(&q);
+    // Bind assignee first if using JOIN (it's in the WHERE clause)
+    if let Some(a) = f.assignee { query = query.bind(a); }
     if let Some(s) = f.status { query = query.bind(s); }
     if let Some(p) = f.project { query = query.bind(p); }
     if let Some(s) = f.search { let like = format!("%{}%", s); query = query.bind(like.clone()).bind(like.clone()).bind(like); }
@@ -86,7 +80,6 @@ pub async fn list_tasks_paged(pool: &Pool, f: TaskFilter<'_>, limit: i64, offset
     if let Some(d) = f.due_before { query = query.bind(d); }
     if let Some(d) = f.due_after { query = query.bind(d); }
     if let Some(uid) = f.user_id { query = query.bind(uid); }
-    if let Some(ref ids) = assignee_task_ids { for id in ids { query = query.bind(id); } }
     if let Some(ref ids) = team_scope { for id in ids { query = query.bind(id); } }
     query = query.bind(limit).bind(offset);
     Ok(query.fetch_all(pool).await?)
@@ -131,20 +124,18 @@ pub async fn increment_task_actual(pool: &Pool, id: i64) -> Result<()> {
 // --- Session CRUD ---
 
 pub async fn count_tasks(pool: &Pool, f: TaskFilter<'_>) -> Result<i64> {
-    // Pre-resolve assignee and team_id to task ID lists (same as list_tasks_paged)
     let team_scope: Option<Vec<i64>> = if let Some(tid) = f.team_id {
         let roots: Vec<(i64,)> = sqlx::query_as("SELECT task_id FROM team_root_tasks WHERE team_id = ?").bind(tid).fetch_all(pool).await?;
         if roots.is_empty() { return Ok(0); }
         Some(get_descendant_ids(pool, &roots.into_iter().map(|r| r.0).collect::<Vec<_>>()).await?)
     } else { None };
-    let assignee_task_ids: Option<Vec<i64>> = if let Some(username) = f.assignee {
-        let rows: Vec<(i64,)> = sqlx::query_as("SELECT ta.task_id FROM task_assignees ta JOIN users u ON ta.user_id = u.id WHERE u.username = ?")
-            .bind(username).fetch_all(pool).await?;
-        Some(rows.into_iter().map(|r| r.0).collect())
-    } else { None };
-    if let Some(ref ids) = assignee_task_ids { if ids.is_empty() { return Ok(0); } }
 
-    let mut q = "SELECT COUNT(*) FROM tasks t WHERE t.deleted_at IS NULL".to_string();
+    // P2: Use JOIN for assignee filter
+    let mut q = if f.assignee.is_some() {
+        "SELECT COUNT(*) FROM tasks t JOIN task_assignees _ta ON _ta.task_id = t.id JOIN users _au ON _au.id = _ta.user_id WHERE t.deleted_at IS NULL AND _au.username = ?".to_string()
+    } else {
+        "SELECT COUNT(*) FROM tasks t WHERE t.deleted_at IS NULL".to_string()
+    };
     if f.status.is_some() { q.push_str(" AND t.status = ?"); }
     if f.project.is_some() { q.push_str(" AND t.project = ?"); }
     if f.search.is_some() { q.push_str(" AND (t.title LIKE ? OR t.tags LIKE ? OR t.description LIKE ?)"); }
@@ -152,15 +143,12 @@ pub async fn count_tasks(pool: &Pool, f: TaskFilter<'_>) -> Result<i64> {
     if f.due_before.is_some() { q.push_str(" AND t.due_date IS NOT NULL AND t.due_date <= ?"); }
     if f.due_after.is_some() { q.push_str(" AND t.due_date IS NOT NULL AND t.due_date >= ?"); }
     if f.user_id.is_some() { q.push_str(" AND t.user_id = ?"); }
-    if let Some(ref ids) = assignee_task_ids {
-        let ph: String = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
-        q.push_str(&format!(" AND t.id IN ({})", ph));
-    }
     if let Some(ref ids) = team_scope {
         let ph: String = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
         q.push_str(&format!(" AND t.id IN ({})", ph));
     }
     let mut query = sqlx::query_as::<_, (i64,)>(&q);
+    if let Some(a) = f.assignee { query = query.bind(a); }
     if let Some(s) = f.status { query = query.bind(s); }
     if let Some(p) = f.project { query = query.bind(p); }
     if let Some(s) = f.search { let like = format!("%{}%", s); query = query.bind(like.clone()).bind(like.clone()).bind(like); }
@@ -168,7 +156,6 @@ pub async fn count_tasks(pool: &Pool, f: TaskFilter<'_>) -> Result<i64> {
     if let Some(d) = f.due_before { query = query.bind(d); }
     if let Some(d) = f.due_after { query = query.bind(d); }
     if let Some(uid) = f.user_id { query = query.bind(uid); }
-    if let Some(ref ids) = assignee_task_ids { for id in ids { query = query.bind(id); } }
     if let Some(ref ids) = team_scope { for id in ids { query = query.bind(id); } }
     let (count,) = query.fetch_one(pool).await?;
     Ok(count)

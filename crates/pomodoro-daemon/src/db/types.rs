@@ -141,3 +141,18 @@ pub struct BurnTotal { pub total_points: f64, pub total_hours: f64, pub count: i
 
 #[derive(Debug, Clone, FromRow, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 pub struct BurnSummaryEntry { pub date: String, pub username: String, pub points: f64, pub hours: f64, pub count: i64 }
+
+#[derive(Debug, Clone, FromRow, serde::Serialize, serde::Deserialize)]
+pub struct UserConfig {
+    pub user_id: i64,
+    pub work_duration_min: Option<i64>,
+    pub short_break_min: Option<i64>,
+    pub long_break_min: Option<i64>,
+    pub long_break_interval: Option<i64>,
+    pub auto_start_breaks: Option<i64>,
+    pub auto_start_work: Option<i64>,
+    pub daily_goal: Option<i64>,
+    pub theme: Option<String>,
+    pub notify_desktop: Option<i64>,
+    pub notify_sound: Option<i64>,
+}
