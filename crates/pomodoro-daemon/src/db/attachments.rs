@@ -37,8 +37,7 @@ pub async fn delete_attachment(pool: &Pool, id: i64) -> Result<String> {
 
 /// Get the attachments storage directory
 pub fn attachments_dir() -> std::path::PathBuf {
-    let dir = dirs::data_dir().unwrap_or_else(|| std::path::PathBuf::from("~/.local/share"))
-        .join("pomodoro").join("attachments");
+    let dir = super::data_dir().join("attachments");
     std::fs::create_dir_all(&dir).ok();
     dir
 }

@@ -12,10 +12,19 @@ pub fn now_str() -> String {
     Utc::now().naive_utc().format("%Y-%m-%dT%H:%M:%S%.3f").to_string()
 }
 
-pub(crate) fn db_path() -> PathBuf {
-    let dir = dirs::data_dir().unwrap_or_else(|| PathBuf::from("~/.local/share")).join("pomodoro");
+/// Resolve the pomodoro data directory.
+/// `POMODORO_DATA_DIR` env var overrides the default `~/.local/share/pomodoro`.
+pub fn data_dir() -> PathBuf {
+    let dir = match std::env::var("POMODORO_DATA_DIR") {
+        Ok(d) if !d.is_empty() => PathBuf::from(d),
+        _ => dirs::data_dir().unwrap_or_else(|| PathBuf::from("~/.local/share")).join("pomodoro"),
+    };
     std::fs::create_dir_all(&dir).ok();
-    dir.join("pomodoro.db")
+    dir
+}
+
+pub(crate) fn db_path() -> PathBuf {
+    data_dir().join("pomodoro.db")
 }
 
 pub async fn connect() -> Result<Pool> {

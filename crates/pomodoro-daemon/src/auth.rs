@@ -35,9 +35,7 @@ fn secret() -> &'static [u8] {
             if !s.is_empty() { return s.into_bytes(); }
         }
         // 2. Persisted secret file
-        let secret_path = dirs::data_dir()
-            .unwrap_or_else(|| std::path::PathBuf::from("~/.local/share"))
-            .join("pomodoro")
+        let secret_path = crate::db::data_dir()
             .join(".jwt_secret");
         if let Ok(data) = std::fs::read(&secret_path) {
             if data.len() >= 32 { return data; }

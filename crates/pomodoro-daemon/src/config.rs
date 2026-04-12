@@ -60,10 +60,13 @@ impl Default for Config {
 
 impl Config {
     pub fn config_path() -> PathBuf {
-        let dir = dirs::config_dir()
-            .or_else(|| std::env::var("HOME").ok().map(|h| PathBuf::from(h).join(".config")))
-            .unwrap_or_else(|| PathBuf::from("/tmp"))
-            .join("pomodoro");
+        let dir = match std::env::var("POMODORO_CONFIG_DIR") {
+            Ok(d) if !d.is_empty() => PathBuf::from(d),
+            _ => dirs::config_dir()
+                .or_else(|| std::env::var("HOME").ok().map(|h| PathBuf::from(h).join(".config")))
+                .unwrap_or_else(|| PathBuf::from("/tmp"))
+                .join("pomodoro"),
+        };
         std::fs::create_dir_all(&dir).ok();
         dir.join("config.toml")
     }
