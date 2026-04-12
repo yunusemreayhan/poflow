@@ -9,7 +9,7 @@ pub struct Task {
     pub tags: Option<String>, pub priority: i64, pub estimated: i64, pub actual: i64,
     pub estimated_hours: f64, pub remaining_points: f64, pub due_date: Option<String>,
     pub status: String, pub sort_order: i64, pub created_at: String, pub updated_at: String,
-    pub attachment_count: i64, pub deleted_at: Option<String>,
+    pub attachment_count: i64, pub deleted_at: Option<String>, pub work_duration_minutes: Option<i64>,
 }
 
 #[derive(Debug, Clone, FromRow, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
@@ -83,7 +83,7 @@ pub struct DayStat { pub date: String, pub completed: i64, pub interrupted: i64,
 pub struct Sprint {
     pub id: i64, pub name: String, pub project: Option<String>, pub goal: Option<String>,
     pub status: String, pub start_date: Option<String>, pub end_date: Option<String>,
-    pub retro_notes: Option<String>,
+    pub retro_notes: Option<String>, pub capacity_hours: Option<f64>,
     pub created_by_id: i64, pub created_by: String, pub created_at: String, pub updated_at: String,
 }
 

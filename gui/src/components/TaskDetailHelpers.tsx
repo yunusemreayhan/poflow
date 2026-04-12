@@ -49,6 +49,30 @@ export function EditField({ label, value, type, onSave }: { label: string; value
 }
 
 export function ProgressBar({ label, pct }: { label: string; pct: number }) {
+
+// F3: Estimate vs actual comparison bars
+export function EstimateVsActual({ estimated, actual, unit }: { estimated: number; actual: number; unit: string }) {
+  if (estimated === 0 && actual === 0) return null;
+  const max = Math.max(estimated, actual, 1);
+  return (
+    <div className="mb-2 text-[10px]">
+      <div className="flex items-center gap-2 mb-1">
+        <span className="w-14 text-white/30">Est</span>
+        <div className="flex-1 h-2 bg-white/5 rounded-full overflow-hidden">
+          <div className="h-full bg-blue-500/60 rounded-full" style={{ width: `${(estimated / max) * 100}%` }} />
+        </div>
+        <span className="text-white/40 w-12 text-right">{estimated}{unit}</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="w-14 text-white/30">Actual</span>
+        <div className="flex-1 h-2 bg-white/5 rounded-full overflow-hidden">
+          <div className={`h-full rounded-full ${actual > estimated ? "bg-red-500/60" : "bg-green-500/60"}`} style={{ width: `${(actual / max) * 100}%` }} />
+        </div>
+        <span className="text-white/40 w-12 text-right">{actual}{unit}</span>
+      </div>
+    </div>
+  );
+}
   return (
     <div className="mb-2">
       <div className="flex justify-between text-[10px] text-white/30 mb-1"><span>{label}</span><span>{pct}% done</span></div>

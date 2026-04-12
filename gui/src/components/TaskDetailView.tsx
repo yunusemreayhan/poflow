@@ -11,7 +11,7 @@ import Select from "./Select";
 import { apiCall } from "../store/api";
 import { computeRollup } from "../rollup";
 import CommentSection from "./CommentSection";
-import { formatDuration, EditField, ProgressBar, ExportButton } from "./TaskDetailHelpers";
+import { formatDuration, EditField, ProgressBar, ExportButton, EstimateVsActual } from "./TaskDetailHelpers";
 
 function DetailNode({ detail, depth, onRefresh, hoursMap }: { detail: TaskDetail; depth: number; onRefresh: () => void; hoursMap: Map<number, number> }) {
   const { updateTask, username: currentUser, role, taskSprints } = useStore();
@@ -91,6 +91,8 @@ function DetailNode({ detail, depth, onRefresh, hoursMap }: { detail: TaskDetail
         {/* Progress bars */}
         {rollup.progressHours !== null && <ProgressBar label="Hours" pct={rollup.progressHours} />}
         {rollup.progressPoints !== null && <ProgressBar label="Points" pct={rollup.progressPoints} />}
+        <EstimateVsActual estimated={t.estimated} actual={t.actual} unit="🍅" />
+        <EstimateVsActual estimated={t.estimated_hours} actual={rollup.totalHours} unit="h" />
 
         {/* Estimate vs Actual comparison */}
         {(rollup.totalEstHours > 0 || rollup.totalEstPoints > 0) && (

@@ -32,6 +32,16 @@ pub async fn end_session(pool: &Pool, id: i64, status: &str) -> Result<Session> 
     Ok(sqlx::query_as::<_, Session>(&format!("{} WHERE s.id = ?", SESSION_SELECT)).bind(id).fetch_one(pool).await?)
 }
 
+// F7: Update session note
+pub async fn update_session_note(pool: &Pool, id: i64, note: &str) -> Result<Session> {
+    sqlx::query("UPDATE sessions SET notes = ? WHERE id = ?").bind(note).bind(id).execute(pool).await?;
+    Ok(sqlx::query_as::<_, Session>(&format!("{} WHERE s.id = ?", SESSION_SELECT)).bind(id).fetch_one(pool).await?)
+}
+
+pub async fn get_session(pool: &Pool, id: i64) -> Result<Session> {
+    Ok(sqlx::query_as::<_, Session>(&format!("{} WHERE s.id = ?", SESSION_SELECT)).bind(id).fetch_one(pool).await?)
+}
+
 pub async fn recover_interrupted(pool: &Pool) -> Result<Vec<Session>> {
     let sessions: Vec<Session> = sqlx::query_as(&format!("{} WHERE s.status = 'running'", SESSION_SELECT)).fetch_all(pool).await?;
     if !sessions.is_empty() {

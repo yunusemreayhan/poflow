@@ -351,6 +351,17 @@ async fn migrate(pool: &Pool) -> Result<()> {
         sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (3, ?)").bind(&now_str()).execute(pool).await.ok();
     }
 
+    // Migration 4: Sprint capacity hours
+    if !applied_set.contains(&4) {
+        sqlx::query("ALTER TABLE sprints ADD COLUMN capacity_hours REAL").execute(pool).await.ok();
+        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (4, ?)").bind(&now_str()).execute(pool).await.ok();
+    }
+    // Migration 5: Per-task work duration override
+    if !applied_set.contains(&5) {
+        sqlx::query("ALTER TABLE tasks ADD COLUMN work_duration_minutes INTEGER").execute(pool).await.ok();
+        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (5, ?)").bind(&now_str()).execute(pool).await.ok();
+    }
+
     sqlx::query("CREATE TABLE IF NOT EXISTS task_attachments (
         id          INTEGER PRIMARY KEY AUTOINCREMENT,
         task_id     INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,

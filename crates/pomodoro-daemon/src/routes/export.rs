@@ -130,6 +130,37 @@ pub async fn import_tasks_csv(State(engine): State<AppState>, claims: Claims, Js
     Ok(Json(serde_json::json!({ "created": created, "errors": errors })))
 }
 
+// F4: JSON task import
+#[derive(Deserialize)]
+pub struct ImportJsonRequest { pub tasks: Vec<ImportJsonTask> }
+#[derive(Deserialize)]
+pub struct ImportJsonTask {
+    pub title: String, pub description: Option<String>, pub project: Option<String>,
+    pub priority: Option<i64>, pub estimated: Option<i64>, pub children: Option<Vec<ImportJsonTask>>,
+}
+
+pub async fn import_tasks_json(State(engine): State<AppState>, claims: Claims, Json(req): Json<ImportJsonRequest>) -> ApiResult<serde_json::Value> {
+    if req.tasks.len() > 500 { return Err(err(StatusCode::BAD_REQUEST, "Too many tasks (max 500)")); }
+    let mut created = 0i64;
+    async fn import_tree(pool: &db::Pool, user_id: i64, tasks: &[ImportJsonTask], parent_id: Option<i64>, created: &mut i64) -> Result<(), String> {
+        for t in tasks {
+            let task = db::create_task(pool, user_id, parent_id, &t.title, t.description.as_deref(), t.project.as_deref(), None, t.priority.unwrap_or(3).clamp(1, 5), t.estimated.unwrap_or(0), 0.0, 0.0, None)
+                .await.map_err(|e| e.to_string())?;
+            *created += 1;
+            if let Some(children) = &t.children {
+                Box::pin(import_tree(pool, user_id, children, Some(task.id), created)).await?;
+            }
+        }
+        Ok(())
+    }
+    let mut errors = Vec::new();
+    if let Err(e) = import_tree(&engine.pool, claims.user_id, &req.tasks, None, &mut created).await {
+        errors.push(e);
+    }
+    engine.notify(ChangeEvent::Tasks);
+    Ok(Json(serde_json::json!({ "created": created, "errors": errors })))
+}
+
 /// Parse a CSV line respecting quoted fields (handles commas and escaped quotes inside quotes)
 fn parse_csv_line(line: &str) -> Vec<String> {
     let mut fields = Vec::new();

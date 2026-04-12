@@ -147,6 +147,17 @@ pub async fn close_room(State(engine): State<AppState>, claims: Claims, Path(id)
 }
 
 
+// F8: Export room estimation history as JSON
+pub async fn export_room_history(State(engine): State<AppState>, _claims: Claims, Path(id): Path<i64>) -> Result<axum::response::Response, ApiError> {
+    let state = db::get_room_state(&engine.pool, id).await.map_err(internal)?;
+    let body = serde_json::to_vec(&state.vote_history).map_err(internal)?;
+    Ok(axum::response::Response::builder()
+        .status(StatusCode::OK)
+        .header("content-type", "application/json")
+        .header("content-disposition", format!("attachment; filename=\"room_{}_history.json\"", id))
+        .body(axum::body::Body::from(body)).map_err(|e| internal(e.to_string()))?)
+}
+
 // --- Sprints ---
 
 pub async fn room_ws(

@@ -99,6 +99,14 @@ pub async fn get_task_sessions(State(engine): State<AppState>, _claims: Claims, 
     db::get_task_sessions(&engine.pool, id).await.map(Json).map_err(internal)
 }
 
+// F7: Update session note
+pub async fn update_session_note(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>, Json(req): Json<UpdateSessionNoteRequest>) -> ApiResult<db::Session> {
+    let session = db::get_session(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Session not found"))?;
+    if !is_owner_or_root(session.user_id, &claims) { return Err(err(StatusCode::FORBIDDEN, "Not session owner")); }
+    if req.note.len() > 5000 { return Err(err(StatusCode::BAD_REQUEST, "Note too long (max 5000 chars)")); }
+    db::update_session_note(&engine.pool, id, &req.note).await.map(Json).map_err(internal)
+}
+
 #[utoipa::path(put, path = "/api/tasks/{id}", request_body = UpdateTaskRequest, responses((status = 200, body = db::Task)), security(("bearer" = [])))]
 pub async fn update_task(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>, Json(req): Json<UpdateTaskRequest>) -> ApiResult<db::Task> {
     let task = db::get_task(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Task not found"))?;
@@ -134,7 +142,8 @@ pub async fn update_task(State(engine): State<AppState>, claims: Claims, Path(id
         req.tags.as_ref().map(|o| o.as_deref()),
         req.priority, req.estimated, req.estimated_hours, req.remaining_points,
         req.due_date.as_ref().map(|o| o.as_deref()),
-        req.status.as_deref(), req.sort_order, req.parent_id)
+        req.status.as_deref(), req.sort_order, req.parent_id,
+        req.work_duration_minutes.as_ref().map(|o| *o))
         .await.map_err(internal)?;
     if let Err(e) = db::audit(&engine.pool, claims.user_id, "update", "task", Some(id), None).await { tracing::warn!("Audit log failed: {}", e); }
     crate::webhook::dispatch(engine.pool.clone(), "task.updated", serde_json::json!({"id": id}));

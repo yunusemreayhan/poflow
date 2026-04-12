@@ -174,9 +174,9 @@ pub async fn accept_estimate(pool: &Pool, _room_id: i64, task_id: i64, value: f6
     match unit {
         "hours" | "mandays" => {
             let hours = if unit == "mandays" { value * 8.0 } else { value };
-            update_task(pool, task_id, None, None, None, None, None, None, Some(hours), None, None, Some("estimated"), None, None).await
+            update_task(pool, task_id, None, None, None, None, None, None, Some(hours), None, None, Some("estimated"), None, None, None).await
         }
-        _ => update_task(pool, task_id, None, None, None, None, None, Some(value as i64), None, Some(value), None, Some("estimated"), None, None).await
+        _ => update_task(pool, task_id, None, None, None, None, None, Some(value as i64), None, Some(value), None, Some("estimated"), None, None, None).await
     }
 }
 

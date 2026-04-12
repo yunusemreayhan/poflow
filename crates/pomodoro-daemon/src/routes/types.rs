@@ -42,6 +42,8 @@ pub struct UpdateTaskRequest {
     pub status: Option<String>,
     pub sort_order: Option<i64>,
     pub parent_id: Option<Option<i64>>,
+    #[serde(default)]
+    pub work_duration_minutes: Option<Option<i64>>,
     pub expected_updated_at: Option<String>,
 }
 #[derive(Deserialize, utoipa::ToSchema)]
@@ -71,7 +73,7 @@ pub struct CastVoteRequest { pub value: f64 }
 #[derive(Deserialize, utoipa::ToSchema)]
 pub struct AcceptEstimateRequest { pub value: f64 }
 #[derive(Deserialize, utoipa::ToSchema)]
-pub struct CreateSprintRequest { pub name: String, pub project: Option<String>, pub goal: Option<String>, pub start_date: Option<String>, pub end_date: Option<String> }
+pub struct CreateSprintRequest { pub name: String, pub project: Option<String>, pub goal: Option<String>, pub start_date: Option<String>, pub end_date: Option<String>, pub capacity_hours: Option<f64> }
 #[derive(Deserialize, utoipa::ToSchema)]
 pub struct UpdateSprintRequest {
     pub name: Option<String>,
@@ -87,6 +89,8 @@ pub struct UpdateSprintRequest {
     pub end_date: Option<Option<String>>,
     #[serde(default, deserialize_with = "deserialize_optional_nullable")]
     pub retro_notes: Option<Option<String>>,
+    #[serde(default)]
+    pub capacity_hours: Option<Option<f64>>,
     pub expected_updated_at: Option<String>,
 }
 #[derive(Deserialize, utoipa::ToSchema)]
@@ -180,3 +184,6 @@ pub fn validate_password(p: &str) -> Result<(), ApiError> {
     if !p.chars().any(|c| c.is_ascii_digit()) { return Err(err(StatusCode::BAD_REQUEST, "Password must contain a digit")); }
     Ok(())
 }
+
+#[derive(Deserialize, utoipa::ToSchema)]
+pub struct UpdateSessionNoteRequest { pub note: String }

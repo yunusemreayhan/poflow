@@ -21,7 +21,7 @@ pub async fn create_sprint(State(engine): State<AppState>, claims: Claims, Json(
     if let Some(ref d) = req.end_date { if chrono::NaiveDate::parse_from_str(d, "%Y-%m-%d").is_err() { return Err(err(StatusCode::BAD_REQUEST, "end_date must be YYYY-MM-DD")); } }
     // V4: Validate end_date >= start_date
     if let (Some(ref s), Some(ref e)) = (&req.start_date, &req.end_date) { if e < s { return Err(err(StatusCode::BAD_REQUEST, "end_date must be on or after start_date")); } }
-    let s = db::create_sprint(&engine.pool, claims.user_id, &req.name, req.project.as_deref(), req.goal.as_deref(), req.start_date.as_deref(), req.end_date.as_deref())
+    let s = db::create_sprint(&engine.pool, claims.user_id, &req.name, req.project.as_deref(), req.goal.as_deref(), req.start_date.as_deref(), req.end_date.as_deref(), req.capacity_hours)
         .await.map_err(internal)?;
     db::audit(&engine.pool, claims.user_id, "create", "sprint", Some(s.id), Some(&s.name)).await.ok();
     crate::webhook::dispatch(engine.pool.clone(), "sprint.created", serde_json::json!({"id": s.id, "name": &s.name}));
@@ -51,7 +51,8 @@ pub async fn update_sprint(State(engine): State<AppState>, claims: Claims, Path(
         None, // B4: Never pass status through update — use /start or /complete
         req.start_date.as_ref().map(|o| o.as_deref()),
         req.end_date.as_ref().map(|o| o.as_deref()),
-        req.retro_notes.as_ref().map(|o| o.as_deref()))
+        req.retro_notes.as_ref().map(|o| o.as_deref()),
+        req.capacity_hours.as_ref().map(|o| *o))
         .await.map_err(internal)?;
     engine.notify(ChangeEvent::Sprints);
     Ok(Json(s))
@@ -70,7 +71,7 @@ pub async fn start_sprint(State(engine): State<AppState>, claims: Claims, Path(i
     let sprint = db::get_sprint(&engine.pool, id).await.map_err(internal)?;
     if !is_owner_or_root(sprint.created_by_id, &claims) { return Err(err(StatusCode::FORBIDDEN, "Not owner")); }
     if sprint.status != "planning" { return Err(err(StatusCode::BAD_REQUEST, format!("Cannot start sprint in '{}' status", sprint.status))); }
-    let s = db::update_sprint(&engine.pool, id, None, None, None, Some("active"), None, None, None).await.map_err(internal)?;
+    let s = db::update_sprint(&engine.pool, id, None, None, None, Some("active"), None, None, None, None).await.map_err(internal)?;
     db::audit(&engine.pool, claims.user_id, "start", "sprint", Some(id), None).await.ok();
     crate::webhook::dispatch(engine.pool.clone(), "sprint.started", serde_json::json!({"id": id}));
     if let Err(e) = db::snapshot_sprint(&engine.pool, id).await { tracing::warn!("Snapshot failed: {}", e); }
@@ -84,11 +85,26 @@ pub async fn complete_sprint(State(engine): State<AppState>, claims: Claims, Pat
     if !is_owner_or_root(sprint.created_by_id, &claims) { return Err(err(StatusCode::FORBIDDEN, "Not owner")); }
     if sprint.status != "active" { return Err(err(StatusCode::BAD_REQUEST, format!("Cannot complete sprint in '{}' status", sprint.status))); }
     if let Err(e) = db::snapshot_sprint(&engine.pool, id).await { tracing::warn!("Snapshot failed: {}", e); }
-    let s = db::update_sprint(&engine.pool, id, None, None, None, Some("completed"), None, None, None).await.map_err(internal)?;
+    let s = db::update_sprint(&engine.pool, id, None, None, None, Some("completed"), None, None, None, None).await.map_err(internal)?;
     db::audit(&engine.pool, claims.user_id, "complete", "sprint", Some(id), None).await.ok();
     crate::webhook::dispatch(engine.pool.clone(), "sprint.completed", serde_json::json!({"id": id}));
     engine.notify(ChangeEvent::Sprints);
     Ok(Json(s))
+}
+
+// F5: Sprint carry-over — move incomplete tasks to a new sprint
+pub async fn carryover_sprint(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>) -> ApiResult<db::Sprint> {
+    let sprint = db::get_sprint(&engine.pool, id).await.map_err(internal)?;
+    if sprint.status != "completed" { return Err(err(StatusCode::BAD_REQUEST, "Sprint must be completed first")); }
+    if !is_owner_or_root(sprint.created_by_id, &claims) { return Err(err(StatusCode::FORBIDDEN, "Not owner")); }
+    let tasks = db::get_sprint_tasks(&engine.pool, id).await.map_err(internal)?;
+    let incomplete: Vec<i64> = tasks.iter().filter(|t| t.status != "completed" && t.status != "archived").map(|t| t.id).collect();
+    if incomplete.is_empty() { return Err(err(StatusCode::BAD_REQUEST, "No incomplete tasks to carry over")); }
+    let new_name = format!("{} (carry-over)", sprint.name);
+    let new_sprint = db::create_sprint(&engine.pool, claims.user_id, &new_name, sprint.project.as_deref(), None, None, None, sprint.capacity_hours).await.map_err(internal)?;
+    db::add_sprint_tasks(&engine.pool, new_sprint.id, &incomplete, claims.user_id).await.map_err(internal)?;
+    engine.notify(ChangeEvent::Sprints);
+    Ok(Json(new_sprint))
 }
 
 #[utoipa::path(get, path = "/api/sprints/{id}/tasks", responses((status = 200, body = Vec<db::Task>)), security(("bearer" = [])))]

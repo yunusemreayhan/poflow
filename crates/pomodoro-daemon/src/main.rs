@@ -232,6 +232,26 @@ async fn main() -> Result<()> {
         }
     });
 
+    // F1: Auto-archive completed tasks older than 90 days (daily)
+    let engine_archive = engine.clone();
+    let mut shutdown_rx_archive = shutdown_tx.subscribe();
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(86400));
+        interval.tick().await;
+        loop {
+            tokio::select! {
+                _ = interval.tick() => {},
+                _ = shutdown_rx_archive.changed() => break,
+            }
+            let cutoff = (chrono::Utc::now() - chrono::Duration::days(90)).format("%Y-%m-%dT%H:%M:%S").to_string();
+            if let Err(e) = sqlx::query("UPDATE tasks SET status = 'archived', updated_at = datetime('now') WHERE status = 'completed' AND updated_at < ? AND deleted_at IS NULL")
+                .bind(&cutoff).execute(&engine_archive.pool).await {
+                tracing::warn!("Auto-archive error: {}", e);
+            }
+            engine_archive.heartbeat("auto_archive").await;
+        }
+    });
+
     // O3: Orphaned attachment cleanup (daily)
     let pool_cleanup = engine.pool.clone();
     let mut shutdown_rx_cleanup = shutdown_tx.subscribe();
