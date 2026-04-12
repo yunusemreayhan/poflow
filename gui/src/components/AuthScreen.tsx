@@ -20,7 +20,7 @@ export default function AuthScreen() {
     e.preventDefault();
     if (!username.trim() || !password.trim()) return;
     // UX7: Client-side password length validation for registration
-    if (isRegister && password.length < 6) { setError("Password must be at least 6 characters"); return; }
+    if (isRegister && password.length < 8) { setError("Password must be at least 8 characters with uppercase + digit"); return; }
     setLoading(true);
     setError("");
     try {
@@ -93,7 +93,7 @@ export default function AuthScreen() {
               type={showPw ? "text" : "password"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Password (min 6 chars)"
+              placeholder="Password (min 8 chars, uppercase + digit)"
               aria-label="Password"
               className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 pr-10 text-sm text-white placeholder-white/30 outline-none focus:border-[var(--color-accent)]"
             />

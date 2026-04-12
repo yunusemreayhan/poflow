@@ -1,5 +1,7 @@
 # BUG: Password placeholder says "min 6 chars" but backend requires 8+
 
+**Status: RESOLVED**
+
 ## Found by
 E2E test exploration via WebDriver
 
