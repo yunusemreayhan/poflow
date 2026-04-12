@@ -1,6 +1,27 @@
 # API Changelog
 
-## v7 (Current)
+## v8 (Current)
+
+### Security Fixes
+- `POST /api/sprints/{id}/roots` — Requires sprint ownership (was unauthenticated).
+- `DELETE /api/sprints/{id}/roots/{task_id}` — Requires sprint ownership.
+- `DELETE /api/admin/users/{id}` — Deleted user's tokens are immediately invalidated.
+- `GET /api/export/sessions` — Root users can now export all sessions (was always filtered to own).
+- Attachment storage keys now include atomic counter to prevent collision.
+- SSE ticket generation no longer panics if `/dev/urandom` is unavailable.
+
+### Validation Improvements
+- `POST /api/sprints/{id}/tasks` — Rejects soft-deleted tasks.
+- `POST /api/sprints/{id}/burn` — Validates task exists and is not soft-deleted.
+- `POST /api/rooms/{id}/start-voting` — Rejects soft-deleted tasks.
+- `PUT /api/config` — Validates `theme` field (must be "dark" or "light").
+- `POST /api/templates` — Name max 200 chars, data max 64KB, limit 100 per user.
+
+### Bug Fixes
+- `POST /api/import/tasks` — Response field is `created` (not `imported`). Frontend now reads the correct field.
+- Token auto-refresh on 401 now works correctly (was referencing wrong store field).
+
+## v7
 
 ### New Endpoints
 - `GET /api/health` — Health check (no auth). Returns DB status and active timer count.

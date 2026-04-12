@@ -50,7 +50,7 @@ function RoomList({ onSelect }: { onSelect: (id: number) => void }) {
           className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--color-accent)] text-white text-sm font-semibold">
           <Plus size={16} /> New Room
         </motion.button>
-        <button onClick={() => setShowClosed(!showClosed)}
+        <button onClick={() => setShowClosed(!showClosed)} aria-pressed={showClosed}
           className={`text-xs px-2 py-1 rounded ${showClosed ? "bg-white/10 text-white" : "text-white/40"}`}>
           {showClosed ? "Hide closed" : "Show closed"}
         </button>

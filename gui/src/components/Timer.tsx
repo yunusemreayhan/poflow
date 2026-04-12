@@ -12,11 +12,11 @@ const PHASE_COLORS: Record<string, string> = {
   Idle: "#6C7A89",
 };
 
-const PHASE_LABELS: Record<string, string> = {
-  Work: "FOCUS",
-  ShortBreak: "SHORT BREAK",
-  LongBreak: "LONG BREAK",
-  Idle: "READY",
+const PHASE_KEYS: Record<string, keyof ReturnType<typeof useT>> = {
+  Work: "work",
+  ShortBreak: "shortBreak",
+  LongBreak: "longBreak",
+  Idle: "idle",
 };
 
 function formatTime(s: number) {
@@ -91,7 +91,7 @@ export default function Timer() {
           className="text-sm font-bold tracking-[0.3em] uppercase"
           style={{ color }}
         >
-          {PHASE_LABELS[phase] ?? phase}
+          {(PHASE_KEYS[phase] ? t[PHASE_KEYS[phase]] : phase).toUpperCase()}
         </motion.div>
       </AnimatePresence>
       {currentTask && isActive && <div className="text-xs text-white/40 truncate max-w-[200px] text-center">{currentTask.title}</div>}
@@ -113,7 +113,7 @@ export default function Timer() {
 
         <svg width={SIZE} height={SIZE} style={{ transform: "rotate(-90deg)" }}
           role="progressbar" aria-valuenow={elapsed} aria-valuemin={0} aria-valuemax={duration}
-          aria-label={`${PHASE_LABELS[phase] ?? phase}: ${formatTime(remaining)} remaining`}>
+          aria-label={`${PHASE_KEYS[phase] ? t[PHASE_KEYS[phase]] : phase}: ${formatTime(remaining)} remaining`}>
           <circle
             cx={SIZE / 2} cy={SIZE / 2} r={R}
             fill="none"
@@ -242,7 +242,7 @@ export default function Timer() {
               style={{ background: `linear-gradient(135deg, ${color}, ${color}99)` }}
             >
               <Play size={20} fill="white" />
-              Resume
+              {t.resume}
             </motion.button>
             <motion.button
               whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
