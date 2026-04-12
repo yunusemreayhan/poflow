@@ -137,11 +137,16 @@ export default function Settings() {
 
   const isDirty = local && config && JSON.stringify(local) !== JSON.stringify(config);
 
+  const [saving, setSaving] = useState(false);
+
   const save = async () => {
-    if (!local) return;
-    await updateConfig(local);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    if (!local || saving) return;
+    setSaving(true);
+    try {
+      await updateConfig(local);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } finally { setSaving(false); }
   };
 
   return (
@@ -277,11 +282,12 @@ export default function Settings() {
       <motion.button
         whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
         onClick={save}
+        disabled={saving}
         className="sticky bottom-4 flex items-center justify-center gap-2 py-4 rounded-xl font-semibold text-white text-base transition-all z-10"
-        style={{ background: saved ? "var(--color-success)" : "var(--color-accent)" }}
+        style={{ background: saved ? "var(--color-success)" : "var(--color-accent)", opacity: saving ? 0.7 : 1 }}
       >
         <Save size={18} />
-        {saved ? t.savedChanges : isDirty ? `${t.saveSettings} •` : t.saveSettings}
+        {saving ? "Saving..." : saved ? t.savedChanges : isDirty ? `${t.saveSettings} •` : t.saveSettings}
       </motion.button>
     </div>
   );

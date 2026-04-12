@@ -404,7 +404,7 @@ function BacklogView({ sprintId, taskIds, reload }: { sprintId: number; taskIds:
       <div>
         <div className="text-xs text-white/50 mb-1 font-medium">Sprint Tasks (click ✕ to remove)</div>
         <div className="space-y-1 max-h-[50vh] overflow-y-auto">
-          {[...taskIds].length === 0 && <div className="text-xs text-white/20 py-2">No tasks in sprint</div>}
+          {[...taskIds].length === 0 && <div className="text-xs text-white/20 py-4 text-center">📋 No tasks yet — add tasks from the task list</div>}
           <TaskList selectMode onSelect={removeTask} selectedTaskId={null} votedTaskIds={taskIds}
             selectLabel="✕" selectClassName="text-red-400 hover:text-red-300" filterIds={taskIds} />
         </div>

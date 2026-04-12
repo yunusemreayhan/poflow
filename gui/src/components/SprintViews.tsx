@@ -159,6 +159,11 @@ export function BurndownView({ stats }: { stats: SprintDailyStat[] }) {
           <Area type="monotone" dataKey="remaining" stroke="#7C3AED" fill="rgba(124,58,237,0.15)" strokeWidth={2} />
         </AreaChart>
       </ResponsiveContainer>
+      <table className="sr-only">
+        <caption>Burndown data ({metric})</caption>
+        <thead><tr><th>Date</th><th>Remaining</th><th>Ideal</th></tr></thead>
+        <tbody>{data.map(d => <tr key={d.date}><td>{d.date}</td><td>{d.remaining.toFixed(1)}</td><td>{d.ideal.toFixed(1)}</td></tr>)}</tbody>
+      </table>
     </div>
   );
 }
