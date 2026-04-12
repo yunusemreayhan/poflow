@@ -17,16 +17,27 @@ pub async fn get_active_timers(State(engine): State<AppState>, _claims: Claims) 
             .collect()
     }; // lock dropped here
     let mut active = Vec::new();
+    if snapshot.is_empty() { return Ok(Json(active)); }
+    // Batch lookup users and tasks
+    let user_ids: Vec<i64> = snapshot.iter().map(|(uid, ..)| *uid).collect();
+    let task_ids: Vec<i64> = snapshot.iter().filter_map(|(_, _, _, tid, ..)| *tid).collect();
+    let uph = user_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+    let usql = format!("SELECT id, username FROM users WHERE id IN ({})", uph);
+    let mut uq = sqlx::query_as::<_, (i64, String)>(&usql);
+    for id in &user_ids { uq = uq.bind(id); }
+    let user_map: std::collections::HashMap<i64, String> = uq.fetch_all(&engine.pool).await.unwrap_or_default().into_iter().collect();
+    let task_map: std::collections::HashMap<i64, String> = if !task_ids.is_empty() {
+        let tph = task_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        let tsql = format!("SELECT id, title FROM tasks WHERE id IN ({})", tph);
+        let mut tq = sqlx::query_as::<_, (i64, String)>(&tsql);
+        for id in &task_ids { tq = tq.bind(id); }
+        tq.fetch_all(&engine.pool).await.unwrap_or_default().into_iter().collect()
+    } else { std::collections::HashMap::new() };
     for (uid, phase, status, task_id, elapsed_s, duration_s) in &snapshot {
-        let username: Option<(String,)> = sqlx::query_as("SELECT username FROM users WHERE id = ?")
-            .bind(uid).fetch_optional(&engine.pool).await.unwrap_or(None);
-        let task_title: Option<(String,)> = if let Some(tid) = task_id {
-            sqlx::query_as("SELECT title FROM tasks WHERE id = ?").bind(tid).fetch_optional(&engine.pool).await.unwrap_or(None)
-        } else { None };
         active.push(serde_json::json!({
-            "username": username.map(|u| u.0).unwrap_or_default(),
+            "username": user_map.get(uid).cloned().unwrap_or_default(),
             "phase": phase, "status": status,
-            "task": task_title.map(|t| t.0),
+            "task": task_id.and_then(|tid| task_map.get(&tid).cloned()),
             "elapsed_s": elapsed_s, "duration_s": duration_s,
         }));
     }

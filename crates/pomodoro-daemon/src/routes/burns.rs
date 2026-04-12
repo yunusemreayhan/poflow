@@ -13,8 +13,9 @@ pub async fn log_burn(State(engine): State<AppState>, claims: Claims, Path(id): 
     let task = db::get_task(&engine.pool, req.task_id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Task not found"))?;
     if task.deleted_at.is_some() { return Err(err(StatusCode::BAD_REQUEST, "Cannot log burns on deleted tasks")); }
     // Verify task belongs to this sprint
-    let sprint_tasks = db::get_sprint_task_entries(&engine.pool, id).await.map_err(internal)?;
-    if !sprint_tasks.iter().any(|st| st.task_id == req.task_id) {
+    let exists: Option<(i64,)> = sqlx::query_as("SELECT 1 FROM sprint_tasks WHERE sprint_id = ? AND task_id = ?")
+        .bind(id).bind(req.task_id).fetch_optional(&engine.pool).await.map_err(internal)?;
+    if exists.is_none() {
         return Err(err(StatusCode::BAD_REQUEST, "Task does not belong to this sprint"));
     }
     let b = db::log_burn(&engine.pool, Some(id), req.task_id, None, claims.user_id, pts, hrs, "manual", req.note.as_deref())

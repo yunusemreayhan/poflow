@@ -61,16 +61,16 @@ Tests: 275 backend, 154 frontend
 
 ## Accessibility (10)
 
-- [ ] **A1.** `TaskDetailView` expandable sections (comments/sessions/time/votes) don't use `aria-expanded`.
-- [ ] **A2.** `NotificationBell` dropdown has no `role="dialog"`, no `aria-label`, no focus trap, no Escape dismiss.
-- [ ] **A3.** `TaskContextMenu` sprint/assignee submenus have no `role="menu"` or `aria-label`.
-- [ ] **A4.** `TaskInlineEditors` close buttons use "✕" text with no `aria-label`.
-- [ ] **A5.** `TaskDetailParts` attachment download "↓" and delete "✕" buttons have no `aria-label`.
-- [ ] **A6.** `AuthScreen` password strength meter has no ARIA live region.
-- [ ] **A7.** `AuthScreen` server URL edit button (🌐) has no `aria-label`.
-- [ ] **A8.** `TaskActivityFeed` toggle button has no `aria-expanded`.
-- [ ] **A9.** `SprintParts` capacity warning "⚠ over capacity" is visual only — no `role="alert"`.
-- [ ] **A10.** `TaskList` FTS search results are clickable divs with no `role="button"` or keyboard handler.
+- [x] **A1.** `TaskDetailView` expandable sections (comments/sessions/time/votes) don't use `aria-expanded`.
+- [x] **A2.** `NotificationBell` dropdown has no `role="dialog"`, no `aria-label`, no focus trap, no Escape dismiss.
+- [x] **A3.** `TaskContextMenu` sprint/assignee submenus have no `role="menu"` or `aria-label`.
+- [x] **A4.** `TaskInlineEditors` close buttons use "✕" text with no `aria-label`.
+- [x] **A5.** `TaskDetailParts` attachment download "↓" and delete "✕" buttons have no `aria-label`.
+- [x] **A6.** `AuthScreen` password strength meter has no ARIA live region.
+- [x] **A7.** `AuthScreen` server URL edit button (🌐) has no `aria-label`.
+- [x] **A8.** `TaskActivityFeed` toggle button has no `aria-expanded`.
+- [x] **A9.** `SprintParts` capacity warning "⚠ over capacity" is visual only — no `role="alert"`.
+- [x] **A10.** `TaskList` FTS search results are clickable divs with no `role="button"` or keyboard handler.
 
 ## Performance (5)
 

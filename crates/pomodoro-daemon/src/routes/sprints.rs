@@ -203,17 +203,20 @@ pub struct CompareQuery { pub a: i64, pub b: i64 }
 
 #[utoipa::path(get, path = "/api/sprints/compare", responses((status = 200)), security(("bearer" = [])))]
 pub async fn compare_sprints(State(engine): State<AppState>, _claims: Claims, Query(q): Query<CompareQuery>) -> ApiResult<serde_json::Value> {
-    let (a, b) = tokio::join!(
-        db::get_sprint_detail(&engine.pool, q.a),
-        db::get_sprint_detail(&engine.pool, q.b)
+    let pool = &engine.pool;
+    let (sa, sb) = tokio::join!(db::get_sprint(pool, q.a), db::get_sprint(pool, q.b));
+    let sa = sa.map_err(|_| err(StatusCode::NOT_FOUND, "Sprint A not found"))?;
+    let sb = sb.map_err(|_| err(StatusCode::NOT_FOUND, "Sprint B not found"))?;
+    let count_sql = "SELECT COUNT(*), SUM(CASE WHEN t.status IN ('completed','done') THEN 1 ELSE 0 END) FROM sprint_tasks st JOIN tasks t ON st.task_id = t.id WHERE st.sprint_id = ? AND t.deleted_at IS NULL";
+    let (ca, cb) = tokio::join!(
+        sqlx::query_as::<_, (i64, i64)>(count_sql).bind(q.a).fetch_one(pool),
+        sqlx::query_as::<_, (i64, i64)>(count_sql).bind(q.b).fetch_one(pool)
     );
-    let a = a.map_err(|_| err(StatusCode::NOT_FOUND, "Sprint A not found"))?;
-    let b = b.map_err(|_| err(StatusCode::NOT_FOUND, "Sprint B not found"))?;
-    let done_a = a.tasks.iter().filter(|t| t.status == "completed").count();
-    let done_b = b.tasks.iter().filter(|t| t.status == "completed").count();
+    let (total_a, done_a) = ca.map_err(internal)?;
+    let (total_b, done_b) = cb.map_err(internal)?;
     Ok(Json(serde_json::json!({
-        "a": {"id": a.sprint.id, "name": a.sprint.name, "total_tasks": a.tasks.len(), "done_tasks": done_a, "capacity_hours": a.sprint.capacity_hours},
-        "b": {"id": b.sprint.id, "name": b.sprint.name, "total_tasks": b.tasks.len(), "done_tasks": done_b, "capacity_hours": b.sprint.capacity_hours},
+        "a": {"id": sa.id, "name": sa.name, "total_tasks": total_a, "done_tasks": done_a, "capacity_hours": sa.capacity_hours},
+        "b": {"id": sb.id, "name": sb.name, "total_tasks": total_b, "done_tasks": done_b, "capacity_hours": sb.capacity_hours},
     })))
 }
 

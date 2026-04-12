@@ -71,7 +71,9 @@ export function useSseConnection(token: string | null) {
     const timerFallback = setInterval(() => {
       if (!sseInstance || sseInstance.readyState !== EventSource.OPEN) poll();
     }, 2000);
-    const taskSafety = setInterval(loadTasks, 30000);
+    const taskSafety = setInterval(() => {
+      if (!sseInstance || sseInstance.readyState !== EventSource.OPEN) loadTasks();
+    }, 30000);
 
     return () => {
       unmounted = true;
