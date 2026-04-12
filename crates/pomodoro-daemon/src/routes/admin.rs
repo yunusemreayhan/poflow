@@ -51,9 +51,9 @@ pub async fn create_backup(State(engine): State<AppState>, claims: Claims) -> Re
     std::fs::create_dir_all(&backup_dir).map_err(|e| internal(format!("Failed to create backup dir: {}", e)))?;
     let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S");
     let backup_path = backup_dir.join(format!("pomodoro_{}.db", timestamp));
-    // S2: Validate path characters to prevent SQL injection via POMODORO_DATA_DIR
+    // S3: Validate path to prevent SQL injection via POMODORO_DATA_DIR
     let path_str = backup_path.display().to_string();
-    if path_str.contains('\'') || path_str.contains(';') || path_str.contains('\0') {
+    if !path_str.bytes().all(|b| b.is_ascii_alphanumeric() || b"/_-. ".contains(&b)) {
         return Err(err(StatusCode::BAD_REQUEST, "Invalid characters in backup path"));
     }
     sqlx::query(&format!("VACUUM INTO '{}'", path_str))
@@ -116,7 +116,7 @@ pub async fn restore_backup(State(engine): State<AppState>, claims: Claims, Json
     // Create a safety backup before restoring
     let safety = backup_dir.join(format!("pre_restore_{}.db", chrono::Utc::now().format("%Y%m%d_%H%M%S")));
     let safety_str = safety.display().to_string();
-    if safety_str.contains('\'') || safety_str.contains(';') || safety_str.contains('\0') {
+    if !safety_str.bytes().all(|b| b.is_ascii_alphanumeric() || b"/_-. ".contains(&b)) {
         return Err(err(StatusCode::BAD_REQUEST, "Invalid characters in backup path"));
     }
     sqlx::query(&format!("VACUUM INTO '{}'", safety_str)).execute(&engine.pool).await.map_err(|e| internal(format!("Safety backup failed: {}", e)))?;
@@ -127,13 +127,19 @@ pub async fn restore_backup(State(engine): State<AppState>, claims: Claims, Json
     // Close all pool connections before overwriting to prevent corruption
     engine.pool.close().await;
     std::fs::copy(&backup_path, &db_path).map_err(|e| internal(format!("Restore failed: {}", e)))?;
+    // S4: Schedule graceful shutdown so the server restarts with the restored DB
+    // (pool is closed, all subsequent requests would fail anyway)
+    tokio::spawn(async {
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+        std::process::exit(0);
+    });
     Ok(axum::response::Response::builder()
         .status(StatusCode::OK)
         .header("content-type", "application/json")
         .body(axum::body::Body::from(serde_json::to_vec(&serde_json::json!({
             "restored_from": req.filename,
             "safety_backup": safety.display().to_string(),
-            "note": "Restart the server to use the restored database"
+            "note": "Server is restarting to apply the restored database"
         })).map_err(|e| internal(e.to_string()))?))
         .map_err(|e| internal(e.to_string()))?)
 }
