@@ -45,6 +45,8 @@ pub struct UpdateTaskRequest {
     #[serde(default)]
     pub work_duration_minutes: Option<Option<i64>>,
     pub expected_updated_at: Option<String>,
+    pub estimate_optimistic: Option<Option<f64>>,
+    pub estimate_pessimistic: Option<Option<f64>>,
 }
 #[derive(Deserialize, utoipa::ToSchema)]
 pub struct StartRequest { pub task_id: Option<i64>, pub phase: Option<String> }

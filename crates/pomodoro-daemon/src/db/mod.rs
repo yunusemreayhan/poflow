@@ -466,6 +466,28 @@ async fn migrate(pool: &Pool) -> Result<()> {
         sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (13, ?)").bind(&now_str()).execute(pool).await.ok();
     }
 
+    // Migration 14: PERT estimates (optimistic/pessimistic hours)
+    if !applied_set.contains(&14) {
+        if let Err(e) = sqlx::query("ALTER TABLE tasks ADD COLUMN estimate_optimistic REAL").execute(pool).await { log_migration_err("ALTER TABLE tasks ADD COLUMN estimate_optimistic", e); }
+        if let Err(e) = sqlx::query("ALTER TABLE tasks ADD COLUMN estimate_pessimistic REAL").execute(pool).await { log_migration_err("ALTER TABLE tasks ADD COLUMN estimate_pessimistic", e); }
+        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (14, ?)").bind(&now_str()).execute(pool).await.ok();
+    }
+
+    // Migration 15: Automation rules
+    if !applied_set.contains(&15) {
+        sqlx::query("CREATE TABLE IF NOT EXISTS automation_rules (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id         INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            name            TEXT NOT NULL,
+            trigger_event   TEXT NOT NULL,
+            condition_json  TEXT NOT NULL DEFAULT '{}',
+            action_json     TEXT NOT NULL DEFAULT '{}',
+            enabled         INTEGER NOT NULL DEFAULT 1,
+            created_at      TEXT NOT NULL
+        )").execute(pool).await.ok();
+        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (15, ?)").bind(&now_str()).execute(pool).await.ok();
+    }
+
     sqlx::query("CREATE TABLE IF NOT EXISTS task_attachments (
         id          INTEGER PRIMARY KEY AUTOINCREMENT,
         task_id     INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,

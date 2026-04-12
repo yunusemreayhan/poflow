@@ -247,3 +247,65 @@ pub async fn github_webhook(State(engine): State<AppState>, Json(payload): Json<
     tracing::info!("GitHub webhook from {}: linked {} commits", repo, linked);
     Ok(StatusCode::OK)
 }
+
+// F19: Automation rules
+#[derive(Deserialize, utoipa::ToSchema)]
+pub struct CreateAutomationRuleRequest {
+    pub name: String,
+    pub trigger_event: String,
+    pub condition_json: Option<String>,
+    pub action_json: String,
+}
+
+#[derive(sqlx::FromRow, serde::Serialize, utoipa::ToSchema)]
+pub struct AutomationRule {
+    pub id: i64, pub user_id: i64, pub name: String, pub trigger_event: String,
+    pub condition_json: String, pub action_json: String, pub enabled: i64, pub created_at: String,
+}
+
+const VALID_TRIGGERS: &[&str] = &["task.status_changed", "task.due_approaching", "task.all_subtasks_done"];
+
+#[utoipa::path(get, path = "/api/automations", responses((status = 200)), security(("bearer" = [])))]
+pub async fn list_automations(State(engine): State<AppState>, claims: Claims) -> ApiResult<Vec<AutomationRule>> {
+    let rows = sqlx::query_as::<_, AutomationRule>("SELECT * FROM automation_rules WHERE user_id = ? ORDER BY created_at DESC")
+        .bind(claims.user_id).fetch_all(&engine.pool).await.map_err(internal)?;
+    Ok(Json(rows))
+}
+
+#[utoipa::path(post, path = "/api/automations", responses((status = 201)), security(("bearer" = [])))]
+pub async fn create_automation(State(engine): State<AppState>, claims: Claims, Json(req): Json<CreateAutomationRuleRequest>) -> Result<(StatusCode, Json<AutomationRule>), ApiError> {
+    if req.name.trim().is_empty() || req.name.len() > 200 { return Err(err(StatusCode::BAD_REQUEST, "Name required (max 200 chars)")); }
+    if !VALID_TRIGGERS.contains(&req.trigger_event.as_str()) { return Err(err(StatusCode::BAD_REQUEST, format!("Invalid trigger. Must be one of: {}", VALID_TRIGGERS.join(", ")))); }
+    if req.action_json.len() > 4096 { return Err(err(StatusCode::BAD_REQUEST, "Action JSON too large")); }
+    // Limit rules per user
+    let (count,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM automation_rules WHERE user_id = ?")
+        .bind(claims.user_id).fetch_one(&engine.pool).await.map_err(internal)?;
+    if count >= 50 { return Err(err(StatusCode::BAD_REQUEST, "Too many rules (max 50)")); }
+    let now = db::now_str();
+    let id = sqlx::query("INSERT INTO automation_rules (user_id, name, trigger_event, condition_json, action_json, enabled, created_at) VALUES (?, ?, ?, ?, ?, 1, ?)")
+        .bind(claims.user_id).bind(req.name.trim()).bind(&req.trigger_event)
+        .bind(req.condition_json.as_deref().unwrap_or("{}")).bind(&req.action_json).bind(&now)
+        .execute(&engine.pool).await.map_err(internal)?.last_insert_rowid();
+    let rule = sqlx::query_as::<_, AutomationRule>("SELECT * FROM automation_rules WHERE id = ?")
+        .bind(id).fetch_one(&engine.pool).await.map_err(internal)?;
+    Ok((StatusCode::CREATED, Json(rule)))
+}
+
+#[utoipa::path(delete, path = "/api/automations/{id}", responses((status = 204)), security(("bearer" = [])))]
+pub async fn delete_automation(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>) -> Result<StatusCode, ApiError> {
+    let rule: (i64,) = sqlx::query_as("SELECT user_id FROM automation_rules WHERE id = ?")
+        .bind(id).fetch_one(&engine.pool).await.map_err(|_| err(StatusCode::NOT_FOUND, "Rule not found"))?;
+    if !is_owner_or_root(rule.0, &claims) { return Err(err(StatusCode::FORBIDDEN, "Not owner")); }
+    sqlx::query("DELETE FROM automation_rules WHERE id = ?").bind(id).execute(&engine.pool).await.map_err(internal)?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+#[utoipa::path(put, path = "/api/automations/{id}/toggle", responses((status = 200)), security(("bearer" = [])))]
+pub async fn toggle_automation(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>) -> Result<StatusCode, ApiError> {
+    let rule: (i64,) = sqlx::query_as("SELECT user_id FROM automation_rules WHERE id = ?")
+        .bind(id).fetch_one(&engine.pool).await.map_err(|_| err(StatusCode::NOT_FOUND, "Rule not found"))?;
+    if !is_owner_or_root(rule.0, &claims) { return Err(err(StatusCode::FORBIDDEN, "Not owner")); }
+    sqlx::query("UPDATE automation_rules SET enabled = CASE WHEN enabled = 1 THEN 0 ELSE 1 END WHERE id = ?")
+        .bind(id).execute(&engine.pool).await.map_err(internal)?;
+    Ok(StatusCode::OK)
+}

@@ -10,6 +10,7 @@ pub struct Task {
     pub estimated_hours: f64, pub remaining_points: f64, pub due_date: Option<String>,
     pub status: String, pub sort_order: i64, pub created_at: String, pub updated_at: String,
     pub attachment_count: i64, pub deleted_at: Option<String>, pub work_duration_minutes: Option<i64>,
+    pub estimate_optimistic: Option<f64>, pub estimate_pessimistic: Option<f64>,
 }
 
 #[derive(Debug, Clone, FromRow, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]

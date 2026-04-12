@@ -14,7 +14,7 @@ pub async fn duplicate_task(State(engine): State<AppState>, claims: Claims, Path
         .await.map_err(internal)?;
     // Copy work_duration_minutes if set
     if task.work_duration_minutes.is_some() {
-        db::update_task(&engine.pool, t.id, None, None, None, None, None, None, None, None, None, None, None, None, task.work_duration_minutes.map(Some)).await.ok();
+        db::update_task(&engine.pool, t.id, None, None, None, None, None, None, None, None, None, None, None, None, task.work_duration_minutes.map(Some), None, None).await.ok();
     }
     // Copy labels
     if let Ok(labels) = db::get_task_labels(&engine.pool, id).await {
@@ -193,7 +193,8 @@ pub async fn update_task(State(engine): State<AppState>, claims: Claims, Path(id
         req.priority, req.estimated, req.estimated_hours, req.remaining_points,
         req.due_date.as_ref().map(|o| o.as_deref()),
         req.status.as_deref(), req.sort_order, req.parent_id,
-        req.work_duration_minutes.as_ref().map(|o| *o))
+        req.work_duration_minutes.as_ref().map(|o| *o),
+        req.estimate_optimistic, req.estimate_pessimistic)
         .await.map_err(internal)?;
     if let Err(e) = db::audit(&engine.pool, claims.user_id, "update", "task", Some(id), None).await { tracing::warn!("Audit log failed: {}", e); }
     // BL3: Auto-unblock dependents when task is completed
@@ -212,7 +213,7 @@ pub async fn update_task(State(engine): State<AppState>, claims: Claims, Path(id
                                 }
                             }
                             if all_done {
-                                db::update_task(&engine.pool, dep_id, None, None, None, None, None, None, None, None, None, Some("backlog"), None, None, None).await.ok();
+                                db::update_task(&engine.pool, dep_id, None, None, None, None, None, None, None, None, None, Some("backlog"), None, None, None, None, None).await.ok();
                             }
                         }
                     }
@@ -296,7 +297,7 @@ pub async fn bulk_update_status(State(engine): State<AppState>, claims: Claims, 
                                     }
                                 }
                                 if all_done {
-                                    db::update_task(&engine.pool, dep_id, None, None, None, None, None, None, None, None, None, Some("backlog"), None, None, None).await.ok();
+                                    db::update_task(&engine.pool, dep_id, None, None, None, None, None, None, None, None, None, Some("backlog"), None, None, None, None, None).await.ok();
                                 }
                             }
                         }

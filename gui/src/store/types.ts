@@ -23,6 +23,8 @@ export interface Task {
   attachment_count: number;
   deleted_at: string | null;
   work_duration_minutes: number | null;
+  estimate_optimistic: number | null;
+  estimate_pessimistic: number | null;
 }
 
 export interface Session {

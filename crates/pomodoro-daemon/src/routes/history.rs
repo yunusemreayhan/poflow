@@ -246,3 +246,86 @@ pub async fn priority_suggestions(State(engine): State<AppState>, claims: Claims
     suggestions.sort_by(|a, b| b["suggested_priority"].as_i64().cmp(&a["suggested_priority"].as_i64()));
     Ok(Json(suggestions))
 }
+
+// F9: Activity feed — unified stream of task updates, comments, sprint changes
+#[derive(Deserialize)]
+pub struct FeedQuery { pub since: Option<String>, pub types: Option<String>, pub limit: Option<i64> }
+
+#[utoipa::path(get, path = "/api/feed", responses((status = 200)), security(("bearer" = [])))]
+pub async fn activity_feed(State(engine): State<AppState>, _claims: Claims, Query(q): Query<FeedQuery>) -> ApiResult<Vec<serde_json::Value>> {
+    let since = q.since.as_deref().unwrap_or("2000-01-01T00:00:00");
+    let limit = q.limit.unwrap_or(50).min(200);
+    let types: Option<Vec<&str>> = q.types.as_deref().map(|t| t.split(',').map(|s| s.trim()).collect());
+
+    let mut items: Vec<serde_json::Value> = Vec::new();
+
+    // Audit log entries
+    if types.as_ref().map_or(true, |t| t.iter().any(|x| *x == "audit" || *x == "all")) {
+        let rows: Vec<(String, String, Option<String>, String, String)> = sqlx::query_as(
+            "SELECT a.action, a.entity_type, a.detail, a.created_at, u.username FROM audit_log a JOIN users u ON a.user_id = u.id WHERE a.created_at > ? ORDER BY a.created_at DESC LIMIT ?")
+            .bind(since).bind(limit).fetch_all(&engine.pool).await.map_err(internal)?;
+        for (action, entity, detail, at, user) in rows {
+            items.push(serde_json::json!({"type": "audit", "action": action, "entity_type": entity, "detail": detail, "created_at": at, "user": user}));
+        }
+    }
+
+    // Recent comments
+    if types.as_ref().map_or(true, |t| t.iter().any(|x| *x == "comment" || *x == "all")) {
+        let rows: Vec<(i64, i64, String, String, String)> = sqlx::query_as(
+            "SELECT c.id, c.task_id, c.content, c.created_at, u.username FROM comments c JOIN users u ON c.user_id = u.id WHERE c.created_at > ? ORDER BY c.created_at DESC LIMIT ?")
+            .bind(since).bind(limit).fetch_all(&engine.pool).await.map_err(internal)?;
+        for (id, task_id, content, at, user) in rows {
+            items.push(serde_json::json!({"type": "comment", "id": id, "task_id": task_id, "content": content.chars().take(200).collect::<String>(), "created_at": at, "user": user}));
+        }
+    }
+
+    // Sort by created_at descending, truncate
+    items.sort_by(|a, b| b["created_at"].as_str().unwrap_or("").cmp(a["created_at"].as_str().unwrap_or("")));
+    items.truncate(limit as usize);
+    Ok(Json(items))
+}
+
+// F3: Smart scheduling suggestions — analyze historical patterns
+#[utoipa::path(get, path = "/api/suggestions/schedule", responses((status = 200)), security(("bearer" = [])))]
+pub async fn schedule_suggestions(State(engine): State<AppState>, claims: Claims) -> ApiResult<serde_json::Value> {
+    // Analyze completed sessions by hour of day
+    let hourly: Vec<(i64, i64, f64)> = sqlx::query_as(
+        "SELECT CAST(strftime('%H', started_at) AS INTEGER) as hour, COUNT(*) as cnt, AVG(duration_s)/60.0 as avg_min \
+         FROM sessions WHERE user_id = ? AND status = 'completed' AND session_type = 'work' \
+         GROUP BY hour ORDER BY cnt DESC")
+        .bind(claims.user_id).fetch_all(&engine.pool).await.map_err(internal)?;
+
+    let peak_hours: Vec<serde_json::Value> = hourly.iter().take(3).map(|(h, c, m)| {
+        serde_json::json!({"hour": h, "sessions": c, "avg_minutes": (*m * 10.0).round() / 10.0})
+    }).collect();
+
+    // Average sessions per day
+    let (avg_daily,): (f64,) = sqlx::query_as(
+        "SELECT COALESCE(AVG(cnt), 0) FROM (SELECT COUNT(*) as cnt FROM sessions WHERE user_id = ? AND status = 'completed' AND session_type = 'work' GROUP BY date(started_at))")
+        .bind(claims.user_id).fetch_one(&engine.pool).await.map_err(internal)?;
+
+    // Day of week patterns
+    let dow: Vec<(i64, i64)> = sqlx::query_as(
+        "SELECT CAST(strftime('%w', started_at) AS INTEGER) as dow, COUNT(*) FROM sessions WHERE user_id = ? AND status = 'completed' AND session_type = 'work' GROUP BY dow ORDER BY COUNT(*) DESC")
+        .bind(claims.user_id).fetch_all(&engine.pool).await.map_err(internal)?;
+    let dow_names = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    let best_days: Vec<String> = dow.iter().take(3).map(|(d, _)| dow_names.get(*d as usize).unwrap_or(&"?").to_string()).collect();
+
+    // Upcoming tasks needing scheduling
+    let upcoming: Vec<(i64, String, f64, Option<String>)> = sqlx::query_as(
+        "SELECT id, title, estimated_hours, due_date FROM tasks WHERE user_id = ? AND status IN ('backlog','active','in_progress') AND deleted_at IS NULL AND estimated_hours > 0 ORDER BY COALESCE(due_date, '9999') ASC LIMIT 10")
+        .bind(claims.user_id).fetch_all(&engine.pool).await.map_err(internal)?;
+
+    let suggestions: Vec<serde_json::Value> = upcoming.iter().map(|(id, title, hours, due)| {
+        let sessions_needed = (*hours / 0.42).ceil() as i64; // ~25min per session
+        let days_needed = (sessions_needed as f64 / avg_daily.max(1.0)).ceil() as i64;
+        serde_json::json!({"task_id": id, "title": title, "estimated_hours": hours, "due_date": due, "sessions_needed": sessions_needed, "days_needed": days_needed})
+    }).collect();
+
+    Ok(Json(serde_json::json!({
+        "peak_hours": peak_hours,
+        "avg_daily_sessions": (avg_daily * 10.0).round() / 10.0,
+        "best_days": best_days,
+        "task_suggestions": suggestions,
+    })))
+}
