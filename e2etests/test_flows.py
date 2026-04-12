@@ -338,9 +338,10 @@ class TestSettings:
         assert "root" in body
 
     def test_settings_shows_server_url(self, app):
-        # URL is in an input — find it by reading all text input values
+        click_tab(app, "Settings")
+        time.sleep(0.5)
         val = app.execute_js("""
-            const inputs = document.querySelectorAll('input[type=text]');
+            const inputs = document.querySelectorAll('input');
             for (const i of inputs) {
                 if (i.value.includes('19090') || i.value.includes('127.0.0.1')) return i.value;
             }
