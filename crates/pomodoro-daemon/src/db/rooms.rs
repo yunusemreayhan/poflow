@@ -46,8 +46,9 @@ pub async fn join_room(pool: &Pool, room_id: i64, user_id: i64) -> Result<()> {
 }
 
 pub async fn leave_room(pool: &Pool, room_id: i64, user_id: i64) -> Result<()> {
-    sqlx::query("DELETE FROM room_members WHERE room_id = ? AND user_id = ?")
+    let r = sqlx::query("DELETE FROM room_members WHERE room_id = ? AND user_id = ?")
         .bind(room_id).bind(user_id).execute(pool).await?;
+    if r.rows_affected() == 0 { return Err(anyhow::anyhow!("Not a member")); }
     Ok(())
 }
 

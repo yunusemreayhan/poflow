@@ -11,6 +11,7 @@ pub async fn list_users(State(engine): State<AppState>, claims: Claims) -> Resul
 pub async fn update_user_role(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>, Json(req): Json<UpdateRoleRequest>) -> ApiResult<db::User> {
     if claims.role != "root" { return Err(err(StatusCode::FORBIDDEN, "Root only")); }
     if !VALID_ROLES.contains(&req.role.as_str()) { return Err(err(StatusCode::BAD_REQUEST, format!("Invalid role '{}'. Must be one of: {}", req.role, VALID_ROLES.join(", ")))); }
+    db::get_user(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "User not found"))?;
     db::update_user_role(&engine.pool, id, &req.role).await.map(Json).map_err(internal)
 }
 
@@ -18,6 +19,7 @@ pub async fn update_user_role(State(engine): State<AppState>, claims: Claims, Pa
 pub async fn delete_user(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>) -> Result<StatusCode, ApiError> {
     if claims.role != "root" { return Err(err(StatusCode::FORBIDDEN, "Root only")); }
     if claims.user_id == id { return Err(err(StatusCode::BAD_REQUEST, "Cannot delete yourself")); }
+    db::get_user(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "User not found"))?;
     db::delete_user(&engine.pool, id).await.map_err(|e| err(StatusCode::BAD_REQUEST, e.to_string()))?;
     // Invalidate user cache so deleted user's tokens are rejected immediately
     auth::invalidate_user_cache(id).await;
@@ -32,6 +34,7 @@ pub struct AdminResetPasswordRequest { pub password: String }
 #[utoipa::path(put, path = "/api/admin/users/{id}/password", request_body = AdminResetPasswordRequest, responses((status = 204)), security(("bearer" = [])))]
 pub async fn admin_reset_password(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>, Json(req): Json<AdminResetPasswordRequest>) -> Result<StatusCode, ApiError> {
     if claims.role != "root" { return Err(err(StatusCode::FORBIDDEN, "Root only")); }
+    db::get_user(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "User not found"))?;
     validate_password(&req.password)?;
     let pw = req.password.clone();
     let hash = tokio::task::spawn_blocking(move || bcrypt::hash(&pw, 12))

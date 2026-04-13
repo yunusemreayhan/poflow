@@ -64,7 +64,7 @@ pub(super) fn valid_date(s: &str) -> bool {
 }
 
 // F1: Search endpoint with highlighted snippets
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::IntoParams)]
 pub struct SearchQuery { pub q: String, pub limit: Option<i64> }
 
 #[utoipa::path(get, path = "/api/tasks/search", responses((status = 200)), security(("bearer" = [])))]

@@ -51,6 +51,7 @@ pub async fn delete_room(State(engine): State<AppState>, claims: Claims, Path(id
 
 #[utoipa::path(post, path = "/api/rooms/{id}/join", responses((status = 200)), security(("bearer" = [])))]
 pub async fn join_room(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>) -> Result<StatusCode, ApiError> {
+    db::get_room(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Room not found"))?;
     db::join_room(&engine.pool, id, claims.user_id).await.map_err(internal)?;
     engine.notify(ChangeEvent::Rooms);
     Ok(StatusCode::NO_CONTENT)
@@ -60,7 +61,7 @@ pub async fn join_room(State(engine): State<AppState>, claims: Claims, Path(id):
 pub async fn leave_room(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>) -> Result<StatusCode, ApiError> {
     let room = db::get_room(&engine.pool, id).await.map_err(internal)?;
     if room.creator_id == claims.user_id { return Err(err(StatusCode::BAD_REQUEST, "Room creator cannot leave — delete the room instead")); }
-    db::leave_room(&engine.pool, id, claims.user_id).await.map_err(internal)?;
+    db::leave_room(&engine.pool, id, claims.user_id).await.map_err(|_| err(StatusCode::BAD_REQUEST, "Not a member of this room"))?;
     engine.notify(ChangeEvent::Rooms);
     Ok(StatusCode::NO_CONTENT)
 }

@@ -51,7 +51,7 @@ export default function TaskContextMenu(p: CtxMenuProps) {
 
   return (
     <>
-      <div className="fixed inset-0 z-40" onClick={close} onKeyDown={e => e.key === "Escape" && close()} />
+      <div className="fixed inset-0 z-40" onClick={close} />
       <div role="menu" aria-label="Task actions" className="fixed z-50 bg-[var(--color-surface)] border border-white/10 rounded-lg shadow-xl py-1 min-w-52 text-xs max-h-[80vh] overflow-y-auto"
         style={{ left: Math.min(pos.x, window.innerWidth - 260), top: Math.min(pos.y, window.innerHeight - 400) }}
         onKeyDown={e => {

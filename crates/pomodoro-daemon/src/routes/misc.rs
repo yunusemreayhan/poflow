@@ -9,6 +9,7 @@ pub async fn health(State(engine): State<AppState>) -> Json<serde_json::Value> {
 
 #[utoipa::path(get, path = "/api/tasks/{id}/votes", responses((status = 200, body = Vec<db::RoomVote>)), security(("bearer" = [])))]
 pub async fn get_task_votes(State(engine): State<AppState>, _claims: Claims, Path(id): Path<i64>) -> ApiResult<Vec<db::RoomVote>> {
+    db::get_task(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Task not found"))?;
     db::get_task_votes(&engine.pool, id).await.map(Json).map_err(internal)
 }
 
@@ -171,6 +172,7 @@ pub async fn sse_timer(State(engine): State<AppState>, Query(q): Query<SseQuery>
 // F13: Task links (GitHub/GitLab integration)
 #[utoipa::path(get, path = "/api/tasks/{id}/links", responses((status = 200)), security(("bearer" = [])))]
 pub async fn get_task_links(State(engine): State<AppState>, _claims: Claims, Path(id): Path<i64>) -> ApiResult<Vec<serde_json::Value>> {
+    db::get_task(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Task not found"))?;
     let rows: Vec<(i64, String, String, String, String)> = sqlx::query_as("SELECT id, link_type, url, title, created_at FROM task_links WHERE task_id = ? ORDER BY created_at DESC")
         .bind(id).fetch_all(&engine.pool).await.map_err(internal)?;
     Ok(Json(rows.into_iter().map(|(id, lt, url, title, at)| serde_json::json!({"id": id, "link_type": lt, "url": url, "title": title, "created_at": at})).collect()))

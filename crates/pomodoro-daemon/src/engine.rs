@@ -189,8 +189,7 @@ impl Engine {
     }
 
     pub async fn pause(&self, user_id: i64) -> anyhow::Result<EngineState> {
-        // V32-1: Acquire config before states to match lock ordering convention
-        let config = self.config.lock().await.clone();
+        let config = self.get_user_config(user_id).await;
         let mut states = self.states.lock().await;
         let state = match states.get_mut(&user_id) {
             Some(s) => s,
@@ -205,8 +204,7 @@ impl Engine {
     }
 
     pub async fn resume(&self, user_id: i64) -> anyhow::Result<EngineState> {
-        // V32-1: Acquire config before states to match lock ordering convention
-        let config = self.config.lock().await.clone();
+        let config = self.get_user_config(user_id).await;
         let mut states = self.states.lock().await;
         let state = match states.get_mut(&user_id) {
             Some(s) => s,
@@ -221,8 +219,7 @@ impl Engine {
     }
 
     pub async fn stop(&self, user_id: i64) -> anyhow::Result<EngineState> {
-        // V32-1: Acquire config before states to match lock ordering convention
-        let config = self.config.lock().await.clone();
+        let config = self.get_user_config(user_id).await;
         let mut states = self.states.lock().await;
         let state = match states.get_mut(&user_id) {
             Some(s) => s,

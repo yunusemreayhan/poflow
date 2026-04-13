@@ -63,8 +63,8 @@ The DELETE from `room_members` silently succeeds even if the user isn't a member
 | V41-2 | Medium | Bug | |
 | V41-3 | Medium | Bug | |
 | V41-4 | Medium | Bug | |
-| V41-5 | Low | Accessibility | |
-| V41-6 | Low | Accessibility | |
+| V41-5 | Low | Accessibility | FALSE POSITIVE — Select already uses button with role="option" |
+| V41-6 | Low | Accessibility | FALSE POSITIVE — AuthScreen already uses button element |
 | V41-7 | Low | Bug | |
 | V41-8 | Low | Code quality | |
 | V41-9 | Low | Bug | |
