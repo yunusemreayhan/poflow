@@ -71,7 +71,8 @@ function Sidebar() {
   return (
     <div className="w-[72px] h-full flex flex-col items-center py-5 border-r border-white/5 shrink-0">
       {/* Top: Logo + Tabs — scrollable */}
-      <div className="min-h-0 flex flex-col items-center gap-2 overflow-y-auto overflow-x-hidden scrollbar-hide">
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden scrollbar-hide">
+        <div className="flex flex-col items-center gap-2 py-1">
       {/* Logo */}
       <div className="mb-2 shrink-0">
         <motion.div
@@ -94,7 +95,7 @@ function Sidebar() {
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
             onClick={() => setTab(tab.id)}
-            className={`relative w-11 h-11 flex items-center justify-center rounded-xl transition-all ${
+            className={`relative w-11 h-11 flex items-center justify-center rounded-xl transition-all shrink-0 ${
               active ? "text-white" : "text-white/30 hover:text-white/60"
             }`}
             title={label}
@@ -117,9 +118,8 @@ function Sidebar() {
         );
       })}
 
+      </div>
       </div> {/* end scrollable top */}
-
-      <div className="flex-1" />
 
       {/* Bottom: Teams + User — always visible */}
       <div className="shrink-0 flex flex-col items-center gap-1 mt-2">
