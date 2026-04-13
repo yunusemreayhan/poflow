@@ -29,7 +29,13 @@ def logged_in(app):
     try:
         body = app.text(app.find("body"))
     except Exception:
-        pytest.skip("WebDriver session expired")
+        # Session may be stale — try reloading
+        try:
+            app.execute_js("location.reload()")
+            import time; time.sleep(2)
+            body = app.text(app.find("body"))
+        except Exception:
+            pytest.skip("WebDriver session expired")
     if "Sign In" in body or "sign in" in body.lower():
         connect_gui_to_daemon(app)
         gui_login(app, "root", ROOT_PASSWORD)

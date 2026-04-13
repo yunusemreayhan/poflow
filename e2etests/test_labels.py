@@ -71,7 +71,9 @@ class TestLabels:
         t = token()
         api("POST", "/api/labels", {"name": f"Gui_{_ID}", "color": "#ff5500"}, t)
         api("POST", "/api/tasks", {"title": f"LbGui_{_ID}", "project": f"LbGP_{_ID}"}, t)
-        click_tab(logged_in, "Timer")
+        # Force GUI to re-fetch tasks from server
+        logged_in.execute_js("window.__STORE__?.getState?.()?.loadTasks?.()")
+        click_tab(logged_in, "Refresh data")
         click_tab(logged_in, "Tasks")
         import time; time.sleep(2)
         body = logged_in.execute_js("return document.body.innerText || ''")

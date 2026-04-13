@@ -29,8 +29,8 @@ def token():
 
 
 def refresh_tasks(app):
-    """Navigate away and back to force task list reload."""
-    click_tab(app, "Timer")
+    """Trigger data refresh and navigate to Tasks tab."""
+    click_tab(app, "Refresh data")
     click_tab(app, "Tasks")
     time.sleep(1)  # Wait for React to render task list
 
