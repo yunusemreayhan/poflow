@@ -28,7 +28,7 @@ pub async fn create_label(State(engine): State<AppState>, claims: Claims, Json(r
 #[utoipa::path(delete, path = "/api/labels/{id}", responses((status = 204)), security(("bearer" = [])))]
 pub async fn delete_label(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>) -> Result<StatusCode, ApiError> {
     if claims.role != "root" { return Err(err(StatusCode::FORBIDDEN, "Only root can delete labels")); }
-    db::delete_label(&engine.pool, id).await.map_err(internal)?;
+    db::delete_label(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Label not found"))?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -59,7 +59,7 @@ pub async fn add_task_label(State(engine): State<AppState>, claims: Claims, Path
 pub async fn remove_task_label(State(engine): State<AppState>, claims: Claims, Path((task_id, label_id)): Path<(i64, i64)>) -> Result<StatusCode, ApiError> {
     let task = db::get_task(&engine.pool, task_id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Task not found"))?;
     if !is_owner_or_root(task.user_id, &claims) { return Err(err(StatusCode::FORBIDDEN, "Not owner")); }
-    db::remove_task_label(&engine.pool, task_id, label_id).await.map_err(internal)?;
+    db::remove_task_label(&engine.pool, task_id, label_id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Label not on task"))?;
     engine.notify(ChangeEvent::Tasks);
     Ok(StatusCode::NO_CONTENT)
 }

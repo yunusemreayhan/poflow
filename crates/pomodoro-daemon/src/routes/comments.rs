@@ -3,6 +3,7 @@ use super::*;
 
 #[utoipa::path(get, path = "/api/tasks/{id}/comments", responses((status = 200, body = Vec<db::Comment>)), security(("bearer" = [])))]
 pub async fn list_comments(State(engine): State<AppState>, _claims: Claims, Path(id): Path<i64>) -> ApiResult<Vec<db::Comment>> {
+    db::get_task(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Task not found"))?;
     db::list_comments(&engine.pool, id).await.map(Json).map_err(internal)
 }
 
@@ -20,6 +21,10 @@ pub async fn add_comment(State(engine): State<AppState>, claims: Claims, Path(id
     if let Some(sid) = req.session_id {
         sqlx::query("SELECT 1 FROM sessions WHERE id = ?").bind(sid).fetch_one(&engine.pool).await
             .map_err(|_| err(StatusCode::NOT_FOUND, "Session not found"))?;
+    }
+    if let Some(pid) = req.parent_id {
+        let parent = db::get_comment(&engine.pool, pid).await.map_err(|_| err(StatusCode::NOT_FOUND, "Parent comment not found"))?;
+        if parent.task_id != id { return Err(err(StatusCode::BAD_REQUEST, "Parent comment belongs to a different task")); }
     }
     db::add_comment(&engine.pool, claims.user_id, id, req.session_id, &req.content, req.parent_id)
         .await.map(|c| {

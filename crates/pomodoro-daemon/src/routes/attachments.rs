@@ -5,6 +5,7 @@ const MAX_ATTACHMENT_SIZE: usize = 10 * 1024 * 1024; // 10MB
 
 #[utoipa::path(get, path = "/api/tasks/{id}/attachments", responses((status = 200)), security(("bearer" = [])))]
 pub async fn list_attachments(State(engine): State<AppState>, _claims: Claims, Path(id): Path<i64>) -> ApiResult<Vec<db::Attachment>> {
+    db::get_task(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Task not found"))?;
     db::list_attachments(&engine.pool, id).await.map(Json).map_err(internal)
 }
 

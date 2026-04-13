@@ -27,7 +27,7 @@ pub async fn end_session(pool: &Pool, id: i64, status: &str) -> Result<Session> 
     let row: (String, String) = sqlx::query_as("SELECT started_at, status FROM sessions WHERE id = ?").bind(id).fetch_one(pool).await?;
     if row.1 != "running" { return Err(anyhow::anyhow!("Session is not running (status: {})", row.1)); }
     let started = parse_timestamp(&row.0);
-    let duration = (Utc::now().naive_utc() - started).num_seconds();
+    let duration = (Utc::now().naive_utc() - started).num_seconds().max(0);
     sqlx::query("UPDATE sessions SET status=?, ended_at=?, duration_s=? WHERE id=?")
         .bind(status).bind(&now).bind(duration).bind(id).execute(pool).await?;
     Ok(sqlx::query_as::<_, Session>(&format!("{} WHERE s.id = ?", SESSION_SELECT)).bind(id).fetch_one(pool).await?)
@@ -49,7 +49,7 @@ pub async fn recover_interrupted(pool: &Pool) -> Result<Vec<Session>> {
         let now = now_str();
         for s in &sessions {
             let started = parse_timestamp(&s.started_at);
-            let duration = (Utc::now().naive_utc() - started).num_seconds();
+            let duration = (Utc::now().naive_utc() - started).num_seconds().max(0);
             sqlx::query("UPDATE sessions SET status='interrupted', ended_at=?, duration_s=? WHERE id=?")
                 .bind(&now).bind(duration).bind(s.id).execute(pool).await?;
         }
@@ -72,7 +72,7 @@ pub async fn get_history(pool: &Pool, from: &str, to: &str, user_id: Option<i64>
     let placeholders = task_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
     // Use CTE to get all ancestors
     let cte_sql = format!(
-        "WITH RECURSIVE ancestors AS (SELECT id, parent_id, title FROM tasks WHERE id IN ({}) UNION ALL SELECT t.id, t.parent_id, t.title FROM tasks t JOIN ancestors a ON t.id = a.parent_id) SELECT DISTINCT id, parent_id, title FROM ancestors",
+        "WITH RECURSIVE ancestors AS (SELECT id, parent_id, title, 0 as depth FROM tasks WHERE id IN ({}) UNION ALL SELECT t.id, t.parent_id, t.title, a.depth + 1 FROM tasks t JOIN ancestors a ON t.id = a.parent_id WHERE a.depth < 50) SELECT DISTINCT id, parent_id, title FROM ancestors",
         placeholders
     );
     let mut q = sqlx::query_as::<_, (i64, Option<i64>, String)>(&cte_sql);
@@ -120,7 +120,3 @@ pub async fn get_today_completed_for_user(pool: &Pool, user_id: Option<i64>) -> 
 
 // --- Comment CRUD ---
 
-pub async fn recover_interrupted_sessions(pool: &Pool) -> Result<u64> {
-    let sessions = recover_interrupted(pool).await?;
-    Ok(sessions.len() as u64)
-}

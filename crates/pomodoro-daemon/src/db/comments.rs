@@ -52,7 +52,7 @@ pub async fn get_task_detail(pool: &Pool, id: i64) -> Result<TaskDetail> {
     let all_comments: Vec<Comment> = cq.fetch_all(pool).await?;
 
     // Batch fetch sessions for all tasks
-    let sessions_sql = format!("{} WHERE s.task_id IN ({}) ORDER BY s.task_id, s.started_at DESC", SESSION_SELECT, ph);
+    let sessions_sql = format!("{} WHERE s.task_id IN ({}) ORDER BY s.task_id, s.started_at DESC LIMIT 2000", SESSION_SELECT, ph);
     let mut sq = sqlx::query_as::<_, Session>(&sessions_sql);
     for tid in &task_ids { sq = sq.bind(tid); }
     let all_sessions: Vec<Session> = sq.fetch_all(pool).await?;

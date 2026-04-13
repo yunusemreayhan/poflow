@@ -31,7 +31,7 @@ pub async fn list_burns(pool: &Pool, sprint_id: i64) -> Result<Vec<BurnEntry>> {
 }
 
 pub async fn list_task_burns(pool: &Pool, task_id: i64) -> Result<Vec<BurnEntry>> {
-    Ok(sqlx::query_as::<_, BurnEntry>(&format!("{} WHERE b.task_id = ? ORDER BY b.created_at DESC", BURN_SELECT))
+    Ok(sqlx::query_as::<_, BurnEntry>(&format!("{} WHERE b.task_id = ? ORDER BY b.created_at DESC LIMIT 1000", BURN_SELECT))
         .bind(task_id).fetch_all(pool).await?)
 }
 

@@ -24,7 +24,7 @@ pub async fn add_dependency(State(engine): State<AppState>, claims: Claims, Path
 pub async fn remove_dependency(State(engine): State<AppState>, claims: Claims, Path((id, dep_id)): Path<(i64, i64)>) -> Result<StatusCode, ApiError> {
     let task = db::get_task(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Task not found"))?;
     if !is_owner_or_root(task.user_id, &claims) { return Err(err(StatusCode::FORBIDDEN, "Not owner")); }
-    db::remove_dependency(&engine.pool, id, dep_id).await.map_err(internal)?;
+    db::remove_dependency(&engine.pool, id, dep_id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Dependency not found"))?;
     engine.notify(ChangeEvent::Tasks);
     Ok(StatusCode::NO_CONTENT)
 }

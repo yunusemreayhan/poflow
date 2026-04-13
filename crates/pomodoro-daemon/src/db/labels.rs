@@ -28,7 +28,8 @@ pub async fn create_label(pool: &Pool, name: &str, color: &str) -> Result<Label>
 }
 
 pub async fn delete_label(pool: &Pool, id: i64) -> Result<()> {
-    sqlx::query("DELETE FROM labels WHERE id = ?").bind(id).execute(pool).await?;
+    let r = sqlx::query("DELETE FROM labels WHERE id = ?").bind(id).execute(pool).await?;
+    if r.rows_affected() == 0 { return Err(anyhow::anyhow!("Label not found")); }
     Ok(())
 }
 
@@ -46,8 +47,9 @@ pub async fn add_task_label(pool: &Pool, task_id: i64, label_id: i64) -> Result<
 }
 
 pub async fn remove_task_label(pool: &Pool, task_id: i64, label_id: i64) -> Result<()> {
-    sqlx::query("DELETE FROM task_labels WHERE task_id = ? AND label_id = ?")
+    let r = sqlx::query("DELETE FROM task_labels WHERE task_id = ? AND label_id = ?")
         .bind(task_id).bind(label_id).execute(pool).await?;
+    if r.rows_affected() == 0 { return Err(anyhow::anyhow!("Task-label association not found")); }
     Ok(())
 }
 

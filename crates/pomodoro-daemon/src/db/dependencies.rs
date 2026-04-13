@@ -25,8 +25,9 @@ pub async fn add_dependency(pool: &Pool, task_id: i64, depends_on: i64) -> Resul
 }
 
 pub async fn remove_dependency(pool: &Pool, task_id: i64, depends_on: i64) -> Result<()> {
-    sqlx::query("DELETE FROM task_dependencies WHERE task_id = ? AND depends_on = ?")
+    let r = sqlx::query("DELETE FROM task_dependencies WHERE task_id = ? AND depends_on = ?")
         .bind(task_id).bind(depends_on).execute(pool).await?;
+    if r.rows_affected() == 0 { return Err(anyhow::anyhow!("Dependency not found")); }
     Ok(())
 }
 
