@@ -43,13 +43,13 @@ When duplicating a task, the copy gets the same `sort_order` as the original. Tw
 
 | ID | Severity | Category | Status |
 |----|----------|----------|--------|
-| V44-1 | Medium | Bug | |
-| V44-2 | Medium | Bug | |
-| V44-3 | Medium | Bug | |
-| V44-4 | Low | Bug | |
-| V44-5 | Low | Bug | |
-| V44-6 | Low | Bug | |
-| V44-7 | Low | Code quality | |
-| V44-8 | Low | Bug | |
+| V44-1 | Medium | Bug | FIXED — validates ISO 8601 or YYYY-MM-DD |
+| V44-2 | Medium | Bug | FIXED — returns 404 if task not in group |
+| V44-3 | Medium | Bug | FIXED — returns 404 if not a root task |
+| V44-4 | Low | Bug | FIXED — returns 404 for non-existent sprint |
+| V44-5 | Low | Bug | FIXED — validates week/month/year |
+| V44-6 | Low | Bug | WON'T FIX — unknown types return no results (expected filter behavior) |
+| V44-7 | Low | Code quality | WON'T FIX — safe parameterized pattern, standard approach |
+| V44-8 | Low | Bug | FIXED — no longer copies sort_order |
 
-**Total: 8 items** — 3 medium, 5 low
+**Total: 8 items** — 6 fixed, 2 won't fix
