@@ -71,20 +71,20 @@ Returns empty for non-existent task instead of 404.
 
 | ID | Severity | Category | Status |
 |----|----------|----------|--------|
-| V40-1 | Medium | Bug | |
-| V40-2 | Medium | Bug | |
+| V40-1 | Medium | Bug | FIXED — LIMIT 1000 added |
+| V40-2 | Medium | Bug | FIXED — duration clamped to max(0) |
 | V40-3 | Medium | Bug | FALSE POSITIVE — recovery runs before engine init and at shutdown |
-| V40-4 | Medium | Bug | |
-| V40-5 | Low | Bug | |
-| V40-6 | Low | Bug | |
-| V40-7 | Low | Bug | |
-| V40-8 | Low | Bug | |
-| V40-9 | Low | Code quality | |
-| V40-10 | Low | Bug | |
-| V40-11 | Low | Code quality | |
-| V40-12 | Low | Bug | |
-| V40-13 | Low | Bug | |
-| V40-14 | Low | Bug | |
-| V40-15 | Low | Bug | |
+| V40-4 | Medium | Bug | FIXED — CTE depth limited to 50 |
+| V40-5 | Low | Bug | FIXED — dead 409 check removed |
+| V40-6 | Low | Bug | FIXED — returns 404 for non-existent label |
+| V40-7 | Low | Bug | FIXED — returns 404 for non-existent dependency |
+| V40-8 | Low | Bug | FIXED — returns 404 for non-existent association |
+| V40-9 | Low | Code quality | FIXED — dead wrapper removed |
+| V40-10 | Low | Bug | FIXED — LIMIT 2000 added |
+| V40-11 | Low | Code quality | FIXED — dead 409 check removed |
+| V40-12 | Low | Bug | FIXED — parent_id validated |
+| V40-13 | Low | Bug | FIXED — returns 404 for non-existent task |
+| V40-14 | Low | Bug | FIXED — returns 404 for non-existent task |
+| V40-15 | Low | Bug | FIXED — returns 404 for non-existent task |
 
-**Total: 15 items** — 4 medium, 11 low (1 pre-marked false positive)
+**Total: 15 items** — 14 fixed, 1 false positive
