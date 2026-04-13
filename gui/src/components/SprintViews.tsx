@@ -142,7 +142,7 @@ export function BurndownView({ stats }: { stats: SprintDailyStat[] }) {
     const header = "date,remaining_" + metric + ",ideal\n";
     const rows = data.map(d => `${d.date},${d.remaining.toFixed(2)},${d.ideal.toFixed(2)}`).join("\n");
     const blob = new Blob([header + rows], { type: "text/csv" });
-    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `burndown_${metric}.csv`; a.click();
+    const a = document.createElement("a"); const u = URL.createObjectURL(blob); a.href = u; a.download = `burndown_${metric}.csv`; a.click(); URL.revokeObjectURL(u);
   };
 
   return (

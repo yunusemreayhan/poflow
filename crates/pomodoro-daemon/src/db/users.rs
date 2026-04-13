@@ -5,9 +5,9 @@ pub(crate) async fn seed_root_user(pool: &Pool) -> Result<()> {
     let count = user_count(pool).await?;
     if count == 0 {
         let password = std::env::var("POMODORO_ROOT_PASSWORD").unwrap_or_else(|_| {
-            use rand::Rng;
-            let mut rng = rand::rng();
-            let pw: String = (0..16).map(|_| rng.sample(rand::distr::Alphanumeric) as char).collect();
+            let mut buf = [0u8; 16];
+            getrandom::fill(&mut buf).expect("getrandom failed for root password");
+            let pw: String = buf.iter().map(|b| format!("{:02x}", b)).collect();
             // V30-8: Write generated password to a restricted file instead of logging
             let pw_path = super::data_dir().join(".root_password");
             if let Err(e) = std::fs::write(&pw_path, &pw) {

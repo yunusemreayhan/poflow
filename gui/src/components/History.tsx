@@ -200,7 +200,7 @@ export default function History() {
               <button onClick={() => {
                 const csv = "date,focus_hours,sessions\n" + filteredStats.slice(-7).map(s => `${s.date},${(s.total_focus_s / 3600).toFixed(2)},${s.completed}`).join("\n");
                 const blob = new Blob([csv], { type: "text/csv" });
-                const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "weekly_report.csv"; a.click();
+                const a = document.createElement("a"); const u = URL.createObjectURL(blob); a.href = u; a.download = "weekly_report.csv"; a.click(); URL.revokeObjectURL(u);
               }} className="text-[10px] text-white/30 hover:text-white/50">📥 CSV</button>
             </div>
             <div className="grid grid-cols-2 gap-3 text-center text-xs">

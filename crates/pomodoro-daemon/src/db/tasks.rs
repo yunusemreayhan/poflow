@@ -10,7 +10,11 @@ fn fts5_ok() -> bool { FTS5_AVAILABLE.load(std::sync::atomic::Ordering::Relaxed)
 
 fn search_clause() -> &'static str {
     if fts5_ok() { " AND t.id IN (SELECT rowid FROM tasks_fts WHERE tasks_fts MATCH ?)" }
-    else { " AND (t.title LIKE ? OR t.tags LIKE ? OR t.description LIKE ?)" }
+    else { " AND (t.title LIKE ? ESCAPE '\\' OR t.tags LIKE ? ESCAPE '\\' OR t.description LIKE ? ESCAPE '\\')" }
+}
+
+fn escape_like(s: &str) -> String {
+    format!("%{}%", s.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_"))
 }
 
 // P3: Populate temp table for large ID sets to avoid SQLite bind parameter limit (999)
@@ -114,7 +118,7 @@ pub async fn list_tasks_paged(pool: &Pool, f: TaskFilter<'_>, limit: i64, offset
     if let Some(p) = f.project { query = query.bind(p); }
     if let Some(s) = f.search {
         if fts5_ok() { let fts = format!("\"{}\"", s.replace('"', "\"\"")); query = query.bind(fts); }
-        else { let like = format!("%{}%", s); query = query.bind(like.clone()).bind(like.clone()).bind(like); }
+        else { let like = escape_like(s); query = query.bind(like.clone()).bind(like.clone()).bind(like); }
     }
     if let Some(p) = f.priority { query = query.bind(p); }
     if let Some(d) = f.due_before { query = query.bind(d); }
@@ -196,7 +200,7 @@ pub async fn count_tasks(pool: &Pool, f: TaskFilter<'_>) -> Result<i64> {
     if let Some(p) = f.project { query = query.bind(p); }
     if let Some(s) = f.search {
         if fts5_ok() { let fts = format!("\"{}\"", s.replace('"', "\"\"")); query = query.bind(fts); }
-        else { let like = format!("%{}%", s); query = query.bind(like.clone()).bind(like.clone()).bind(like); }
+        else { let like = escape_like(s); query = query.bind(like.clone()).bind(like.clone()).bind(like); }
     }
     if let Some(p) = f.priority { query = query.bind(p); }
     if let Some(d) = f.due_before { query = query.bind(d); }
@@ -210,11 +214,11 @@ pub async fn count_tasks(pool: &Pool, f: TaskFilter<'_>) -> Result<i64> {
 // B2: Added user_id filter — non-root users only see their own tasks
 pub async fn search_tasks_fts(pool: &Pool, query: &str, limit: i64, user_id: Option<i64>) -> Result<Vec<(i64, String, String)>> {
     if !fts5_ok() {
-        let like = format!("%{}%", query);
+        let like = escape_like(query);
         let (sql, needs_uid) = if user_id.is_some() {
-            ("SELECT id, title, COALESCE(SUBSTR(description, 1, 200), '') FROM tasks WHERE deleted_at IS NULL AND user_id = ? AND (title LIKE ? OR description LIKE ? OR tags LIKE ?) LIMIT ?".to_string(), true)
+            ("SELECT id, title, COALESCE(SUBSTR(description, 1, 200), '') FROM tasks WHERE deleted_at IS NULL AND user_id = ? AND (title LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\' OR tags LIKE ? ESCAPE '\\') LIMIT ?".to_string(), true)
         } else {
-            ("SELECT id, title, COALESCE(SUBSTR(description, 1, 200), '') FROM tasks WHERE deleted_at IS NULL AND (title LIKE ? OR description LIKE ? OR tags LIKE ?) LIMIT ?".to_string(), false)
+            ("SELECT id, title, COALESCE(SUBSTR(description, 1, 200), '') FROM tasks WHERE deleted_at IS NULL AND (title LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\' OR tags LIKE ? ESCAPE '\\') LIMIT ?".to_string(), false)
         };
         let mut q = sqlx::query_as::<_, (i64, String, String)>(&sql);
         if needs_uid { q = q.bind(user_id.unwrap()); }
