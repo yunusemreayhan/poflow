@@ -10,7 +10,7 @@ async fn app() -> axum::Router {
     let pool = pomodoro_daemon::db::connect_memory().await.unwrap();
     let config = pomodoro_daemon::config::Config::default();
     let engine = Arc::new(pomodoro_daemon::engine::Engine::new(pool, config).await);
-    pomodoro_daemon::build_router(engine)
+    pomodoro_daemon::build_router(engine).await
 }
 
 fn json_req(method: &str, uri: &str, body: Option<Value>) -> Request<Body> {
@@ -4908,7 +4908,7 @@ async fn test_auto_archive() {
     let pool = pomodoro_daemon::db::connect_memory().await.unwrap();
     let config = pomodoro_daemon::config::Config::default();
     let engine = Arc::new(pomodoro_daemon::engine::Engine::new(pool.clone(), config).await);
-    let app = pomodoro_daemon::build_router(engine);
+    let app = pomodoro_daemon::build_router(engine).await;
     let tok = login_root(&app).await;
     // Create and complete a task
     let tid = body_json(app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"ArchiveMe"})))).await.unwrap()).await["id"].as_i64().unwrap();

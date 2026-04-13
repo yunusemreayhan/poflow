@@ -52,7 +52,8 @@ pub async fn unread_count(pool: &Pool, user_id: i64) -> Result<i64> {
 
 // B8: Cleanup old notifications (keep last 200 per user, delete read older than 30 days)
 pub async fn cleanup_notifications(pool: &Pool) -> Result<u64> {
-    let result = sqlx::query("DELETE FROM notifications WHERE read = 1 AND created_at < strftime('%Y-%m-%dT%H:%M:%f', 'now', '-30 days')")
-        .execute(pool).await?;
+    let cutoff = (chrono::Utc::now() - chrono::Duration::days(30)).format("%Y-%m-%dT%H:%M:%S%.3f").to_string();
+    let result = sqlx::query("DELETE FROM notifications WHERE read = 1 AND created_at < ?")
+        .bind(&cutoff).execute(pool).await?;
     Ok(result.rows_affected())
 }

@@ -13,14 +13,17 @@ use std::sync::Arc;
 use tower_http::cors::{CorsLayer, AllowOrigin};
 use axum::http::{HeaderValue, Method, header};
 
-pub fn build_router(engine: Arc<engine::Engine>) -> Router {
+pub async fn build_router(engine: Arc<engine::Engine>) -> Router {
     use axum::routing::{delete, get, post, put};
 
     // CORS: env var POMODORO_CORS_ORIGINS overrides config, defaults to localhost
     let origins_str = std::env::var("POMODORO_CORS_ORIGINS").ok();
-    let extra: Vec<HeaderValue> = origins_str.as_deref()
-        .map(|s| s.split(',').filter_map(|o| o.trim().parse().ok()).collect())
-        .unwrap_or_else(|| engine.config.try_lock().map(|c| c.cors_origins.iter().filter_map(|o| o.parse().ok()).collect()).unwrap_or_default());
+    let extra: Vec<HeaderValue> = if let Some(s) = origins_str.as_deref() {
+        s.split(',').filter_map(|o| o.trim().parse().ok()).collect()
+    } else {
+        let c = engine.config.lock().await;
+        c.cors_origins.iter().filter_map(|o| o.parse().ok()).collect()
+    };
     let mut all_origins: Vec<HeaderValue> = vec![
         "http://localhost:1420".parse().unwrap(),
         "http://127.0.0.1:1420".parse().unwrap(),

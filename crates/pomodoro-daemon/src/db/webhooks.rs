@@ -25,9 +25,12 @@ fn derive_key() -> [u8; 32] {
             std::fs::read(&path).ok()
                 .filter(|d| d.len() >= 32)
                 .unwrap_or_else(|| {
-                    tracing::error!("SECURITY: No JWT secret available for webhook key derivation — using data_dir hash as fallback");
-                    use sha2::{Sha256 as S, Digest};
-                    S::digest(crate::db::data_dir().to_string_lossy().as_bytes()).to_vec()
+                    // Generate a new random secret file if none exists
+                    let mut secret = vec![0u8; 64];
+                    getrandom::fill(&mut secret).expect("getrandom failed for JWT secret generation");
+                    let _ = std::fs::write(&path, &secret);
+                    tracing::warn!("Generated new .jwt_secret file for webhook key derivation");
+                    secret
                 })
         });
     let mut mac = Hmac::<Sha256>::new_from_slice(&secret_bytes).unwrap();
@@ -38,20 +41,19 @@ fn derive_key() -> [u8; 32] {
     key
 }
 
-fn encrypt_secret(plaintext: &str) -> String {
+fn encrypt_secret(plaintext: &str) -> Result<String> {
     use aes_gcm::{Aes256Gcm, KeyInit, aead::Aead};
     use aes_gcm::Nonce;
     let key = derive_key();
-    let cipher = Aes256Gcm::new_from_slice(&key).unwrap();
+    let cipher = Aes256Gcm::new_from_slice(&key).map_err(|e| anyhow::anyhow!("AES init: {e}"))?;
     let mut nonce_bytes = [0u8; 12];
-    use rand::Rng;
-    rand::rng().fill(&mut nonce_bytes);
+    getrandom::fill(&mut nonce_bytes).map_err(|e| anyhow::anyhow!("getrandom: {e}"))?;
     let nonce = Nonce::from_slice(&nonce_bytes);
-    let ciphertext = cipher.encrypt(nonce, plaintext.as_bytes()).expect("encryption failed");
+    let ciphertext = cipher.encrypt(nonce, plaintext.as_bytes()).map_err(|e| anyhow::anyhow!("encrypt: {e}"))?;
     // Format: hex(nonce) + ":" + hex(ciphertext)
     let nonce_hex: String = nonce_bytes.iter().map(|b| format!("{:02x}", b)).collect();
     let ct_hex: String = ciphertext.iter().map(|b| format!("{:02x}", b)).collect();
-    format!("{}:{}", nonce_hex, ct_hex)
+    Ok(format!("{}:{}", nonce_hex, ct_hex))
 }
 
 pub fn decrypt_secret(stored: &str) -> Option<String> {
@@ -108,7 +110,7 @@ pub async fn list_webhooks(pool: &Pool, user_id: i64) -> Result<Vec<Webhook>> {
 
 pub async fn create_webhook(pool: &Pool, user_id: i64, url: &str, events: &str, secret: Option<&str>) -> Result<Webhook> {
     let now = now_str();
-    let encrypted = secret.map(encrypt_secret);
+    let encrypted = secret.map(encrypt_secret).transpose()?;
     let id = sqlx::query("INSERT INTO webhooks (user_id, url, events, secret, created_at) VALUES (?,?,?,?,?)")
         .bind(user_id).bind(url).bind(events).bind(&encrypted).bind(&now)
         .execute(pool).await?.last_insert_rowid();

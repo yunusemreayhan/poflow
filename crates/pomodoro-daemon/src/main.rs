@@ -355,7 +355,7 @@ async fn main() -> Result<()> {
         }
     });
 
-    let mut app = build_router(engine.clone());
+    let mut app = build_router(engine.clone()).await;
     let swagger_enabled = std::env::var("POMODORO_SWAGGER").map_or(true, |v| v != "0" && v.to_lowercase() != "false");
     if swagger_enabled {
         app = app.merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()));
