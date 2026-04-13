@@ -82,6 +82,7 @@ pub async fn snapshot_epic_group(State(engine): State<AppState>, claims: Claims,
 
 #[utoipa::path(get, path = "/api/sprints/{id}/roots", responses((status = 200, body = Vec<i64>)), security(("bearer" = [])))]
 pub async fn get_sprint_root_tasks(State(engine): State<AppState>, _claims: Claims, Path(id): Path<i64>) -> ApiResult<Vec<i64>> {
+    db::get_sprint(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Sprint not found"))?;
     db::get_sprint_root_tasks(&engine.pool, id).await.map(Json).map_err(internal)
 }
 

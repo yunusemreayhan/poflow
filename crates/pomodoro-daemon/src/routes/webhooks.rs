@@ -65,6 +65,19 @@ pub async fn update_webhook(State(engine): State<AppState>, claims: Claims, Path
     if !is_owner_or_root(wh.0, &claims) { return Err(err(StatusCode::FORBIDDEN, "Not owner")); }
     if let Some(ref url) = req.url {
         if !url.starts_with("http://") && !url.starts_with("https://") { return Err(err(StatusCode::BAD_REQUEST, "URL must start with http:// or https://")); }
+        if let Ok(parsed) = url::Url::parse(url) {
+            if parsed.username() != "" || parsed.password().is_some() {
+                return Err(err(StatusCode::BAD_REQUEST, "Webhook URL must not contain credentials"));
+            }
+            if let Some(host) = parsed.host_str() {
+                let blocked = ["localhost", "127.0.0.1", "0.0.0.0", "::1", "[::1]"];
+                let is_blocked = blocked.contains(&host) || host.ends_with(".local")
+                    || host.parse::<std::net::IpAddr>().map(|ip| crate::webhook::is_private_ip_pub(&ip)).unwrap_or(false);
+                if is_blocked {
+                    return Err(err(StatusCode::BAD_REQUEST, "Webhook URL must not point to private/loopback addresses"));
+                }
+            }
+        }
     }
     let mut sql_parts = Vec::new();
     if req.url.is_some() { sql_parts.push("url = ?"); }
