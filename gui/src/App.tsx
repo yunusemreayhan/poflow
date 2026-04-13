@@ -71,7 +71,7 @@ function Sidebar() {
   return (
     <div className="w-[72px] h-full flex flex-col items-center py-5 border-r border-white/5 shrink-0">
       {/* Top: Logo + Tabs — scrollable */}
-      <div className="flex-1 min-h-0 flex flex-col items-center gap-2 overflow-y-auto overflow-x-hidden scrollbar-hide">
+      <div className="min-h-0 flex flex-col items-center gap-2 overflow-y-auto overflow-x-hidden scrollbar-hide">
       {/* Logo */}
       <div className="mb-2 shrink-0">
         <motion.div
@@ -118,6 +118,8 @@ function Sidebar() {
       })}
 
       </div> {/* end scrollable top */}
+
+      <div className="flex-1" />
 
       {/* Bottom: Teams + User — always visible */}
       <div className="shrink-0 flex flex-col items-center gap-1 mt-2">
