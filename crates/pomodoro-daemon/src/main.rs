@@ -116,9 +116,10 @@ use utoipa_swagger_ui::SwaggerUi;
         routes::CreateAutomationRuleRequest, routes::AutomationRule,
         routes::SlackIntegrationRequest,
         routes::NotifPref, routes::BulkStatusRequest,
+        routes::EditCommentRequest,
     )),
     modifiers(&SecurityAddon),
-    info(title = "Pomodoro API", version = "2.0.1", description = "Multi-user Pomodoro timer with hierarchical task management")
+    info(title = "Pomodoro API", version = "2.1.0", description = "Multi-user Pomodoro timer with hierarchical task management")
 )]
 struct ApiDoc;
 

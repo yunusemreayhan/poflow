@@ -74,7 +74,8 @@ pub async fn snapshot_epic_group(State(engine): State<AppState>, claims: Claims,
     if detail.group.created_by != claims.user_id && claims.role != "root" {
         return Err(err(StatusCode::FORBIDDEN, "Not owner"));
     }
-    db::snapshot_epic_group(&engine.pool, id).await.map_err(internal)?;
+    db::snapshot_epic_group(&engine.pool, id).await
+        .map_err(|e| if e.to_string().contains("UNIQUE") { err(StatusCode::CONFLICT, "Snapshot already exists for today") } else { internal(e) })?;
     Ok(StatusCode::NO_CONTENT)
 }
 

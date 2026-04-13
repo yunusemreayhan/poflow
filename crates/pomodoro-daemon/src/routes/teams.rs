@@ -115,7 +115,8 @@ pub async fn get_team_scope(State(engine): State<AppState>, _claims: Claims, Pat
 pub async fn snapshot_sprint(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>) -> ApiResult<db::SprintDailyStat> {
     let sprint = db::get_sprint(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Sprint not found"))?;
     if !is_owner_or_root(sprint.created_by_id, &claims) { return Err(err(StatusCode::FORBIDDEN, "Not owner")); }
-    db::snapshot_sprint(&engine.pool, id).await.map(Json).map_err(internal)
+    db::snapshot_sprint(&engine.pool, id).await.map(Json)
+        .map_err(|e| if e.to_string().contains("UNIQUE") { err(StatusCode::CONFLICT, "Snapshot already exists for today") } else { internal(e) })
 }
 
 #[utoipa::path(get, path = "/api/sprints/{id}/board", responses((status = 200, body = db::SprintBoard)), security(("bearer" = [])))]

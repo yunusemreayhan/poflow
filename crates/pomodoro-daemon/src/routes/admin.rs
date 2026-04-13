@@ -21,6 +21,8 @@ pub async fn delete_user(State(engine): State<AppState>, claims: Claims, Path(id
     db::delete_user(&engine.pool, id).await.map_err(|e| err(StatusCode::BAD_REQUEST, e.to_string()))?;
     // Invalidate user cache so deleted user's tokens are rejected immediately
     auth::invalidate_user_cache(id).await;
+    // V38-16: Stop active timer for deleted user
+    engine.states.lock().await.remove(&id);
     Ok(StatusCode::NO_CONTENT)
 }
 

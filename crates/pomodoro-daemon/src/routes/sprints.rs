@@ -9,6 +9,7 @@ async fn get_owned_sprint(pool: &db::Pool, id: i64, claims: &Claims) -> Result<d
 
 #[utoipa::path(get, path = "/api/sprints", responses((status = 200, body = Vec<db::Sprint>)), security(("bearer" = [])))]
 pub async fn list_sprints(State(engine): State<AppState>, _claims: Claims, Query(q): Query<SprintQuery>) -> ApiResult<Vec<db::Sprint>> {
+    if let Some(ref s) = q.status { validate_sprint_status(s)?; }
     db::list_sprints(&engine.pool, q.status.as_deref(), q.project.as_deref()).await.map(Json).map_err(internal)
 }
 
@@ -33,6 +34,7 @@ pub async fn create_sprint(State(engine): State<AppState>, claims: Claims, Json(
 
 #[utoipa::path(get, path = "/api/sprints/{id}", responses((status = 200, body = db::SprintDetail)), security(("bearer" = [])))]
 pub async fn get_sprint_detail(State(engine): State<AppState>, _claims: Claims, Path(id): Path<i64>) -> ApiResult<db::SprintDetail> {
+    db::get_sprint(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Sprint not found"))?;
     db::get_sprint_detail(&engine.pool, id).await.map(Json).map_err(internal)
 }
 

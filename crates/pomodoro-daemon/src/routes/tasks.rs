@@ -170,6 +170,7 @@ pub async fn create_task(State(engine): State<AppState>, claims: Claims, Json(re
 
 #[utoipa::path(get, path = "/api/tasks/{id}", responses((status = 200, body = db::TaskDetail)), security(("bearer" = [])))]
 pub async fn get_task_detail(State(engine): State<AppState>, _claims: Claims, Path(id): Path<i64>) -> ApiResult<db::TaskDetail> {
+    db::get_task(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Task not found"))?;
     db::get_task_detail(&engine.pool, id).await.map(Json).map_err(internal)
 }
 
