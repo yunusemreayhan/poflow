@@ -1,7 +1,8 @@
 import { useStore } from "../store/store";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Save, Shield, ShieldOff, Check, Trash2 } from "lucide-react";
+import { invoke } from "@tauri-apps/api/core";
 import type { Config, User, AuthResponse } from "../store/api";
 import { LabelManager } from "./Labels";
 import AuditLog from "./AuditLog";
@@ -10,6 +11,35 @@ import { useI18n, useT } from "../i18n";
 import { apiCall, setToken } from "../store/api";
 import { TemplateManager, WebhookManager, CsvImport, TrashView, NotificationPrefs } from "./SettingsParts";
 import TeamManager from "./TeamManager";
+
+function PanelIndicatorToggle() {
+  const [running, setRunning] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const check = useCallback(() => {
+    invoke<boolean>("indicator_status").then(setRunning).catch(() => {});
+  }, []);
+  useEffect(() => { check(); const id = setInterval(check, 5000); return () => clearInterval(id); }, [check]);
+  const toggle = async () => {
+    setLoading(true);
+    try {
+      const result = await invoke<boolean>("indicator_toggle", { enable: !running });
+      setRunning(result);
+    } catch { /* ignore */ }
+    setTimeout(() => { check(); setLoading(false); }, 1000);
+  };
+  return (
+    <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/5">
+      <div>
+        <div className="text-xs text-white/60">Panel Indicator</div>
+        <div className="text-[10px] text-white/30">Timer countdown in system tray</div>
+      </div>
+      <button onClick={toggle} disabled={loading}
+        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${running ? "bg-[var(--color-success)]/20 text-[var(--color-success)]" : "bg-white/5 text-white/40 hover:text-white/60"}`}>
+        {loading ? "..." : running ? "● Running" : "○ Start"}
+      </button>
+    </div>
+  );
+}
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -260,6 +290,7 @@ export default function Settings() {
             )}
           </div>
         </Field>
+        <PanelIndicatorToggle />
       </div>
 
       {role === "root" && <AdminPanel />}

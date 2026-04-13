@@ -214,6 +214,35 @@ async fn clear_auth(_state: tauri::State<'_, Arc<AppState>>) -> Result<(), Strin
     Ok(())
 }
 
+#[tauri::command]
+async fn indicator_status() -> Result<bool, String> {
+    let output = std::process::Command::new("pgrep").args(["-f", "panel-indicator.py"])
+        .output().map_err(|e| e.to_string())?;
+    Ok(output.status.success())
+}
+
+#[tauri::command]
+async fn indicator_toggle(enable: bool) -> Result<bool, String> {
+    if enable {
+        let home = dirs::home_dir().unwrap_or_default();
+        let candidates = [
+            std::path::PathBuf::from("/usr/share/pomodoro/panel-indicator.py"),
+            home.join("repos/pomodoroLinux/tools/panel-indicator.py"),
+            home.join(".local/share/pomodoro/panel-indicator.py"),
+        ];
+        let script = candidates.iter().find(|p| p.exists())
+            .ok_or("panel-indicator.py not found")?;
+        std::process::Command::new("python3").arg(script)
+            .stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null())
+            .spawn().map_err(|e| e.to_string())?;
+        Ok(true)
+    } else {
+        std::process::Command::new("pkill").args(["-f", "panel-indicator.py"])
+            .output().map_err(|e| e.to_string())?;
+        Ok(false)
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app_state = Arc::new(AppState {
@@ -224,7 +253,7 @@ pub fn run() {
     tauri::Builder::default()
         .manage(app_state)
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![api_call, set_token, get_connection, set_connection, write_file, save_auth, load_auth, clear_auth])
+        .invoke_handler(tauri::generate_handler![api_call, set_token, get_connection, set_connection, write_file, save_auth, load_auth, clear_auth, indicator_status, indicator_toggle])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
