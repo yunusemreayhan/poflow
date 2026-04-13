@@ -91,25 +91,25 @@ Need to verify if `sprint_retro_report` returns 404 for non-existent sprints or 
 
 | ID | Severity | Category | Status |
 |----|----------|----------|--------|
-| V38-1 | Medium | Bug | |
-| V38-2 | Medium | Bug | |
-| V38-3 | Medium | Bug | |
-| V38-4 | Medium | Security | |
-| V38-5 | Medium | Bug | |
+| V38-1 | Medium | Bug | FIXED — 4 watcher endpoints registered in OpenAPI paths |
+| V38-2 | Medium | Bug | FALSE POSITIVE — JSON.parse already wrapped in try/catch |
+| V38-3 | Medium | Bug | FIXED — activeTeamId JSON.parse wrapped in try/catch |
+| V38-4 | Medium | Security | FIXED — migrate_legacy_secrets re-encrypts XOR to AES-GCM at startup |
+| V38-5 | Medium | Bug | FIXED — strips existing (carry-over) suffix |
 | V38-6 | Low | Bug | FALSE POSITIVE — import uses dynamic col_idx mapping |
-| V38-7 | Low | Code quality | |
-| V38-8 | Low | Bug | |
-| V38-9 | Low | Bug | |
-| V38-10 | Low | UX | |
-| V38-11 | Low | Code quality | |
-| V38-12 | Low | Bug | |
-| V38-13 | Low | Bug | |
-| V38-14 | Low | Accessibility | |
-| V38-15 | Low | Code quality | |
-| V38-16 | Low | Bug | |
+| V38-7 | Low | Code quality | WON'T FIX — pattern is safe with parameterized queries |
+| V38-8 | Low | Bug | FIXED — returns 404 instead of 500 |
+| V38-9 | Low | Bug | FIXED — returns 409 Conflict for duplicate snapshots |
+| V38-10 | Low | UX | WON'T FIX — buttons not inside any form |
+| V38-11 | Low | Code quality | WON'T FIX — HMAC-SHA256 new_from_slice cannot fail |
+| V38-12 | Low | Bug | FIXED — returns 404 instead of 500 |
+| V38-13 | Low | Bug | FIXED — validates status query parameter |
+| V38-14 | Low | Accessibility | WON'T FIX — full column navigation would be a new feature |
+| V38-15 | Low | Code quality | FIXED — OpenAPI version bumped to 2.1.0 |
+| V38-16 | Low | Bug | FIXED — removes deleted user's timer state |
 | V38-17 | Low | Bug | FALSE POSITIVE — import handles estimated_hours/remaining_points |
-| V38-18 | Low | Performance | |
-| V38-19 | Low | Code quality | |
+| V38-18 | Low | Performance | FALSE POSITIVE — ETag check already runs before heavy queries |
+| V38-19 | Low | Code quality | FIXED — EditCommentRequest registered in OpenAPI schemas |
 | V38-20 | Low | Bug | FALSE POSITIVE — sprint_retro_report checks existence with 404 |
 
-**Total: 20 items** — 5 medium, 15 low (3 pre-marked false positive)
+**Total: 20 items** — 11 fixed, 4 won't fix, 5 false positive
