@@ -51,15 +51,15 @@ The notification kind `"task_added_to_sprint"` is used in `add_sprint_tasks` but
 
 | ID | Severity | Category | Status |
 |----|----------|----------|--------|
-| V42-1 | Medium | Bug | |
-| V42-2 | Medium | Bug | |
-| V42-3 | Medium | Bug | |
-| V42-4 | Medium | Bug | |
-| V42-5 | Low | Bug | |
-| V42-6 | Low | Bug | |
-| V42-7 | Low | Bug | |
-| V42-8 | Low | Code quality | |
-| V42-9 | Low | Bug | |
-| V42-10 | Low | Bug | |
+| V42-1 | Medium | Bug | FIXED — returns 404 for non-existent sprint |
+| V42-2 | Medium | Bug | FIXED — returns 404 for non-existent sprint |
+| V42-3 | Medium | Bug | FIXED — returns 404 if task not in sprint |
+| V42-4 | Medium | Bug | FIXED — returns 404 instead of 500 |
+| V42-5 | Low | Bug | FIXED — returns 404 for non-existent task |
+| V42-6 | Low | Bug | FIXED — returns 404 if user not assigned |
+| V42-7 | Low | Bug | WON'T FIX — query scoped to active sprints, bounded by date count |
+| V42-8 | Low | Code quality | FIXED — single lock scope |
+| V42-9 | Low | Bug | FIXED — added to EVENT_TYPES |
+| V42-10 | Low | Bug | FIXED — clamped to 1-50 |
 
-**Total: 10 items** — 4 medium, 6 low
+**Total: 10 items** — 9 fixed, 1 won't fix
