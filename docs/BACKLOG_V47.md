@@ -31,10 +31,10 @@ If `depends_on` task doesn't exist, the FK error maps to a generic BAD_REQUEST w
 
 | ID | Severity | Category | Status |
 |----|----------|----------|--------|
-| V47-1 | Medium | Bug | |
-| V47-2 | Medium | Bug | |
-| V47-3 | Medium | Bug | |
-| V47-4 | Low | Bug | |
-| V47-5 | Low | Bug | |
+| V47-1 | Medium | Bug | FIXED — returns 404 |
+| V47-2 | Medium | Bug | FIXED — returns 404 for non-existent task |
+| V47-3 | Medium | Bug | FIXED — returns 404 for non-existent task |
+| V47-4 | Low | Bug | FIXED — verifies label exists |
+| V47-5 | Low | Bug | FIXED — verifies depends_on task exists |
 
-**Total: 5 items** — 3 medium, 2 low
+**Total: 5 items** — 5 fixed
