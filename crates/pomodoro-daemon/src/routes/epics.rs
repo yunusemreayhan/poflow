@@ -64,7 +64,7 @@ pub async fn remove_epic_group_task(State(engine): State<AppState>, claims: Clai
     if detail.group.created_by != claims.user_id && claims.role != "root" {
         return Err(err(StatusCode::FORBIDDEN, "Not owner"));
     }
-    db::remove_epic_group_task(&engine.pool, id, task_id).await.map_err(internal)?;
+    db::remove_epic_group_task(&engine.pool, id, task_id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Task not in epic group"))?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -101,13 +101,14 @@ pub async fn add_sprint_root_tasks(State(engine): State<AppState>, claims: Claim
 pub async fn remove_sprint_root_task(State(engine): State<AppState>, claims: Claims, Path((id, task_id)): Path<(i64, i64)>) -> Result<StatusCode, ApiError> {
     let sprint = db::get_sprint(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Sprint not found"))?;
     if !is_owner_or_root(sprint.created_by_id, &claims) { return Err(err(StatusCode::FORBIDDEN, "Not sprint owner")); }
-    db::remove_sprint_root_task(&engine.pool, id, task_id).await.map_err(internal)?;
+    db::remove_sprint_root_task(&engine.pool, id, task_id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Task not a root task in this sprint"))?;
     engine.notify(ChangeEvent::Sprints);
     Ok(StatusCode::NO_CONTENT)
 }
 
 #[utoipa::path(get, path = "/api/sprints/{id}/scope", responses((status = 200, body = Vec<i64>)), security(("bearer" = [])))]
 pub async fn get_sprint_scope(State(engine): State<AppState>, _claims: Claims, Path(id): Path<i64>) -> ApiResult<Vec<i64>> {
+    db::get_sprint(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Sprint not found"))?;
     let roots = db::get_sprint_root_tasks(&engine.pool, id).await.map_err(internal)?;
     if roots.is_empty() { return Ok(Json(vec![])); }
     db::get_descendant_ids(&engine.pool, &roots).await.map(Json).map_err(internal)

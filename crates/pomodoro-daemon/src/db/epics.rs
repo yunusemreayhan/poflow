@@ -12,7 +12,8 @@ pub async fn add_sprint_root_task(pool: &Pool, sprint_id: i64, task_id: i64) -> 
 }
 
 pub async fn remove_sprint_root_task(pool: &Pool, sprint_id: i64, task_id: i64) -> Result<()> {
-    sqlx::query("DELETE FROM sprint_root_tasks WHERE sprint_id = ? AND task_id = ?").bind(sprint_id).bind(task_id).execute(pool).await?;
+    let r = sqlx::query("DELETE FROM sprint_root_tasks WHERE sprint_id = ? AND task_id = ?").bind(sprint_id).bind(task_id).execute(pool).await?;
+    if r.rows_affected() == 0 { return Err(anyhow::anyhow!("Task not a root task")); }
     Ok(())
 }
 
@@ -65,7 +66,8 @@ pub async fn add_epic_group_task(pool: &Pool, group_id: i64, task_id: i64) -> Re
 }
 
 pub async fn remove_epic_group_task(pool: &Pool, group_id: i64, task_id: i64) -> Result<()> {
-    sqlx::query("DELETE FROM epic_group_tasks WHERE group_id = ? AND task_id = ?").bind(group_id).bind(task_id).execute(pool).await?;
+    let r = sqlx::query("DELETE FROM epic_group_tasks WHERE group_id = ? AND task_id = ?").bind(group_id).bind(task_id).execute(pool).await?;
+    if r.rows_affected() == 0 { return Err(anyhow::anyhow!("Task not in epic group")); }
     Ok(())
 }
 
