@@ -33,7 +33,7 @@ pub async fn create_room(State(engine): State<AppState>, claims: Claims, Json(re
 #[utoipa::path(get, path = "/api/rooms/{id}", responses((status = 200, body = db::RoomState)), security(("bearer" = [])))]
 pub async fn get_room_state(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>) -> ApiResult<db::RoomState> {
     // S2: Verify membership (or root)
-    let state = db::get_room_state(&engine.pool, id).await.map_err(internal)?;
+    let state = db::get_room_state(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Room not found"))?;
     if claims.role != "root" && !state.members.iter().any(|m| m.username == claims.username) {
         return Err(err(StatusCode::FORBIDDEN, "Not a member of this room"));
     }
@@ -59,7 +59,7 @@ pub async fn join_room(State(engine): State<AppState>, claims: Claims, Path(id):
 
 #[utoipa::path(post, path = "/api/rooms/{id}/leave", responses((status = 200)), security(("bearer" = [])))]
 pub async fn leave_room(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>) -> Result<StatusCode, ApiError> {
-    let room = db::get_room(&engine.pool, id).await.map_err(internal)?;
+    let room = db::get_room(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Room not found"))?;
     if room.creator_id == claims.user_id { return Err(err(StatusCode::BAD_REQUEST, "Room creator cannot leave — delete the room instead")); }
     db::leave_room(&engine.pool, id, claims.user_id).await.map_err(|_| err(StatusCode::BAD_REQUEST, "Not a member of this room"))?;
     engine.notify(ChangeEvent::Rooms);
@@ -103,7 +103,7 @@ pub async fn start_voting(State(engine): State<AppState>, claims: Claims, Path(i
 #[utoipa::path(post, path = "/api/rooms/{id}/vote", request_body = CastVoteRequest, responses((status = 200)), security(("bearer" = [])))]
 pub async fn cast_vote(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>, Json(req): Json<CastVoteRequest>) -> Result<StatusCode, ApiError> {
     if req.value < 0.0 || req.value > 1000.0 { return Err(err(StatusCode::BAD_REQUEST, "Vote value must be 0-1000")); }
-    let room = db::get_room(&engine.pool, id).await.map_err(internal)?;
+    let room = db::get_room(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Room not found"))?;
     if room.status != "voting" { return Err(err(StatusCode::BAD_REQUEST, "Room is not in voting state")); }
     // Verify user is a room member
     let members = db::get_room_members(&engine.pool, id).await.map_err(internal)?;
@@ -136,7 +136,7 @@ pub async fn accept_estimate(State(engine): State<AppState>, claims: Claims, Pat
         return Err(err(StatusCode::FORBIDDEN, "Admin only"));
     }
     if req.value < 0.0 || req.value > 10000.0 { return Err(err(StatusCode::BAD_REQUEST, "Estimate value must be 0-10000")); }
-    let room = db::get_room(&engine.pool, id).await.map_err(internal)?;
+    let room = db::get_room(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Room not found"))?;
     if room.status != "revealed" { return Err(err(StatusCode::BAD_REQUEST, "Votes must be revealed before accepting")); }
     let task_id = room.current_task_id.ok_or_else(|| err(StatusCode::BAD_REQUEST, "No active vote"))?;
     let task = db::accept_estimate(&engine.pool, id, task_id, req.value, &room.estimation_unit).await.map_err(internal)?;
