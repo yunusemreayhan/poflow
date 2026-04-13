@@ -137,3 +137,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   0% { transform: translateX(-100%); }
   100% { transform: translateX(400%); }
 }
+
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }

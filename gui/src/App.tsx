@@ -69,9 +69,11 @@ function Sidebar() {
   }, []);
 
   return (
-    <div className="w-[72px] flex flex-col items-center py-5 gap-2 border-r border-white/5 shrink-0">
+    <div className="w-[72px] h-full flex flex-col items-center py-5 border-r border-white/5 shrink-0">
+      {/* Top: Logo + Tabs — scrollable */}
+      <div className="flex-1 min-h-0 flex flex-col items-center gap-2 overflow-y-auto overflow-x-hidden scrollbar-hide">
       {/* Logo */}
-      <div className="mb-4">
+      <div className="mb-2 shrink-0">
         <motion.div
           animate={{ rotate: [0, 360] }}
           transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
@@ -115,8 +117,10 @@ function Sidebar() {
         );
       })}
 
-      <div className="flex-1" />
+      </div> {/* end scrollable top */}
 
+      {/* Bottom: Teams + User — always visible */}
+      <div className="shrink-0 flex flex-col items-center gap-1 mt-2">
       {/* Team selector */}
       {teams.length > 0 && (
         <div className="flex flex-col items-center gap-0.5 mb-2">
@@ -160,6 +164,7 @@ function Sidebar() {
       >
         {connected ? <Wifi size={16} /> : <WifiOff size={16} />}
       </div>
+      </div> {/* end bottom pinned */}
     </div>
   );
 }
