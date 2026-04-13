@@ -499,6 +499,14 @@ async fn migrate(pool: &Pool) -> Result<()> {
         sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (16, ?)").bind(&now_str()).execute(pool).await.ok();
     }
 
+    // Migration 17: Add missing columns to user_configs (theme, notify_desktop, notify_sound)
+    if !applied_set.contains(&17) {
+        if let Err(e) = sqlx::query("ALTER TABLE user_configs ADD COLUMN theme TEXT").execute(pool).await { log_migration_err("ALTER TABLE user_configs ADD COLUMN theme", e); }
+        if let Err(e) = sqlx::query("ALTER TABLE user_configs ADD COLUMN notify_desktop INTEGER DEFAULT 1").execute(pool).await { log_migration_err("ALTER TABLE user_configs ADD COLUMN notify_desktop", e); }
+        if let Err(e) = sqlx::query("ALTER TABLE user_configs ADD COLUMN notify_sound INTEGER DEFAULT 1").execute(pool).await { log_migration_err("ALTER TABLE user_configs ADD COLUMN notify_sound", e); }
+        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (17, ?)").bind(&now_str()).execute(pool).await.ok();
+    }
+
     sqlx::query("CREATE TABLE IF NOT EXISTS task_attachments (
         id          INTEGER PRIMARY KEY AUTOINCREMENT,
         task_id     INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
