@@ -300,10 +300,8 @@ export default function Settings() {
       <div className="glass p-6 rounded-2xl">
         <div className="flex items-center gap-3 mb-4">
           <span className="text-sm text-[var(--color-text)]">Language</span>
-          <select value={locale} onChange={e => setLocale(e.target.value)} aria-label="Language"
-            className="text-xs px-2 py-1 rounded bg-[var(--color-surface)] border border-white/10 text-[var(--color-text)]">
-            {availableLocales().map(l => <option key={l} value={l}>{l.toUpperCase()}</option>)}
-          </select>
+          <Select value={locale} onChange={v => setLocale(v)} ariaLabel="Language"
+            options={availableLocales().map(l => ({value:l,label:l.toUpperCase()}))} />
         </div>
         <LabelManager />
         <TemplateManager />

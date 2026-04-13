@@ -1,6 +1,7 @@
 import { useMemo, useState, useCallback } from "react";
 import { useStore } from "../store/store";
 import type { Task } from "../store/api";
+import Select from "./Select";
 
 const COLUMNS = [
   { id: "backlog", label: "Backlog", color: "#6C7A89" },
@@ -78,12 +79,8 @@ export default function KanbanBoard() {
     <div className="p-8 h-full flex flex-col gap-5 overflow-hidden">
       <div className="glass p-4 flex items-center gap-3">
         <h2 className="text-lg font-semibold text-white flex-1">Kanban Board</h2>
-        <select value={groupBy} onChange={e => setGroupBy(e.target.value as typeof groupBy)}
-          className="bg-white/5 border border-white/10 text-white/70 text-xs rounded px-2 py-1 outline-none">
-          <option value="none">No grouping</option>
-          <option value="project">By project</option>
-          <option value="user">By assignee</option>
-        </select>
+        <Select value={groupBy} onChange={v => setGroupBy(v as typeof groupBy)}
+          options={[{value:"none",label:"No grouping"},{value:"project",label:"By project"},{value:"user",label:"By assignee"}]} />
       </div>
 
       <div className="flex-1 overflow-x-auto">

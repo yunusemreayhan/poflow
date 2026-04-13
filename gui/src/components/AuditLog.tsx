@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { apiCall } from "../store/api";
 import { useT } from "../i18n";
+import Select from "./Select";
 
 interface AuditEntry {
   id: number;
@@ -33,15 +34,8 @@ export default function AuditLog() {
     <div className="space-y-4">
       <div className="flex items-center gap-3">
         <h2 className="text-sm font-semibold text-[var(--color-text)]">{t.auditLog}</h2>
-        <select value={filter} onChange={e => { setFilter(e.target.value); setPage(1); }}
-          className="text-xs px-2 py-1 rounded bg-[var(--color-surface)] border border-white/10 text-[var(--color-text)]"
-          aria-label="Filter by entity type">
-          <option value="">{t.filterAll}</option>
-          <option value="task">{t.filterTasks}</option>
-          <option value="user">{t.filterUsers}</option>
-          <option value="sprint">{t.filterSprints}</option>
-          <option value="room">{t.filterRooms}</option>
-        </select>
+        <Select value={filter} onChange={v => { setFilter(v); setPage(1); }} ariaLabel="Filter by entity type"
+          options={[{value:"",label:t.filterAll},{value:"task",label:t.filterTasks},{value:"user",label:t.filterUsers},{value:"sprint",label:t.filterSprints},{value:"room",label:t.filterRooms}]} />
       </div>
       <div className="space-y-1 max-h-96 overflow-y-auto" role="table" aria-label="Audit log entries">
         <div className="sr-only" role="row"><span role="columnheader">Time</span><span role="columnheader">Action</span><span role="columnheader">Entity</span><span role="columnheader">Detail</span></div>

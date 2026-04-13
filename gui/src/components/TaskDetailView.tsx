@@ -3,11 +3,11 @@ import { ArrowLeft, MessageSquare, Clock, Trash2, Users } from "lucide-react";
 import { useStore } from "../store/store";
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { TaskDetail, TimeReport } from "../store/api";
+import Select from "./Select";
 import { TaskLabelPicker } from "./Labels";
 import { TaskDependencies } from "./Dependencies";
 import { TaskRecurrence } from "./Recurrence";
 import { TaskActivityFeed, TaskAttachments, TaskTimeChart } from "./TaskDetailParts";
-import Select from "./Select";
 import { apiCall } from "../store/api";
 import { computeRollup } from "../rollup";
 import CommentSection from "./CommentSection";
@@ -232,12 +232,8 @@ function DetailNode({ detail, depth, onRefresh, hoursMap }: { detail: TaskDetail
             <EditField label="Description" value={t.description || ""} onSave={(v) => saveField("description", v)} />
             <div className="flex items-center justify-between py-1.5">
               <span className="text-xs text-white/40">Status</span>
-              <select value={t.status} onChange={e => saveField("status", e.target.value)}
-                className="bg-white/5 border border-white/10 rounded px-2 py-1 text-xs text-white outline-none">
-                {["backlog","active","in_progress","completed","done","estimated","archived"].map(s => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
+              <Select value={t.status} onChange={v => saveField("status", v)}
+                options={["backlog","active","in_progress","completed","done","estimated","archived"].map(s => ({value:s,label:s}))} />
             </div>
             <EditField label="Priority (1-5)" value={t.priority} type="number" onSave={(v) => saveField("priority", v)} />
             <EditField label="Est. Pomodoros / Points" value={t.estimated} type="number" onSave={(v) => saveField("estimated", v)} />

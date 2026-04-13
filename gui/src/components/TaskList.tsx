@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, FolderOpen } from "lucide-react";
 import { useStore } from "../store/store";
+import Select from "./Select";
 import { useState, useMemo, useEffect } from "react";
 import { buildTree } from "../tree";
 import { matchSearch } from "../utils";
@@ -171,13 +172,8 @@ export default function TaskList({ selectMode, onSelect, selectedTaskId, votedTa
           className={`shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-all ${filter !== "all" ? "bg-[var(--color-accent)] text-white" : "bg-white/5 text-white/40 hover:text-white/60"}`}>
           {filter === "active" ? "Active" : filter === "mine" ? "Mine" : "All"} ({sorted.length})
         </button>
-        <select value={sortBy} onChange={e => setSortBy(e.target.value as any)} aria-label="Sort tasks"
-          className="text-[10px] bg-transparent border border-white/10 rounded px-1 py-0.5 text-white/40">
-          <option value="order">Manual</option>
-          <option value="priority">Priority</option>
-          <option value="due">Due date</option>
-          <option value="updated">Updated</option>
-        </select>
+        <Select value={sortBy} onChange={v => setSortBy(v as any)} ariaLabel="Sort tasks"
+          options={[{value:"order",label:"Manual"},{value:"priority",label:"Priority"},{value:"due",label:"Due date"},{value:"updated",label:"Updated"}]} />
         <button onClick={() => setTreeKey(k => k + 1)} title="Expand all"
           className="shrink-0 px-2 py-1 rounded-full text-xs bg-white/5 text-white/40 hover:text-white/60">⊞</button>
         <button onClick={() => setViewMode(v => v === "tree" ? "table" : "tree")} title={viewMode === "tree" ? "Table view" : "Tree view"}
