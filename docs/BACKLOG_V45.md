@@ -31,10 +31,10 @@ Unlike rooms (which filter by membership for non-root), epic groups are visible 
 
 | ID | Severity | Category | Status |
 |----|----------|----------|--------|
-| V45-1 | Medium | Bug | |
-| V45-2 | Medium | Bug | |
-| V45-3 | Medium | Bug | |
-| V45-4 | Low | Code quality | |
-| V45-5 | Low | Bug | |
+| V45-1 | Medium | Bug | FIXED — returns 404 |
+| V45-2 | Medium | Bug | FIXED — validates length and emptiness |
+| V45-3 | Medium | Bug | FIXED — batch-validates existence |
+| V45-4 | Low | Code quality | FIXED — deduplicates task_ids |
+| V45-5 | Low | Bug | WON'T FIX — epic groups are intentionally shared |
 
-**Total: 5 items** — 3 medium, 2 low
+**Total: 5 items** — 4 fixed, 1 won't fix
