@@ -63,9 +63,10 @@ class TestLeafOnlyMode:
         assert status == 200
         assert result["leaf_only_mode"] == enabled
 
-    def _get_task_ids(self):
-        status, tasks = api("GET", "/api/tasks", token=self.token, base_url=self.url)
+    def _get_task_ids(self, endpoint="/api/tasks"):
+        status, resp = api("GET", endpoint, token=self.token, base_url=self.url)
         assert status == 200
+        tasks = resp["tasks"] if "tasks" in resp else resp
         return [t["id"] for t in tasks]
 
     def test_leaf_only_off_returns_all_tasks(self):
@@ -93,3 +94,19 @@ class TestLeafOnlyMode:
         self._set_leaf_only(False)
         ids_off = self._get_task_ids()
         assert self.parent["id"] in ids_off, "Parent should reappear after disabling leaf_only_mode"
+
+    def test_tasks_full_leaf_only_off(self):
+        """/api/tasks/full with leaf_only OFF returns all tasks."""
+        self._set_leaf_only(False)
+        ids = self._get_task_ids("/api/tasks/full")
+        assert self.parent["id"] in ids
+        assert self.child["id"] in ids
+        assert self.leaf["id"] in ids
+
+    def test_tasks_full_leaf_only_on(self):
+        """/api/tasks/full with leaf_only ON excludes parents."""
+        self._set_leaf_only(True)
+        ids = self._get_task_ids("/api/tasks/full")
+        assert self.parent["id"] not in ids, "Parent should be HIDDEN in /api/tasks/full"
+        assert self.child["id"] in ids
+        assert self.leaf["id"] in ids
