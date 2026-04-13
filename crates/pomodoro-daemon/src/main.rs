@@ -117,6 +117,9 @@ use utoipa_swagger_ui::SwaggerUi;
         routes::SlackIntegrationRequest,
         routes::NotifPref, routes::BulkStatusRequest,
         routes::EditCommentRequest,
+        routes::RefreshRequest, routes::ChangePasswordRequest,
+        routes::RestoreRequest, routes::ReorderRequest,
+        routes::CreateTemplateRequest, routes::RoomRoleRequest,
     )),
     modifiers(&SecurityAddon),
     info(title = "Pomodoro API", version = "2.1.0", description = "Multi-user Pomodoro timer with hierarchical task management")

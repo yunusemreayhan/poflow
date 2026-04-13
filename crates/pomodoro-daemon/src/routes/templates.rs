@@ -62,7 +62,10 @@ pub async fn instantiate_template(State(engine): State<AppState>, claims: Claims
     let project = data["project"].as_str().map(|s| s.to_string());
     let priority = data["priority"].as_i64().unwrap_or(3).clamp(1, 5);
     let estimated = data["estimated"].as_i64().unwrap_or(0).max(0);
-    let t = db::create_task(&engine.pool, claims.user_id, None, &title, desc.as_deref(), project.as_deref(), None, priority, estimated, 0.0, 0.0, None)
+    let tags = data["tags"].as_str().map(|s| resolve(s));
+    let due_date = data["due_date"].as_str().map(|s| resolve(s));
+    let estimated_hours = data["estimated_hours"].as_f64().unwrap_or(0.0).max(0.0);
+    let t = db::create_task(&engine.pool, claims.user_id, None, &title, desc.as_deref(), project.as_deref(), tags.as_deref(), priority, estimated, estimated_hours, 0.0, due_date.as_deref())
         .await.map_err(internal)?;
     engine.notify(ChangeEvent::Tasks);
     Ok((StatusCode::CREATED, Json(t)))

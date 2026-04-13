@@ -28,6 +28,7 @@ pub async fn log_burn(State(engine): State<AppState>, claims: Claims, Path(id): 
 
 #[utoipa::path(get, path = "/api/sprints/{id}/burns", responses((status = 200, body = Vec<db::BurnEntry>)), security(("bearer" = [])))]
 pub async fn list_burns(State(engine): State<AppState>, _claims: Claims, Path(id): Path<i64>) -> ApiResult<Vec<db::BurnEntry>> {
+    db::get_sprint(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Sprint not found"))?;
     db::list_burns(&engine.pool, id).await.map(Json).map_err(internal)
 }
 
@@ -46,5 +47,6 @@ pub async fn cancel_burn(State(engine): State<AppState>, claims: Claims, Path((s
 
 #[utoipa::path(get, path = "/api/sprints/{id}/burn-summary", responses((status = 200, body = Vec<db::BurnSummaryEntry>)), security(("bearer" = [])))]
 pub async fn get_burn_summary(State(engine): State<AppState>, _claims: Claims, Path(id): Path<i64>) -> ApiResult<Vec<db::BurnSummaryEntry>> {
+    db::get_sprint(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Sprint not found"))?;
     db::get_burn_summary(&engine.pool, id).await.map(Json).map_err(internal)
 }

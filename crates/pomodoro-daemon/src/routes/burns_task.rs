@@ -3,6 +3,7 @@ use super::*;
 
 #[utoipa::path(get, path = "/api/tasks/{id}/time", responses((status = 200, body = Vec<db::BurnEntry>)), security(("bearer" = [])))]
 pub async fn list_time_reports(State(engine): State<AppState>, _claims: Claims, Path(id): Path<i64>) -> ApiResult<Vec<db::BurnEntry>> {
+    db::get_task(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Task not found"))?;
     db::list_task_burns(&engine.pool, id).await.map(Json).map_err(internal)
 }
 
@@ -30,11 +31,13 @@ pub async fn add_time_report(State(engine): State<AppState>, claims: Claims, Pat
 
 #[utoipa::path(get, path = "/api/tasks/{id}/burn-total", responses((status = 200, body = db::BurnTotal)), security(("bearer" = [])))]
 pub async fn get_task_burn_total(State(engine): State<AppState>, _claims: Claims, Path(id): Path<i64>) -> ApiResult<db::BurnTotal> {
+    db::get_task(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Task not found"))?;
     db::get_task_burn_total(&engine.pool, id).await.map(Json).map_err(internal)
 }
 
 #[utoipa::path(get, path = "/api/tasks/{id}/burn-users", responses((status = 200, body = Vec<String>)), security(("bearer" = [])))]
 pub async fn get_task_burn_users(State(engine): State<AppState>, _claims: Claims, Path(id): Path<i64>) -> ApiResult<Vec<String>> {
+    db::get_task(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Task not found"))?;
     db::get_task_burn_users(&engine.pool, id).await.map(Json).map_err(internal)
 }
 
