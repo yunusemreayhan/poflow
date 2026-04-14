@@ -7192,3 +7192,146 @@ async fn test_label_filter() {
     assert!(arr.iter().all(|t| t["title"] == "Labeled"), "Label filter should only return labeled tasks");
     assert!(arr.iter().any(|t| t["title"] == "Labeled"));
 }
+
+// ============================================================
+// Time tracking reports (Jira gap #6)
+// ============================================================
+
+#[tokio::test]
+async fn test_time_tracking_report_json() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    // Create task + complete a session so there's data
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"TT","project":"Proj1"})))).await.unwrap();
+    let tid = body_json(resp).await["id"].as_i64().unwrap();
+    app.clone().oneshot(auth_req("POST", "/api/timer/start", &tok, Some(json!({"task_id": tid})))).await.unwrap();
+    app.clone().oneshot(auth_req("POST", "/api/timer/stop", &tok, None)).await.unwrap();
+    // Get report
+    let resp = app.clone().oneshot(auth_req("GET", "/api/reports/time-tracking", &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let ct = resp.headers().get("content-type").unwrap().to_str().unwrap();
+    assert!(ct.contains("json"));
+}
+
+#[tokio::test]
+async fn test_time_tracking_report_csv() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("GET", "/api/reports/time-tracking?format=csv", &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let ct = resp.headers().get("content-type").unwrap().to_str().unwrap();
+    assert!(ct.contains("csv"));
+    let body = String::from_utf8(resp.into_body().collect().await.unwrap().to_bytes().to_vec()).unwrap();
+    assert!(body.starts_with("username,project,week,hours,sessions"));
+}
+
+#[tokio::test]
+async fn test_time_tracking_non_root_rejected() {
+    let app = app().await;
+    let (user_tok, _) = register_user_full(&app, "ttuser", "TtUser111").await;
+    let resp = app.clone().oneshot(auth_req("GET", "/api/reports/time-tracking", &user_tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 403);
+}
+
+// ============================================================
+// Advanced search (Jira gap #10)
+// ============================================================
+
+#[tokio::test]
+async fn test_advanced_search_status_filter() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"AS1"})))).await.unwrap();
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"AS2"})))).await.unwrap();
+    let t2 = body_json(resp).await["id"].as_i64().unwrap();
+    app.clone().oneshot(auth_req("PUT", &format!("/api/tasks/{}", t2), &tok, Some(json!({"status":"in_progress"})))).await.unwrap();
+    // Search for in_progress only
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks/search/advanced", &tok, Some(json!({
+        "filters": [{"field": "status", "op": "eq", "value": "in_progress"}]
+    })))).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let tasks = body_json(resp).await;
+    assert!(tasks.as_array().unwrap().iter().all(|t| t["status"] == "in_progress"));
+}
+
+#[tokio::test]
+async fn test_advanced_search_multi_status() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"MS1"})))).await.unwrap();
+    let t1 = body_json(resp).await["id"].as_i64().unwrap();
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"MS2"})))).await.unwrap();
+    let t2 = body_json(resp).await["id"].as_i64().unwrap();
+    app.clone().oneshot(auth_req("PUT", &format!("/api/tasks/{}", t1), &tok, Some(json!({"status":"in_progress"})))).await.unwrap();
+    app.clone().oneshot(auth_req("PUT", &format!("/api/tasks/{}", t2), &tok, Some(json!({"status":"completed"})))).await.unwrap();
+    // Search for in_progress OR completed
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks/search/advanced", &tok, Some(json!({
+        "filters": [{"field": "status", "op": "in", "value": ["in_progress", "completed"]}]
+    })))).await.unwrap();
+    let tasks = body_json(resp).await;
+    let statuses: Vec<&str> = tasks.as_array().unwrap().iter().map(|t| t["status"].as_str().unwrap()).collect();
+    assert!(statuses.iter().all(|s| *s == "in_progress" || *s == "completed"));
+}
+
+#[tokio::test]
+async fn test_advanced_search_combined_filters() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"CF1","priority":5,"project":"SearchProj"})))).await.unwrap();
+    let t1 = body_json(resp).await["id"].as_i64().unwrap();
+    app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"CF2","priority":1,"project":"SearchProj"})))).await.unwrap();
+    // Search: priority >= 4 AND project = SearchProj
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks/search/advanced", &tok, Some(json!({
+        "filters": [
+            {"field": "priority", "op": "gte", "value": 4},
+            {"field": "project", "op": "eq", "value": "SearchProj"}
+        ]
+    })))).await.unwrap();
+    let tasks = body_json(resp).await;
+    let arr = tasks.as_array().unwrap();
+    assert!(arr.iter().all(|t| t["priority"].as_i64().unwrap() >= 4));
+    assert!(arr.iter().any(|t| t["id"] == t1));
+}
+
+#[tokio::test]
+async fn test_advanced_search_custom_field_filter() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    // Create custom field
+    let resp = app.clone().oneshot(auth_req("POST", "/api/fields", &tok, Some(json!({"name":"env","field_type":"text"})))).await.unwrap();
+    let fid = body_json(resp).await["id"].as_i64().unwrap();
+    // Create tasks with different field values
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"Prod"})))).await.unwrap();
+    let t1 = body_json(resp).await["id"].as_i64().unwrap();
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"Dev"})))).await.unwrap();
+    let t2 = body_json(resp).await["id"].as_i64().unwrap();
+    app.clone().oneshot(auth_req("PUT", &format!("/api/tasks/{}/fields/{}", t1, fid), &tok, Some(json!({"value":"production"})))).await.unwrap();
+    app.clone().oneshot(auth_req("PUT", &format!("/api/tasks/{}/fields/{}", t2, fid), &tok, Some(json!({"value":"development"})))).await.unwrap();
+    // Search by custom field
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks/search/advanced", &tok, Some(json!({
+        "filters": [{"field": "custom:env", "op": "eq", "value": "production"}]
+    })))).await.unwrap();
+    let tasks = body_json(resp).await;
+    let arr = tasks.as_array().unwrap();
+    assert!(arr.iter().any(|t| t["title"] == "Prod"));
+    assert!(!arr.iter().any(|t| t["title"] == "Dev"));
+}
+
+#[tokio::test]
+async fn test_advanced_search_with_sort() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"Sort1","priority":1})))).await.unwrap();
+    app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"Sort5","priority":5})))).await.unwrap();
+    // Sort by priority descending
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks/search/advanced", &tok, Some(json!({
+        "filters": [],
+        "sort_by": "priority",
+        "sort_dir": "desc"
+    })))).await.unwrap();
+    let tasks = body_json(resp).await;
+    let arr = tasks.as_array().unwrap();
+    if arr.len() >= 2 {
+        assert!(arr[0]["priority"].as_i64().unwrap() >= arr[1]["priority"].as_i64().unwrap());
+    }
+}

@@ -77,6 +77,130 @@ pub async fn search_tasks(State(engine): State<AppState>, claims: Claims, Query(
     Ok(Json(results.into_iter().map(|(id, title, snippet)| serde_json::json!({"id": id, "title": title, "snippet": snippet})).collect()))
 }
 
+// Advanced structured search (JQL-like)
+#[derive(Deserialize, utoipa::ToSchema)]
+pub struct AdvancedSearchRequest {
+    pub filters: Vec<SearchFilter>,
+    pub sort_by: Option<String>,   // "created_at", "updated_at", "priority", "due_date", "title"
+    pub sort_dir: Option<String>,  // "asc" or "desc"
+    pub limit: Option<i64>,
+    pub offset: Option<i64>,
+}
+
+#[derive(Deserialize, utoipa::ToSchema)]
+pub struct SearchFilter {
+    pub field: String,    // "status", "project", "assignee", "label", "priority", "due_date", "title", "description", "custom:<field_name>"
+    pub op: String,       // "eq", "neq", "gt", "lt", "gte", "lte", "in", "contains"
+    pub value: serde_json::Value,
+}
+
+#[utoipa::path(post, path = "/api/tasks/search/advanced", request_body = AdvancedSearchRequest, responses((status = 200, body = Vec<db::Task>)), security(("bearer" = [])))]
+pub async fn advanced_search(State(engine): State<AppState>, claims: Claims, Json(req): Json<AdvancedSearchRequest>) -> ApiResult<Vec<db::Task>> {
+    let limit = req.limit.unwrap_or(100).min(500);
+    let offset = req.offset.unwrap_or(0);
+    let mut conditions = Vec::new();
+    let mut binds: Vec<String> = Vec::new();
+
+    conditions.push("t.deleted_at IS NULL".to_string());
+    if claims.role != "root" {
+        conditions.push("t.user_id = ?".to_string());
+        binds.push(claims.user_id.to_string());
+    }
+
+    for f in &req.filters {
+        match f.field.as_str() {
+            "status" => {
+                match f.op.as_str() {
+                    "eq" => { conditions.push("t.status = ?".into()); binds.push(f.value.as_str().unwrap_or("").to_string()); }
+                    "neq" => { conditions.push("t.status != ?".into()); binds.push(f.value.as_str().unwrap_or("").to_string()); }
+                    "in" => {
+                        if let Some(arr) = f.value.as_array() {
+                            let ph = arr.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+                            conditions.push(format!("t.status IN ({})", ph));
+                            for v in arr { binds.push(v.as_str().unwrap_or("").to_string()); }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            "project" => {
+                match f.op.as_str() {
+                    "eq" => { conditions.push("t.project = ?".into()); binds.push(f.value.as_str().unwrap_or("").to_string()); }
+                    "contains" => { conditions.push("t.project LIKE ?".into()); binds.push(format!("%{}%", f.value.as_str().unwrap_or(""))); }
+                    _ => {}
+                }
+            }
+            "assignee" => {
+                if f.op == "eq" {
+                    conditions.push("EXISTS (SELECT 1 FROM task_assignees _ta JOIN users _au ON _au.id = _ta.user_id WHERE _ta.task_id = t.id AND _au.username = ?)".into());
+                    binds.push(f.value.as_str().unwrap_or("").to_string());
+                }
+            }
+            "label" => {
+                if f.op == "eq" {
+                    conditions.push("EXISTS (SELECT 1 FROM task_labels _tl JOIN labels _l ON _l.id = _tl.label_id WHERE _tl.task_id = t.id AND _l.name = ?)".into());
+                    binds.push(f.value.as_str().unwrap_or("").to_string());
+                }
+            }
+            "priority" => {
+                let val = f.value.as_i64().unwrap_or(0).to_string();
+                match f.op.as_str() {
+                    "eq" => { conditions.push("t.priority = ?".into()); binds.push(val); }
+                    "gt" => { conditions.push("t.priority > ?".into()); binds.push(val); }
+                    "gte" => { conditions.push("t.priority >= ?".into()); binds.push(val); }
+                    "lt" => { conditions.push("t.priority < ?".into()); binds.push(val); }
+                    _ => {}
+                }
+            }
+            "due_date" => {
+                let val = f.value.as_str().unwrap_or("").to_string();
+                match f.op.as_str() {
+                    "lt" => { conditions.push("t.due_date IS NOT NULL AND t.due_date < ?".into()); binds.push(val); }
+                    "lte" => { conditions.push("t.due_date IS NOT NULL AND t.due_date <= ?".into()); binds.push(val); }
+                    "gt" => { conditions.push("t.due_date IS NOT NULL AND t.due_date > ?".into()); binds.push(val); }
+                    "gte" => { conditions.push("t.due_date IS NOT NULL AND t.due_date >= ?".into()); binds.push(val); }
+                    "eq" => { conditions.push("t.due_date = ?".into()); binds.push(val); }
+                    _ => {}
+                }
+            }
+            "title" => {
+                if f.op == "contains" {
+                    conditions.push("t.title LIKE ?".into());
+                    binds.push(format!("%{}%", f.value.as_str().unwrap_or("")));
+                }
+            }
+            s if s.starts_with("custom:") => {
+                let field_name = &s[7..];
+                if f.op == "eq" {
+                    conditions.push("EXISTS (SELECT 1 FROM task_custom_values _cv JOIN custom_fields _cf ON _cf.id = _cv.field_id WHERE _cv.task_id = t.id AND _cf.name = ? AND _cv.value = ?)".into());
+                    binds.push(field_name.to_string());
+                    binds.push(f.value.as_str().unwrap_or("").to_string());
+                }
+            }
+            _ => {}
+        }
+    }
+
+    let sort = match req.sort_by.as_deref() {
+        Some("priority") => "t.priority",
+        Some("due_date") => "t.due_date",
+        Some("created_at") => "t.created_at",
+        Some("updated_at") => "t.updated_at",
+        Some("title") => "t.title",
+        _ => "t.sort_order",
+    };
+    let dir = if req.sort_dir.as_deref() == Some("asc") { "ASC" } else { "DESC" };
+
+    let sql = format!("{} WHERE {} ORDER BY {} {} LIMIT ? OFFSET ?",
+        db::TASK_SELECT, conditions.join(" AND "), sort, dir);
+
+    let mut query = sqlx::query_as::<_, db::Task>(&sql);
+    for b in &binds { query = query.bind(b); }
+    query = query.bind(limit).bind(offset);
+    let tasks = query.fetch_all(&engine.pool).await.map_err(internal)?;
+    Ok(Json(tasks))
+}
+
 // F4: Task time tracking summary
 #[utoipa::path(get, path = "/api/tasks/{id}/time-summary", responses((status = 200)), security(("bearer" = [])))]
 pub async fn get_task_time_summary(State(engine): State<AppState>, _claims: Claims, Path(id): Path<i64>) -> ApiResult<serde_json::Value> {

@@ -21,6 +21,51 @@ pub async fn user_hours_report(State(engine): State<AppState>, claims: Claims, Q
     Ok(Json(rows.into_iter().map(|(u, h, s)| serde_json::json!({"username": u, "hours": (h * 100.0).round() / 100.0, "sessions": s})).collect()))
 }
 
+// Time tracking report: hours per user per project per week
+#[derive(Deserialize)]
+pub struct TimeTrackingQuery { pub from: Option<String>, pub to: Option<String>, pub format: Option<String> }
+
+#[utoipa::path(get, path = "/api/reports/time-tracking", responses((status = 200)), security(("bearer" = [])))]
+pub async fn time_tracking_report(State(engine): State<AppState>, claims: Claims, Query(q): Query<TimeTrackingQuery>) -> Result<axum::response::Response, ApiError> {
+    if claims.role != "root" { return Err(err(StatusCode::FORBIDDEN, "Root only")); }
+    let from = q.from.as_deref().unwrap_or("2000-01-01");
+    let to = q.to.as_deref().unwrap_or("2099-12-31");
+    let to_ts = format!("{}T23:59:59", to);
+
+    let rows: Vec<(String, String, String, f64, i64)> = sqlx::query_as(
+        "SELECT u.username, COALESCE(t.project, '(none)'), \
+         strftime('%Y-W%W', s.started_at) as week, \
+         COALESCE(SUM(s.duration_s),0)/3600.0, COUNT(s.id) \
+         FROM sessions s \
+         JOIN users u ON s.user_id = u.id \
+         LEFT JOIN tasks t ON s.task_id = t.id \
+         WHERE s.status = 'completed' AND s.started_at >= ? AND s.started_at <= ? \
+         GROUP BY u.username, t.project, week \
+         ORDER BY week DESC, u.username, t.project")
+        .bind(from).bind(&to_ts).fetch_all(&engine.pool).await.map_err(internal)?;
+
+    if q.format.as_deref() == Some("csv") {
+        let mut csv = String::from("username,project,week,hours,sessions\n");
+        for (user, project, week, hours, sessions) in &rows {
+            csv.push_str(&format!("{},{},{},{:.2},{}\n", user, project, week, hours, sessions));
+        }
+        return Ok(axum::response::Response::builder()
+            .status(StatusCode::OK)
+            .header("content-type", "text/csv")
+            .header("content-disposition", "attachment; filename=\"time-tracking.csv\"")
+            .body(axum::body::Body::from(csv)).map_err(|e| internal(e.to_string()))?);
+    }
+
+    let data: Vec<serde_json::Value> = rows.into_iter().map(|(u, p, w, h, s)| {
+        serde_json::json!({"username": u, "project": p, "week": w, "hours": (h * 100.0).round() / 100.0, "sessions": s})
+    }).collect();
+    Ok(axum::response::Response::builder()
+        .status(StatusCode::OK)
+        .header("content-type", "application/json")
+        .body(axum::body::Body::from(serde_json::to_vec(&data).map_err(|e| internal(e.to_string()))?))
+        .map_err(|e| internal(e.to_string()))?)
+}
+
 #[utoipa::path(get, path = "/api/history", responses((status = 200, body = Vec<db::SessionWithPath>)), security(("bearer" = [])))]
 pub async fn get_history(State(engine): State<AppState>, claims: Claims, Query(q): Query<HistoryQuery>) -> ApiResult<Vec<db::SessionWithPath>> {
     let from = q.from.unwrap_or_else(|| "2000-01-01T00:00:00".to_string());
