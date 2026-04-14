@@ -7130,3 +7130,65 @@ async fn test_custom_field_non_root_cannot_create() {
     let resp = app.clone().oneshot(auth_req("POST", "/api/fields", &user_tok, Some(json!({"name":"MyField"})))).await.unwrap();
     assert_eq!(resp.status(), 403);
 }
+
+// ============================================================
+// Bulk operations + label filter (Jira gap #9)
+// ============================================================
+
+#[tokio::test]
+async fn test_bulk_assign() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    register_user_full(&app, "bulkdev", "BulkDv111").await;
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"BA1"})))).await.unwrap();
+    let t1 = body_json(resp).await["id"].as_i64().unwrap();
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"BA2"})))).await.unwrap();
+    let t2 = body_json(resp).await["id"].as_i64().unwrap();
+    // Bulk assign
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks/bulk-assign", &tok, Some(json!({"task_ids":[t1,t2],"username":"bulkdev"})))).await.unwrap();
+    assert_eq!(resp.status(), 204);
+    // Verify
+    let resp = app.clone().oneshot(auth_req("GET", &format!("/api/tasks/{}/assignees", t1), &tok, None)).await.unwrap();
+    let a = body_json(resp).await;
+    assert!(a.as_array().unwrap().iter().any(|u| u == "bulkdev"));
+}
+
+#[tokio::test]
+async fn test_bulk_sprint_move() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"SM1"})))).await.unwrap();
+    let t1 = body_json(resp).await["id"].as_i64().unwrap();
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"SM2"})))).await.unwrap();
+    let t2 = body_json(resp).await["id"].as_i64().unwrap();
+    let resp = app.clone().oneshot(auth_req("POST", "/api/sprints", &tok, Some(json!({"name":"BulkSprint"})))).await.unwrap();
+    let sid = body_json(resp).await["id"].as_i64().unwrap();
+    // Bulk move
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks/bulk-sprint", &tok, Some(json!({"task_ids":[t1,t2],"sprint_id":sid})))).await.unwrap();
+    assert_eq!(resp.status(), 204);
+    // Verify
+    let resp = app.clone().oneshot(auth_req("GET", &format!("/api/sprints/{}", sid), &tok, None)).await.unwrap();
+    let detail = body_json(resp).await;
+    assert_eq!(detail["tasks"].as_array().unwrap().len(), 2);
+}
+
+#[tokio::test]
+async fn test_label_filter() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    // Create label
+    let resp = app.clone().oneshot(auth_req("POST", "/api/labels", &tok, Some(json!({"name":"urgent","color":"#ef4444"})))).await.unwrap();
+    let lid = body_json(resp).await["id"].as_i64().unwrap();
+    // Create tasks
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"Labeled"})))).await.unwrap();
+    let t1 = body_json(resp).await["id"].as_i64().unwrap();
+    app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"Unlabeled"})))).await.unwrap();
+    // Add label to t1
+    app.clone().oneshot(auth_req("PUT", &format!("/api/tasks/{}/labels/{}", t1, lid), &tok, None)).await.unwrap();
+    // Filter by label
+    let resp = app.clone().oneshot(auth_req("GET", "/api/tasks?label=urgent", &tok, None)).await.unwrap();
+    let tasks = body_json(resp).await;
+    let arr = tasks.as_array().unwrap();
+    assert!(arr.iter().all(|t| t["title"] == "Labeled"), "Label filter should only return labeled tasks");
+    assert!(arr.iter().any(|t| t["title"] == "Labeled"));
+}

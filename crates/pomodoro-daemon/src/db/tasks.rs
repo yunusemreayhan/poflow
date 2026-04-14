@@ -70,10 +70,11 @@ pub struct TaskFilter<'a> {
     pub priority: Option<i64>,
     pub team_id: Option<i64>,
     pub user_id: Option<i64>,
+    pub label: Option<&'a str>,
 }
 
 pub async fn list_tasks(pool: &Pool, status: Option<&str>, project: Option<&str>) -> Result<Vec<Task>> {
-    list_tasks_paged(pool, TaskFilter { status, project, search: None, assignee: None, due_before: None, due_after: None, priority: None, team_id: None, user_id: None }, 5000, 0).await
+    list_tasks_paged(pool, TaskFilter { status, project, search: None, assignee: None, due_before: None, due_after: None, priority: None, team_id: None, user_id: None, label: None }, 5000, 0).await
 }
 
 pub async fn list_deleted_tasks(pool: &Pool, user_id: Option<i64>) -> Result<Vec<Task>> {
@@ -105,6 +106,7 @@ pub async fn list_tasks_paged(pool: &Pool, f: TaskFilter<'_>, limit: i64, offset
     if f.due_before.is_some() { q.push_str(" AND t.due_date IS NOT NULL AND t.due_date <= ?"); }
     if f.due_after.is_some() { q.push_str(" AND t.due_date IS NOT NULL AND t.due_date >= ?"); }
     if f.user_id.is_some() { q.push_str(" AND t.user_id = ?"); }
+    if f.label.is_some() { q.push_str(" AND EXISTS (SELECT 1 FROM task_labels _tl JOIN labels _l ON _l.id = _tl.label_id WHERE _tl.task_id = t.id AND _l.name = ?)"); }
     let used_temp = if let Some(ref ids) = team_scope {
         if ids.len() > 500 { populate_team_scope_table(pool, ids).await?; }
         append_team_scope_filter(&mut q, ids)
@@ -124,6 +126,7 @@ pub async fn list_tasks_paged(pool: &Pool, f: TaskFilter<'_>, limit: i64, offset
     if let Some(d) = f.due_before { query = query.bind(d); }
     if let Some(d) = f.due_after { query = query.bind(d); }
     if let Some(uid) = f.user_id { query = query.bind(uid); }
+    if let Some(l) = f.label { query = query.bind(l); }
     if let Some(ref ids) = team_scope { if !used_temp { for id in ids { query = query.bind(id); } } }
     query = query.bind(limit).bind(offset);
     Ok(query.fetch_all(pool).await?)
@@ -190,6 +193,7 @@ pub async fn count_tasks(pool: &Pool, f: TaskFilter<'_>) -> Result<i64> {
     if f.due_before.is_some() { q.push_str(" AND t.due_date IS NOT NULL AND t.due_date <= ?"); }
     if f.due_after.is_some() { q.push_str(" AND t.due_date IS NOT NULL AND t.due_date >= ?"); }
     if f.user_id.is_some() { q.push_str(" AND t.user_id = ?"); }
+    if f.label.is_some() { q.push_str(" AND EXISTS (SELECT 1 FROM task_labels _tl JOIN labels _l ON _l.id = _tl.label_id WHERE _tl.task_id = t.id AND _l.name = ?)"); }
     let used_temp = if let Some(ref ids) = team_scope {
         if ids.len() > 500 { populate_team_scope_table(pool, ids).await?; }
         append_team_scope_filter(&mut q, ids)
@@ -206,6 +210,7 @@ pub async fn count_tasks(pool: &Pool, f: TaskFilter<'_>) -> Result<i64> {
     if let Some(d) = f.due_before { query = query.bind(d); }
     if let Some(d) = f.due_after { query = query.bind(d); }
     if let Some(uid) = f.user_id { query = query.bind(uid); }
+    if let Some(l) = f.label { query = query.bind(l); }
     if let Some(ref ids) = team_scope { if !used_temp { for id in ids { query = query.bind(id); } } }
     let (count,) = query.fetch_one(pool).await?;
     Ok(count)

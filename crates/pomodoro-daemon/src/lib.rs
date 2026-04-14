@@ -67,6 +67,8 @@ pub async fn build_router(engine: Arc<engine::Engine>) -> Router {
         .route("/api/tasks/{id}/permanent", delete(routes::purge_task))
         .route("/api/tasks/{id}/duplicate", post(routes::duplicate_task))
         .route("/api/tasks/bulk-status", put(routes::bulk_update_status))
+        .route("/api/tasks/bulk-assign", post(routes::bulk_assign))
+        .route("/api/tasks/bulk-sprint", post(routes::bulk_sprint_move))
         .route("/api/tasks/{id}/comments", get(routes::list_comments).post(routes::add_comment))
         .route("/api/comments/{id}", delete(routes::delete_comment).put(routes::edit_comment))
         .route("/api/tasks/{id}/time", get(routes::list_time_reports).post(routes::add_time_report))

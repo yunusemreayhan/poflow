@@ -6,7 +6,7 @@ pub struct ExportQuery { pub format: Option<String>, pub from: Option<String>, p
 #[utoipa::path(get, path = "/api/export/tasks", responses((status = 200)), security(("bearer" = [])))]
 pub async fn export_tasks(State(engine): State<AppState>, claims: Claims, Query(q): Query<ExportQuery>) -> Result<axum::response::Response, ApiError> {
     let user_filter = if claims.role == "root" { None } else { Some(claims.user_id) };
-    let filter = db::TaskFilter { status: None, project: None, search: None, assignee: None, due_before: None, due_after: None, priority: None, team_id: None, user_id: user_filter };
+    let filter = db::TaskFilter { status: None, project: None, search: None, assignee: None, due_before: None, due_after: None, priority: None, team_id: None, user_id: user_filter, label: None };
     let tasks = db::list_tasks_paged(&engine.pool, filter, 50000, 0).await.map_err(internal)?;
     let fmt = q.format.as_deref().unwrap_or("json");
     match fmt {
@@ -247,7 +247,7 @@ fn parse_csv_line(line: &str) -> Vec<String> {
 #[utoipa::path(get, path = "/api/export/ical", responses((status = 200)), security(("bearer" = [])))]
 pub async fn export_ical(State(engine): State<AppState>, claims: Claims) -> Result<axum::response::Response, ApiError> {
     let user_filter = if claims.role == "root" { None } else { Some(claims.user_id) };
-    let filter = db::TaskFilter { status: None, project: None, search: None, assignee: None, due_before: None, due_after: None, priority: None, team_id: None, user_id: user_filter };
+    let filter = db::TaskFilter { status: None, project: None, search: None, assignee: None, due_before: None, due_after: None, priority: None, team_id: None, user_id: user_filter, label: None };
     let tasks = db::list_tasks_paged(&engine.pool, filter, 50000, 0).await.map_err(internal)?;
     let sprints = db::list_sprints(&engine.pool, None, None).await.map_err(internal)?;
 

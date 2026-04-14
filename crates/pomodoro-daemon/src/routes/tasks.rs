@@ -105,6 +105,7 @@ pub struct TaskQuery {
     pub search: Option<String>, pub assignee: Option<String>,
     pub due_before: Option<String>, pub due_after: Option<String>,
     pub priority: Option<i64>,
+    pub label: Option<String>,
 }
 
 #[utoipa::path(get, path = "/api/tasks", responses((status = 200, body = Vec<db::Task>)), security(("bearer" = [])))]
@@ -116,7 +117,7 @@ pub async fn list_tasks(State(engine): State<AppState>, _claims: Claims, Query(q
         status: q.status.as_deref(), project: q.project.as_deref(),
         search: q.search.as_deref(), assignee: q.assignee.as_deref(),
         due_before: q.due_before.as_deref(), due_after: q.due_after.as_deref(),
-        priority: q.priority, team_id: q.team_id, user_id: None,
+        priority: q.priority, team_id: q.team_id, user_id: None, label: q.label.as_deref(),
     };
     let tasks = db::list_tasks_paged(&engine.pool, filter, per_page, offset).await.map_err(internal)?;
     // Only compute total count if pagination is explicitly requested
@@ -125,7 +126,7 @@ pub async fn list_tasks(State(engine): State<AppState>, _claims: Claims, Query(q
             status: q.status.as_deref(), project: q.project.as_deref(),
             search: q.search.as_deref(), assignee: q.assignee.as_deref(),
             due_before: q.due_before.as_deref(), due_after: q.due_after.as_deref(),
-            priority: q.priority, team_id: q.team_id, user_id: None,
+            priority: q.priority, team_id: q.team_id, user_id: None, label: q.label.as_deref(),
         };
         Some(db::count_tasks(&engine.pool, filter2).await.map_err(internal)?)
     } else { None };
@@ -319,6 +320,54 @@ pub async fn bulk_update_status(State(engine): State<AppState>, claims: Claims, 
     // B4: Fire webhooks for bulk status updates
     crate::webhook::dispatch(engine.pool.clone(), "task.updated", serde_json::json!({"ids": &req.task_ids, "status": &req.status, "bulk": true}));
     engine.notify(ChangeEvent::Tasks);
+    Ok(StatusCode::NO_CONTENT)
+}
+
+// ── Bulk assign ────────────────────────────────────────────────
+
+#[derive(Deserialize, utoipa::ToSchema)]
+pub struct BulkAssignRequest { pub task_ids: Vec<i64>, pub username: String }
+
+#[utoipa::path(post, path = "/api/tasks/bulk-assign", request_body = BulkAssignRequest, responses((status = 204)), security(("bearer" = [])))]
+pub async fn bulk_assign(State(engine): State<AppState>, claims: Claims, Json(req): Json<BulkAssignRequest>) -> Result<StatusCode, ApiError> {
+    if req.task_ids.is_empty() { return Ok(StatusCode::NO_CONTENT); }
+    if req.task_ids.len() > 500 { return Err(err(StatusCode::BAD_REQUEST, "Too many task IDs (max 500)")); }
+    let uid = db::get_user_id_by_username(&engine.pool, &req.username).await.map_err(internal)?
+        .ok_or_else(|| err(StatusCode::NOT_FOUND, "User not found"))?;
+    // Ownership check: root can bulk-assign any, others only their own
+    if claims.role != "root" {
+        let ph = req.task_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        let sql = format!("SELECT COUNT(*) FROM tasks WHERE id IN ({}) AND user_id != ? AND deleted_at IS NULL", ph);
+        let mut q = sqlx::query_as::<_, (i64,)>(&sql);
+        for id in &req.task_ids { q = q.bind(id); }
+        q = q.bind(claims.user_id);
+        let (non_owned,) = q.fetch_one(&engine.pool).await.map_err(internal)?;
+        if non_owned > 0 { return Err(err(StatusCode::FORBIDDEN, "Cannot assign tasks you don't own")); }
+    }
+    for tid in &req.task_ids {
+        db::add_assignee(&engine.pool, *tid, uid).await.ok(); // ignore duplicates
+    }
+    engine.notify(ChangeEvent::Tasks);
+    Ok(StatusCode::NO_CONTENT)
+}
+
+// ── Bulk move to sprint ────────────────────────────────────────
+
+#[derive(Deserialize, utoipa::ToSchema)]
+pub struct BulkSprintMoveRequest { pub task_ids: Vec<i64>, pub sprint_id: i64 }
+
+#[utoipa::path(post, path = "/api/tasks/bulk-sprint", request_body = BulkSprintMoveRequest, responses((status = 204)), security(("bearer" = [])))]
+pub async fn bulk_sprint_move(State(engine): State<AppState>, claims: Claims, Json(req): Json<BulkSprintMoveRequest>) -> Result<StatusCode, ApiError> {
+    if req.task_ids.is_empty() { return Ok(StatusCode::NO_CONTENT); }
+    if req.task_ids.len() > 500 { return Err(err(StatusCode::BAD_REQUEST, "Too many task IDs (max 500)")); }
+    let sprint = db::get_sprint(&engine.pool, req.sprint_id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Sprint not found"))?;
+    if !is_owner_or_root(sprint.created_by_id, &claims) { return Err(err(StatusCode::FORBIDDEN, "Not sprint owner")); }
+    for tid in &req.task_ids {
+        sqlx::query("INSERT OR IGNORE INTO sprint_tasks (sprint_id, task_id, added_by_id, added_at) VALUES (?, ?, ?, ?)")
+            .bind(req.sprint_id).bind(tid).bind(claims.user_id).bind(db::now_str())
+            .execute(&engine.pool).await.ok();
+    }
+    engine.notify(ChangeEvent::Sprints);
     Ok(StatusCode::NO_CONTENT)
 }
 
