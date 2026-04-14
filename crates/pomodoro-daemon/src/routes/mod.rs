@@ -156,3 +156,5 @@ mod notifications;
 pub use notifications::*;
 mod custom_statuses;
 pub use custom_statuses::*;
+mod custom_fields;
+pub use custom_fields::*;

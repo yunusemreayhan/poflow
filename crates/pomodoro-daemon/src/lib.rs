@@ -186,6 +186,11 @@ pub async fn build_router(engine: Arc<engine::Engine>) -> Router {
         // Custom statuses (Jira-like workflows)
         .route("/api/statuses", get(routes::list_custom_statuses).post(routes::create_custom_status))
         .route("/api/statuses/{id}", put(routes::update_custom_status).delete(routes::delete_custom_status))
+        // Custom fields on tasks
+        .route("/api/fields", get(routes::list_custom_fields).post(routes::create_custom_field))
+        .route("/api/fields/{id}", put(routes::update_custom_field).delete(routes::delete_custom_field))
+        .route("/api/tasks/{id}/fields", get(routes::get_task_fields))
+        .route("/api/tasks/{task_id}/fields/{field_id}", put(routes::set_task_field_value).delete(routes::delete_task_field_value))
         .route("/api/tasks/{id}/attachments", get(routes::list_attachments)
             .post(routes::upload_attachment.layer(axum::extract::DefaultBodyLimit::max(10 * 1024 * 1024))))
         .route("/api/attachments/{id}/download", get(routes::download_attachment))

@@ -64,6 +64,11 @@ pub async fn get_task_detail(pool: &Pool, id: i64) -> Result<TaskDetail> {
     for s in all_sessions { if let Some(tid) = s.task_id { sessions_map.entry(tid).or_default().push(s); } }
 
     // Build tree from flat list
+    // Batch fetch custom field values for all tasks
+    let cf_rows = get_task_field_values_batch(pool, &task_ids).await.unwrap_or_default();
+    let mut cf_map: std::collections::HashMap<i64, Vec<TaskFieldValue>> = std::collections::HashMap::new();
+    for (tid, fv) in cf_rows { cf_map.entry(tid).or_default().push(fv); }
+
     let mut detail_map: std::collections::HashMap<i64, TaskDetail> = std::collections::HashMap::new();
     for t in &all_tasks {
         detail_map.insert(t.id, TaskDetail {
@@ -71,6 +76,7 @@ pub async fn get_task_detail(pool: &Pool, id: i64) -> Result<TaskDetail> {
             comments: comments_map.remove(&t.id).unwrap_or_default(),
             sessions: sessions_map.remove(&t.id).unwrap_or_default(),
             children: vec![],
+            custom_fields: cf_map.remove(&t.id).unwrap_or_default(),
         });
     }
 

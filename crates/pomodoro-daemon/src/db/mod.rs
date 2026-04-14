@@ -522,6 +522,29 @@ async fn migrate(pool: &Pool) -> Result<()> {
         sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (18, ?)").bind(&now_str()).execute(pool).await.ok();
     }
 
+    // Migration 19: Custom fields on tasks (Jira-like custom fields)
+    if !applied_set.contains(&19) {
+        sqlx::query("CREATE TABLE IF NOT EXISTS custom_fields (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            name        TEXT NOT NULL,
+            field_type  TEXT NOT NULL DEFAULT 'text',
+            options     TEXT,
+            required    INTEGER NOT NULL DEFAULT 0,
+            sort_order  INTEGER NOT NULL DEFAULT 0,
+            created_by  INTEGER NOT NULL REFERENCES users(id),
+            created_at  TEXT NOT NULL
+        )").execute(pool).await.ok();
+        sqlx::query("CREATE UNIQUE INDEX IF NOT EXISTS idx_custom_fields_name ON custom_fields(name)").execute(pool).await.ok();
+        sqlx::query("CREATE TABLE IF NOT EXISTS task_custom_values (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            task_id     INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+            field_id    INTEGER NOT NULL REFERENCES custom_fields(id) ON DELETE CASCADE,
+            value       TEXT,
+            UNIQUE(task_id, field_id)
+        )").execute(pool).await.ok();
+        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (19, ?)").bind(&now_str()).execute(pool).await.ok();
+    }
+
     sqlx::query("CREATE TABLE IF NOT EXISTS task_attachments (
         id          INTEGER PRIMARY KEY AUTOINCREMENT,
         task_id     INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
@@ -596,3 +619,5 @@ mod notifications;
 pub use notifications::*;
 mod custom_statuses;
 pub use custom_statuses::*;
+mod custom_fields;
+pub use custom_fields::*;

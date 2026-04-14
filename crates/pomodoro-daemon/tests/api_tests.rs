@@ -7039,3 +7039,94 @@ async fn test_custom_status_board_mapping() {
     let board = body_json(resp).await;
     assert!(board["done"].as_array().unwrap().iter().any(|t| t["title"] == "BoardTask"), "Custom status with category done should map to done column");
 }
+
+// ============================================================
+// Custom fields on tasks (Jira gap #3)
+// ============================================================
+
+#[tokio::test]
+async fn test_custom_field_crud() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    // Create text field
+    let resp = app.clone().oneshot(auth_req("POST", "/api/fields", &tok, Some(json!({"name":"Sprint Goal","field_type":"text"})))).await.unwrap();
+    assert_eq!(resp.status(), 201);
+    let field = body_json(resp).await;
+    assert_eq!(field["name"], "Sprint Goal");
+    assert_eq!(field["field_type"], "text");
+    let fid = field["id"].as_i64().unwrap();
+    // Create select field
+    let resp = app.clone().oneshot(auth_req("POST", "/api/fields", &tok, Some(json!({"name":"Severity","field_type":"select","options":["low","medium","high","critical"]})))).await.unwrap();
+    assert_eq!(resp.status(), 201);
+    assert_eq!(body_json(resp).await["field_type"], "select");
+    // List
+    let resp = app.clone().oneshot(auth_req("GET", "/api/fields", &tok, None)).await.unwrap();
+    let fields = body_json(resp).await;
+    assert!(fields.as_array().unwrap().len() >= 2);
+    // Update
+    let resp = app.clone().oneshot(auth_req("PUT", &format!("/api/fields/{}", fid), &tok, Some(json!({"name":"Goal","field_type":"text","required":true})))).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    assert_eq!(body_json(resp).await["required"], true);
+    // Delete
+    let resp = app.clone().oneshot(auth_req("DELETE", &format!("/api/fields/{}", fid), &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 204);
+}
+
+#[tokio::test]
+async fn test_custom_field_values_on_task() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    // Create field
+    let resp = app.clone().oneshot(auth_req("POST", "/api/fields", &tok, Some(json!({"name":"Component","field_type":"text"})))).await.unwrap();
+    let fid = body_json(resp).await["id"].as_i64().unwrap();
+    // Create task
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"FieldTask"})))).await.unwrap();
+    let tid = body_json(resp).await["id"].as_i64().unwrap();
+    // Set value
+    let resp = app.clone().oneshot(auth_req("PUT", &format!("/api/tasks/{}/fields/{}", tid, fid), &tok, Some(json!({"value":"Backend"})))).await.unwrap();
+    assert_eq!(resp.status(), 204);
+    // Get values
+    let resp = app.clone().oneshot(auth_req("GET", &format!("/api/tasks/{}/fields", tid), &tok, None)).await.unwrap();
+    let vals = body_json(resp).await;
+    let arr = vals.as_array().unwrap();
+    assert_eq!(arr.len(), 1);
+    assert_eq!(arr[0]["field_name"], "Component");
+    assert_eq!(arr[0]["value"], "Backend");
+    // Update value
+    let resp = app.clone().oneshot(auth_req("PUT", &format!("/api/tasks/{}/fields/{}", tid, fid), &tok, Some(json!({"value":"Frontend"})))).await.unwrap();
+    assert_eq!(resp.status(), 204);
+    let resp = app.clone().oneshot(auth_req("GET", &format!("/api/tasks/{}/fields", tid), &tok, None)).await.unwrap();
+    assert_eq!(body_json(resp).await.as_array().unwrap()[0]["value"], "Frontend");
+    // Delete value
+    let resp = app.clone().oneshot(auth_req("DELETE", &format!("/api/tasks/{}/fields/{}", tid, fid), &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 204);
+    let resp = app.clone().oneshot(auth_req("GET", &format!("/api/tasks/{}/fields", tid), &tok, None)).await.unwrap();
+    assert!(body_json(resp).await.as_array().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn test_custom_field_in_task_detail() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    // Create field + task + set value
+    let resp = app.clone().oneshot(auth_req("POST", "/api/fields", &tok, Some(json!({"name":"Priority Level","field_type":"select","options":["P0","P1","P2"]})))).await.unwrap();
+    let fid = body_json(resp).await["id"].as_i64().unwrap();
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"DetailTask"})))).await.unwrap();
+    let tid = body_json(resp).await["id"].as_i64().unwrap();
+    app.clone().oneshot(auth_req("PUT", &format!("/api/tasks/{}/fields/{}", tid, fid), &tok, Some(json!({"value":"P0"})))).await.unwrap();
+    // Get task detail — should include custom_fields
+    let resp = app.clone().oneshot(auth_req("GET", &format!("/api/tasks/{}", tid), &tok, None)).await.unwrap();
+    let detail = body_json(resp).await;
+    let cf = detail["custom_fields"].as_array().unwrap();
+    assert_eq!(cf.len(), 1);
+    assert_eq!(cf[0]["field_name"], "Priority Level");
+    assert_eq!(cf[0]["value"], "P0");
+}
+
+#[tokio::test]
+async fn test_custom_field_non_root_cannot_create() {
+    let app = app().await;
+    let (user_tok, _) = register_user_full(&app, "fielduser", "FieldU111").await;
+    let resp = app.clone().oneshot(auth_req("POST", "/api/fields", &user_tok, Some(json!({"name":"MyField"})))).await.unwrap();
+    assert_eq!(resp.status(), 403);
+}

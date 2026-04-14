@@ -76,6 +76,15 @@ pub struct VoteResult {
 pub struct TaskDetail {
     pub task: Task, pub comments: Vec<Comment>, pub sessions: Vec<Session>,
     #[schema(no_recursion)] pub children: Vec<TaskDetail>,
+    #[serde(default)] pub custom_fields: Vec<TaskFieldValue>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
+pub struct TaskFieldValue {
+    pub field_id: i64,
+    pub field_name: String,
+    pub field_type: String,
+    pub value: Option<String>,
 }
 
 #[derive(Debug, Clone, FromRow, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
