@@ -154,3 +154,5 @@ mod attachments;
 pub use attachments::*;
 mod notifications;
 pub use notifications::*;
+mod custom_statuses;
+pub use custom_statuses::*;

@@ -6951,3 +6951,91 @@ async fn test_rapid_status_cycling() {
         assert_eq!(body["status"].as_str().unwrap(), *status);
     }
 }
+
+// ============================================================
+// Custom task statuses (Jira-like workflows)
+// ============================================================
+
+#[tokio::test]
+async fn test_custom_status_crud() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    // Create
+    let resp = app.clone().oneshot(auth_req("POST", "/api/statuses", &tok, Some(json!({"name":"review","color":"#f59e0b","category":"in_progress"})))).await.unwrap();
+    assert_eq!(resp.status(), 201);
+    let status = body_json(resp).await;
+    assert_eq!(status["name"], "review");
+    assert_eq!(status["category"], "in_progress");
+    let sid = status["id"].as_i64().unwrap();
+    // List
+    let resp = app.clone().oneshot(auth_req("GET", "/api/statuses", &tok, None)).await.unwrap();
+    let statuses = body_json(resp).await;
+    assert!(statuses.as_array().unwrap().iter().any(|s| s["name"] == "review"));
+    // Update
+    let resp = app.clone().oneshot(auth_req("PUT", &format!("/api/statuses/{}", sid), &tok, Some(json!({"name":"code_review","color":"#10b981","category":"in_progress"})))).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    assert_eq!(body_json(resp).await["name"], "code_review");
+    // Delete
+    let resp = app.clone().oneshot(auth_req("DELETE", &format!("/api/statuses/{}", sid), &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 204);
+}
+
+#[tokio::test]
+async fn test_custom_status_used_in_task() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    // Create custom status
+    app.clone().oneshot(auth_req("POST", "/api/statuses", &tok, Some(json!({"name":"testing","category":"in_progress"})))).await.unwrap();
+    // Create task
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"T"})))).await.unwrap();
+    let tid = body_json(resp).await["id"].as_i64().unwrap();
+    // Set task to custom status
+    let resp = app.clone().oneshot(auth_req("PUT", &format!("/api/tasks/{}", tid), &tok, Some(json!({"status":"testing"})))).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    assert_eq!(body_json(resp).await["status"], "testing");
+}
+
+#[tokio::test]
+async fn test_custom_status_unknown_rejected() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"T"})))).await.unwrap();
+    let tid = body_json(resp).await["id"].as_i64().unwrap();
+    // Try to set task to non-existent custom status
+    let resp = app.clone().oneshot(auth_req("PUT", &format!("/api/tasks/{}", tid), &tok, Some(json!({"status":"nonexistent_status"})))).await.unwrap();
+    assert_eq!(resp.status(), 400, "Unknown custom status should be rejected");
+}
+
+#[tokio::test]
+async fn test_custom_status_non_root_cannot_create() {
+    let app = app().await;
+    let (user_tok, _) = register_user_full(&app, "statususer", "StatUs111").await;
+    let resp = app.clone().oneshot(auth_req("POST", "/api/statuses", &user_tok, Some(json!({"name":"mystat","category":"todo"})))).await.unwrap();
+    assert_eq!(resp.status(), 403);
+}
+
+#[tokio::test]
+async fn test_custom_status_board_mapping() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    // Create custom statuses in different categories
+    app.clone().oneshot(auth_req("POST", "/api/statuses", &tok, Some(json!({"name":"qa_review","category":"in_progress"})))).await.unwrap();
+    app.clone().oneshot(auth_req("POST", "/api/statuses", &tok, Some(json!({"name":"deployed","category":"done"})))).await.unwrap();
+    // Create task, sprint, add task
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"BoardTask"})))).await.unwrap();
+    let tid = body_json(resp).await["id"].as_i64().unwrap();
+    let resp = app.clone().oneshot(auth_req("POST", "/api/sprints", &tok, Some(json!({"name":"BS"})))).await.unwrap();
+    let sid = body_json(resp).await["id"].as_i64().unwrap();
+    app.clone().oneshot(auth_req("POST", &format!("/api/sprints/{}/tasks", sid), &tok, Some(json!({"task_ids":[tid]})))).await.unwrap();
+    // Set task to custom "qa_review" (category: in_progress)
+    app.clone().oneshot(auth_req("PUT", &format!("/api/tasks/{}", tid), &tok, Some(json!({"status":"qa_review"})))).await.unwrap();
+    // Check board — task should be in in_progress column
+    let resp = app.clone().oneshot(auth_req("GET", &format!("/api/sprints/{}/board", sid), &tok, None)).await.unwrap();
+    let board = body_json(resp).await;
+    assert!(board["in_progress"].as_array().unwrap().iter().any(|t| t["title"] == "BoardTask"), "Custom status with category in_progress should map to in_progress column");
+    // Change to "deployed" (category: done)
+    app.clone().oneshot(auth_req("PUT", &format!("/api/tasks/{}", tid), &tok, Some(json!({"status":"deployed"})))).await.unwrap();
+    let resp = app.clone().oneshot(auth_req("GET", &format!("/api/sprints/{}/board", sid), &tok, None)).await.unwrap();
+    let board = body_json(resp).await;
+    assert!(board["done"].as_array().unwrap().iter().any(|t| t["title"] == "BoardTask"), "Custom status with category done should map to done column");
+}

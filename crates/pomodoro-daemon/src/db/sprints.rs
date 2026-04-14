@@ -79,9 +79,19 @@ pub async fn get_sprint_tasks(pool: &Pool, sprint_id: i64) -> Result<Vec<Task>> 
 
 pub async fn get_sprint_board(pool: &Pool, sprint_id: i64) -> Result<SprintBoard> {
     let tasks = get_sprint_tasks(pool, sprint_id).await?;
+    // Load custom status categories for board column mapping
+    let custom: Vec<(String, String)> = sqlx::query_as("SELECT name, category FROM custom_statuses")
+        .fetch_all(pool).await.unwrap_or_default();
+    let category_map: std::collections::HashMap<&str, &str> = custom.iter().map(|(n, c)| (n.as_str(), c.as_str())).collect();
     let (mut todo, mut in_progress, mut blocked, mut done) = (Vec::new(), Vec::new(), Vec::new(), Vec::new());
     for t in tasks {
-        match t.status.as_str() { "completed" | "done" => done.push(t), "blocked" => blocked.push(t), "in_progress" | "active" => in_progress.push(t), _ => todo.push(t) }
+        let cat = category_map.get(t.status.as_str()).copied();
+        match cat.unwrap_or(t.status.as_str()) {
+            "completed" | "done" => done.push(t),
+            "blocked" => blocked.push(t),
+            "in_progress" | "active" => in_progress.push(t),
+            _ => todo.push(t),
+        }
     }
     Ok(SprintBoard { todo, in_progress, blocked, done })
 }

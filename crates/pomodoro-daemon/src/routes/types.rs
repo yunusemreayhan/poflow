@@ -170,7 +170,14 @@ pub const VALID_ROLES: &[&str] = &["user", "root"];
 pub const VALID_ROOM_ROLES: &[&str] = &["admin", "voter", "observer"];
 
 pub fn validate_task_status(s: &str) -> Result<(), ApiError> {
-    if !VALID_TASK_STATUSES.contains(&s) { Err(err(StatusCode::BAD_REQUEST, format!("Invalid status '{}'. Must be one of: {}", s, VALID_TASK_STATUSES.join(", ")))) } else { Ok(()) }
+    // Built-in statuses always valid; custom statuses validated at the route level with DB access
+    if !VALID_TASK_STATUSES.contains(&s) && !s.chars().all(|c| c.is_alphanumeric() || c == '_') {
+        Err(err(StatusCode::BAD_REQUEST, format!("Invalid status '{}'. Must be alphanumeric/underscore", s)))
+    } else if s.len() > 50 {
+        Err(err(StatusCode::BAD_REQUEST, "Status name too long (max 50)"))
+    } else {
+        Ok(())
+    }
 }
 
 pub fn validate_sprint_status(s: &str) -> Result<(), ApiError> {

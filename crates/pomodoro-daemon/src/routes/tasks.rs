@@ -200,7 +200,13 @@ pub async fn update_task(State(engine): State<AppState>, claims: Claims, Path(id
     }
     if let Some(ref t) = req.title { if t.trim().is_empty() { return Err(err(StatusCode::BAD_REQUEST, "Title cannot be empty")); } if t.len() > 500 { return Err(err(StatusCode::BAD_REQUEST, "Title too long (max 500)")); } }
     if let Some(ref d) = req.description { if d.as_ref().map_or(false, |d| d.len() > 10000) { return Err(err(StatusCode::BAD_REQUEST, "Description too long")); } }
-    if let Some(ref s) = req.status { validate_task_status(s)?; }
+    if let Some(ref s) = req.status {
+        validate_task_status(s)?;
+        if !VALID_TASK_STATUSES.contains(&s.as_str()) {
+            db::get_custom_status_by_name(&engine.pool, s).await.map_err(internal)?
+                .ok_or_else(|| err(StatusCode::BAD_REQUEST, format!("Unknown status '{}'. Create it via POST /api/statuses first", s)))?;
+        }
+    }
     if let Some(p) = req.priority { if p < 1 || p > 5 { return Err(err(StatusCode::BAD_REQUEST, "Priority must be 1-5")); } }
     if let Some(e) = req.estimated { if e < 0 { return Err(err(StatusCode::BAD_REQUEST, "Estimated cannot be negative")); } }
     if let Some(h) = req.estimated_hours { if h < 0.0 { return Err(err(StatusCode::BAD_REQUEST, "Estimated hours cannot be negative")); } }
@@ -282,6 +288,10 @@ pub struct BulkStatusRequest { pub task_ids: Vec<i64>, pub status: String }
 #[utoipa::path(put, path = "/api/tasks/bulk-status", request_body = BulkStatusRequest, responses((status = 204)), security(("bearer" = [])))]
 pub async fn bulk_update_status(State(engine): State<AppState>, claims: Claims, Json(req): Json<BulkStatusRequest>) -> Result<StatusCode, ApiError> {
     validate_task_status(&req.status)?;
+    if !VALID_TASK_STATUSES.contains(&req.status.as_str()) {
+        db::get_custom_status_by_name(&engine.pool, &req.status).await.map_err(internal)?
+            .ok_or_else(|| err(StatusCode::BAD_REQUEST, format!("Unknown status '{}'", req.status)))?;
+    }
     if req.task_ids.is_empty() { return Ok(StatusCode::NO_CONTENT); }
     if req.task_ids.len() > 500 { return Err(err(StatusCode::BAD_REQUEST, "Too many task IDs (max 500)")); }
     // Batch ownership check

@@ -507,6 +507,21 @@ async fn migrate(pool: &Pool) -> Result<()> {
         sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (17, ?)").bind(&now_str()).execute(pool).await.ok();
     }
 
+    // Migration 18: Custom task statuses (Jira-like workflows)
+    if !applied_set.contains(&18) {
+        sqlx::query("CREATE TABLE IF NOT EXISTS custom_statuses (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            name        TEXT NOT NULL,
+            color       TEXT NOT NULL DEFAULT '#6366f1',
+            category    TEXT NOT NULL DEFAULT 'todo',
+            sort_order  INTEGER NOT NULL DEFAULT 0,
+            created_by  INTEGER NOT NULL REFERENCES users(id),
+            created_at  TEXT NOT NULL
+        )").execute(pool).await.ok();
+        sqlx::query("CREATE UNIQUE INDEX IF NOT EXISTS idx_custom_statuses_name ON custom_statuses(name)").execute(pool).await.ok();
+        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (18, ?)").bind(&now_str()).execute(pool).await.ok();
+    }
+
     sqlx::query("CREATE TABLE IF NOT EXISTS task_attachments (
         id          INTEGER PRIMARY KEY AUTOINCREMENT,
         task_id     INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
@@ -579,3 +594,5 @@ mod attachments;
 pub use attachments::*;
 mod notifications;
 pub use notifications::*;
+mod custom_statuses;
+pub use custom_statuses::*;
