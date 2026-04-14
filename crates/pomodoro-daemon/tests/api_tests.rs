@@ -5297,9 +5297,10 @@ async fn flow_assignee_cannot_update_task() {
     // Assign dev1
     let resp = app.clone().oneshot(auth_req("POST", &format!("/api/tasks/{}/assignees", task_id), &root_token, Some(json!({"username":"dev1"})))).await.unwrap();
     assert_eq!(resp.status(), 200);
-    // dev1 tries to update → should be 403
+    // dev1 (assignee) can update the task
     let resp = app.clone().oneshot(auth_req("PUT", &format!("/api/tasks/{}", task_id), &user_token, Some(json!({"status":"in_progress"})))).await.unwrap();
-    assert_eq!(resp.status(), 403);
+    assert_eq!(resp.status(), 200, "Assignee should be able to update task");
+    assert_eq!(body_json(resp).await["status"], "in_progress");
 }
 
 #[tokio::test]
@@ -5387,6 +5388,30 @@ async fn flow_elevate_user_to_root() {
     let resp = app.clone().oneshot(auth_req("PUT", &format!("/api/admin/users/{}/role", uid), &root_token, Some(json!({"role":"root"})))).await.unwrap();
     assert_eq!(resp.status(), 200);
     assert_eq!(body_json(resp).await["role"], "root");
+}
+
+#[tokio::test]
+async fn flow_cannot_demote_last_root() {
+    let app = app().await;
+    let root_token = login_root(&app).await;
+    // Try to demote root (the only root user) to user
+    let resp = app.clone().oneshot(auth_req("PUT", "/api/admin/users/1/role", &root_token, Some(json!({"role":"user"})))).await.unwrap();
+    assert_eq!(resp.status(), 400, "Should not be able to demote the last root user");
+}
+
+#[tokio::test]
+async fn flow_role_change_creates_audit_log() {
+    let app = app().await;
+    let root_token = login_root(&app).await;
+    let (_, uid) = register_user_full(&app, "auditee", "AuditP111").await;
+    // Change role
+    app.clone().oneshot(auth_req("PUT", &format!("/api/admin/users/{}/role", uid), &root_token, Some(json!({"role":"root"})))).await.unwrap();
+    // Check audit log
+    let resp = app.clone().oneshot(auth_req("GET", "/api/audit?entity_type=user", &root_token, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let entries = body_json(resp).await;
+    let arr = entries.as_array().unwrap();
+    assert!(arr.iter().any(|e| e["action"] == "update_role"), "Audit log should contain role change entry");
 }
 
 #[tokio::test]

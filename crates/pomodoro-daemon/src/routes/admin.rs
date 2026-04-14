@@ -11,8 +11,21 @@ pub async fn list_users(State(engine): State<AppState>, claims: Claims) -> Resul
 pub async fn update_user_role(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>, Json(req): Json<UpdateRoleRequest>) -> ApiResult<db::User> {
     if claims.role != "root" { return Err(err(StatusCode::FORBIDDEN, "Root only")); }
     if !VALID_ROLES.contains(&req.role.as_str()) { return Err(err(StatusCode::BAD_REQUEST, format!("Invalid role '{}'. Must be one of: {}", req.role, VALID_ROLES.join(", ")))); }
-    db::get_user(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "User not found"))?;
-    db::update_user_role(&engine.pool, id, &req.role).await.map(Json).map_err(internal)
+    let user = db::get_user(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "User not found"))?;
+    // Prevent demoting the last root user
+    if user.role == "root" && req.role != "root" {
+        let (root_count,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM users WHERE role = 'root'")
+            .fetch_one(&engine.pool).await.map_err(internal)?;
+        if root_count <= 1 {
+            return Err(err(StatusCode::BAD_REQUEST, "Cannot demote the last root user"));
+        }
+    }
+    let updated = db::update_user_role(&engine.pool, id, &req.role).await.map_err(internal)?;
+    // Audit log for role changes
+    db::audit(&engine.pool, claims.user_id, "update_role", "user", Some(id), Some(&req.role)).await.ok();
+    // Invalidate user cache so role change takes effect immediately
+    auth::invalidate_user_cache(&engine.user_auth_cache, id).await;
+    Ok(Json(updated))
 }
 
 #[utoipa::path(delete, path = "/api/admin/users/{id}", responses((status = 204)), security(("bearer" = [])))]
