@@ -7404,3 +7404,73 @@ async fn test_checklist_cascade_on_task_delete() {
     let resp = app.clone().oneshot(auth_req("GET", &format!("/api/tasks/{}/checklist", tid), &tok, None)).await.unwrap();
     assert_eq!(body_json(resp).await.as_array().unwrap().len(), 1);
 }
+
+// ============================================================
+// RBAC: Admin role (Jira gap #2)
+// ============================================================
+
+#[tokio::test]
+async fn test_admin_can_manage_labels() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let (_, uid) = register_user_full(&app, "admlab", "AdmLab111").await;
+    // Elevate to admin
+    let resp = app.clone().oneshot(auth_req("PUT", &format!("/api/admin/users/{}/role", uid), &tok, Some(json!({"role":"admin"})))).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    // Re-login as admin to get fresh token with admin role
+    let resp = app.clone().oneshot(json_req("POST", "/api/auth/login", Some(json!({"username":"admlab","password":"AdmLab111"})))).await.unwrap();
+    let admin_tok = body_json(resp).await["token"].as_str().unwrap().to_string();
+    // Admin can create labels
+    let resp = app.clone().oneshot(auth_req("POST", "/api/labels", &admin_tok, Some(json!({"name":"admin_label","color":"#ff0000"})))).await.unwrap();
+    assert_eq!(resp.status(), 201, "Admin should be able to create labels");
+}
+
+#[tokio::test]
+async fn test_admin_can_manage_others_tasks() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let (user_tok, _) = register_user_full(&app, "admtask_user", "AdmTU1111").await;
+    let (_, admin_uid) = register_user_full(&app, "admtask_admin", "AdmTA1111").await;
+    // Elevate to admin
+    app.clone().oneshot(auth_req("PUT", &format!("/api/admin/users/{}/role", admin_uid), &tok, Some(json!({"role":"admin"})))).await.unwrap();
+    let resp = app.clone().oneshot(json_req("POST", "/api/auth/login", Some(json!({"username":"admtask_admin","password":"AdmTA1111"})))).await.unwrap();
+    let admin_tok = body_json(resp).await["token"].as_str().unwrap().to_string();
+    // User creates task
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &user_tok, Some(json!({"title":"User task"})))).await.unwrap();
+    let tid = body_json(resp).await["id"].as_i64().unwrap();
+    // Admin can update user's task
+    let resp = app.clone().oneshot(auth_req("PUT", &format!("/api/tasks/{}", tid), &admin_tok, Some(json!({"status":"in_progress"})))).await.unwrap();
+    assert_eq!(resp.status(), 200, "Admin should be able to update any task");
+}
+
+#[tokio::test]
+async fn test_admin_cannot_manage_users() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let (_, admin_uid) = register_user_full(&app, "admnouser", "AdmNU1111").await;
+    app.clone().oneshot(auth_req("PUT", &format!("/api/admin/users/{}/role", admin_uid), &tok, Some(json!({"role":"admin"})))).await.unwrap();
+    let resp = app.clone().oneshot(json_req("POST", "/api/auth/login", Some(json!({"username":"admnouser","password":"AdmNU1111"})))).await.unwrap();
+    let admin_tok = body_json(resp).await["token"].as_str().unwrap().to_string();
+    // Admin cannot list users
+    let resp = app.clone().oneshot(auth_req("GET", "/api/admin/users", &admin_tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 403, "Admin should NOT be able to list users");
+    // Admin cannot create backup
+    let resp = app.clone().oneshot(auth_req("POST", "/api/admin/backup", &admin_tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 403, "Admin should NOT be able to create backups");
+}
+
+#[tokio::test]
+async fn test_admin_can_create_custom_statuses_and_fields() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let (_, admin_uid) = register_user_full(&app, "admcf", "AdmCF1111").await;
+    app.clone().oneshot(auth_req("PUT", &format!("/api/admin/users/{}/role", admin_uid), &tok, Some(json!({"role":"admin"})))).await.unwrap();
+    let resp = app.clone().oneshot(json_req("POST", "/api/auth/login", Some(json!({"username":"admcf","password":"AdmCF1111"})))).await.unwrap();
+    let admin_tok = body_json(resp).await["token"].as_str().unwrap().to_string();
+    // Admin can create custom statuses
+    let resp = app.clone().oneshot(auth_req("POST", "/api/statuses", &admin_tok, Some(json!({"name":"admin_review","category":"in_progress"})))).await.unwrap();
+    assert_eq!(resp.status(), 201);
+    // Admin can create custom fields
+    let resp = app.clone().oneshot(auth_req("POST", "/api/fields", &admin_tok, Some(json!({"name":"admin_field","field_type":"text"})))).await.unwrap();
+    assert_eq!(resp.status(), 201);
+}

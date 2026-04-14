@@ -13,7 +13,7 @@ pub async fn list_labels(State(engine): State<AppState>, _claims: Claims) -> Api
 #[utoipa::path(post, path = "/api/labels", responses((status = 201)), security(("bearer" = [])))]
 pub async fn create_label(State(engine): State<AppState>, claims: Claims, Json(req): Json<CreateLabelRequest>) -> Result<(StatusCode, Json<db::Label>), ApiError> {
     // V32-7: Root-only for consistency with delete/update
-    if claims.role != "root" { return Err(err(StatusCode::FORBIDDEN, "Only root can create labels")); }
+    if !auth::is_admin_or_root(&claims) { return Err(err(StatusCode::FORBIDDEN, "Admin or root required")); }
     if req.name.trim().is_empty() { return Err(err(StatusCode::BAD_REQUEST, "Label name cannot be empty")); }
     if req.name.len() > 100 { return Err(err(StatusCode::BAD_REQUEST, "Label name too long (max 100)")); }
     let color = req.color.as_deref().unwrap_or("#6366f1");
@@ -27,7 +27,7 @@ pub async fn create_label(State(engine): State<AppState>, claims: Claims, Json(r
 
 #[utoipa::path(delete, path = "/api/labels/{id}", responses((status = 204)), security(("bearer" = [])))]
 pub async fn delete_label(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>) -> Result<StatusCode, ApiError> {
-    if claims.role != "root" { return Err(err(StatusCode::FORBIDDEN, "Only root can delete labels")); }
+    if !auth::is_admin_or_root(&claims) { return Err(err(StatusCode::FORBIDDEN, "Admin or root required")); }
     db::delete_label(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Label not found"))?;
     Ok(StatusCode::NO_CONTENT)
 }
@@ -35,7 +35,7 @@ pub async fn delete_label(State(engine): State<AppState>, claims: Claims, Path(i
 // V31-17: Update label name/color
 #[utoipa::path(put, path = "/api/labels/{id}", request_body = CreateLabelRequest, responses((status = 200)), security(("bearer" = [])))]
 pub async fn update_label(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>, Json(req): Json<CreateLabelRequest>) -> ApiResult<db::Label> {
-    if claims.role != "root" { return Err(err(StatusCode::FORBIDDEN, "Only root can update labels")); }
+    if !auth::is_admin_or_root(&claims) { return Err(err(StatusCode::FORBIDDEN, "Admin or root required")); }
     if req.name.trim().is_empty() { return Err(err(StatusCode::BAD_REQUEST, "Label name cannot be empty")); }
     if req.name.len() > 100 { return Err(err(StatusCode::BAD_REQUEST, "Label name too long (max 100)")); }
     let color = req.color.as_deref().unwrap_or("#6366f1");

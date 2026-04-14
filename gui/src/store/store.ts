@@ -132,7 +132,7 @@ export const useStore = create<Store>((set, get) => ({
   token: null,
   username: null,
   role: null,
-  serverUrl: (typeof localStorage !== "undefined" && localStorage.getItem("serverUrl")) || "http://127.0.0.1:9090",
+  serverUrl: (typeof localStorage !== "undefined" && localStorage.getItem("serverUrl")) || (typeof window !== "undefined" && !(window as any).__TAURI_INTERNALS__ ? window.location.origin : "http://127.0.0.1:9090"),
   savedServers: loadServers(),
   toasts: [],
   toast: (msg, type = "success", onUndo) => {

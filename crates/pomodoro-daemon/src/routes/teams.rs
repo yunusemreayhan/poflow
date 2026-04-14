@@ -30,7 +30,7 @@ pub async fn get_team(State(engine): State<AppState>, _claims: Claims, Path(id):
 #[utoipa::path(delete, path = "/api/teams/{id}", responses((status = 204)), security(("bearer" = [])))]
 pub async fn delete_team(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>) -> Result<StatusCode, ApiError> {
     db::get_team_detail(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Team not found"))?;
-    if claims.role != "root" && !db::is_team_admin(&engine.pool, id, claims.user_id).await.map_err(internal)? {
+    if !auth::is_admin_or_root(&claims) && !db::is_team_admin(&engine.pool, id, claims.user_id).await.map_err(internal)? {
         return Err(err(StatusCode::FORBIDDEN, "Only root or team admin can delete teams"));
     }
     db::delete_team(&engine.pool, id).await.map_err(internal)?;
@@ -45,7 +45,7 @@ fn default_member_role() -> String { "member".to_string() }
 
 #[utoipa::path(post, path = "/api/teams/{id}/members", responses((status = 204)), security(("bearer" = [])))]
 pub async fn add_team_member(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>, Json(req): Json<TeamMemberRequest>) -> Result<StatusCode, ApiError> {
-    if !db::is_team_admin(&engine.pool, id, claims.user_id).await.map_err(internal)? && claims.role != "root" {
+    if !db::is_team_admin(&engine.pool, id, claims.user_id).await.map_err(internal)? && !auth::is_admin_or_root(&claims) {
         return Err(err(StatusCode::FORBIDDEN, "Team admin only"));
     }
     if !["admin", "member"].contains(&req.role.as_str()) {
@@ -58,7 +58,7 @@ pub async fn add_team_member(State(engine): State<AppState>, claims: Claims, Pat
 
 #[utoipa::path(delete, path = "/api/teams/{id}/members/{user_id}", responses((status = 204)), security(("bearer" = [])))]
 pub async fn remove_team_member(State(engine): State<AppState>, claims: Claims, Path((id, user_id)): Path<(i64, i64)>) -> Result<StatusCode, ApiError> {
-    if !db::is_team_admin(&engine.pool, id, claims.user_id).await.map_err(internal)? && claims.role != "root" {
+    if !db::is_team_admin(&engine.pool, id, claims.user_id).await.map_err(internal)? && !auth::is_admin_or_root(&claims) {
         return Err(err(StatusCode::FORBIDDEN, "Team admin only"));
     }
     // Prevent removing the last admin
@@ -78,7 +78,7 @@ pub async fn get_my_teams(State(engine): State<AppState>, claims: Claims) -> Api
 
 #[utoipa::path(post, path = "/api/teams/{id}/roots", responses((status = 204)), security(("bearer" = [])))]
 pub async fn add_team_root_tasks(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>, Json(req): Json<EpicGroupTasksRequest>) -> Result<StatusCode, ApiError> {
-    if !db::is_team_admin(&engine.pool, id, claims.user_id).await.map_err(internal)? && claims.role != "root" {
+    if !db::is_team_admin(&engine.pool, id, claims.user_id).await.map_err(internal)? && !auth::is_admin_or_root(&claims) {
         return Err(err(StatusCode::FORBIDDEN, "Team admin only"));
     }
     if req.task_ids.is_empty() { return Ok(StatusCode::NO_CONTENT); }
@@ -99,7 +99,7 @@ pub async fn add_team_root_tasks(State(engine): State<AppState>, claims: Claims,
 
 #[utoipa::path(delete, path = "/api/teams/{id}/roots/{task_id}", responses((status = 204)), security(("bearer" = [])))]
 pub async fn remove_team_root_task(State(engine): State<AppState>, claims: Claims, Path((id, task_id)): Path<(i64, i64)>) -> Result<StatusCode, ApiError> {
-    if !db::is_team_admin(&engine.pool, id, claims.user_id).await.map_err(internal)? && claims.role != "root" {
+    if !db::is_team_admin(&engine.pool, id, claims.user_id).await.map_err(internal)? && !auth::is_admin_or_root(&claims) {
         return Err(err(StatusCode::FORBIDDEN, "Team admin only"));
     }
     db::remove_team_root_task(&engine.pool, id, task_id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Task not a root task in this team"))?;

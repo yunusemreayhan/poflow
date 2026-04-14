@@ -25,7 +25,7 @@ pub async fn duplicate_task(State(engine): State<AppState>, claims: Claims, Path
     let task = db::get_task(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Task not found"))?;
     if task.deleted_at.is_some() { return Err(err(StatusCode::BAD_REQUEST, "Cannot duplicate deleted task")); }
     // BL7: Only owner or root can duplicate
-    if task.user_id != claims.user_id && claims.role != "root" { return Err(err(StatusCode::FORBIDDEN, "Not your task")); }
+    if task.user_id != claims.user_id && !auth::is_admin_or_root(&claims) { return Err(err(StatusCode::FORBIDDEN, "Not your task")); }
     let t = db::create_task(&engine.pool, claims.user_id, task.parent_id,
         &format!("{} (copy)", task.title), task.description.as_deref(),
         task.project.as_deref(), task.tags.as_deref(),
@@ -102,7 +102,7 @@ pub async fn advanced_search(State(engine): State<AppState>, claims: Claims, Jso
     let mut binds: Vec<String> = Vec::new();
 
     conditions.push("t.deleted_at IS NULL".to_string());
-    if claims.role != "root" {
+    if !auth::is_admin_or_root(&claims) {
         conditions.push("t.user_id = ?".to_string());
         binds.push(claims.user_id.to_string());
     }
@@ -283,7 +283,7 @@ pub async fn create_task(State(engine): State<AppState>, claims: Claims, Json(re
     // BL6: Validate parent_id exists and belongs to user (or is root)
     if let Some(pid) = req.parent_id {
         let parent = db::get_task(&engine.pool, pid).await.map_err(|_| err(StatusCode::NOT_FOUND, "Parent task not found"))?;
-        if parent.user_id != claims.user_id && claims.role != "root" { return Err(err(StatusCode::FORBIDDEN, "Parent task not owned by you")); }
+        if parent.user_id != claims.user_id && !auth::is_admin_or_root(&claims) { return Err(err(StatusCode::FORBIDDEN, "Parent task not owned by you")); }
     }
     let t = db::create_task(&engine.pool, claims.user_id, req.parent_id, req.title.trim(), req.description.as_deref(), req.project.as_deref(), req.tags.as_deref(), priority, estimated, req.estimated_hours.unwrap_or(0.0), req.remaining_points.unwrap_or(0.0), req.due_date.as_deref())
         .await.map_err(internal)?;
@@ -420,7 +420,7 @@ pub async fn bulk_update_status(State(engine): State<AppState>, claims: Claims, 
     if req.task_ids.is_empty() { return Ok(StatusCode::NO_CONTENT); }
     if req.task_ids.len() > 500 { return Err(err(StatusCode::BAD_REQUEST, "Too many task IDs (max 500)")); }
     // Batch ownership check
-    if claims.role != "root" {
+    if !auth::is_admin_or_root(&claims) {
         let ph = req.task_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
         let q = format!("SELECT COUNT(*) FROM tasks WHERE id IN ({}) AND user_id != ?", ph);
         let mut query = sqlx::query_as::<_, (i64,)>(&q);
@@ -459,7 +459,7 @@ pub async fn bulk_assign(State(engine): State<AppState>, claims: Claims, Json(re
     let uid = db::get_user_id_by_username(&engine.pool, &req.username).await.map_err(internal)?
         .ok_or_else(|| err(StatusCode::NOT_FOUND, "User not found"))?;
     // Ownership check: root can bulk-assign any, others only their own
-    if claims.role != "root" {
+    if !auth::is_admin_or_root(&claims) {
         let ph = req.task_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
         let sql = format!("SELECT COUNT(*) FROM tasks WHERE id IN ({}) AND user_id != ? AND deleted_at IS NULL", ph);
         let mut q = sqlx::query_as::<_, (i64,)>(&sql);
@@ -503,7 +503,7 @@ pub struct ReorderRequest { pub orders: Vec<(i64, i64)> }
 pub async fn reorder_tasks(State(engine): State<AppState>, claims: Claims, Json(req): Json<ReorderRequest>) -> Result<StatusCode, ApiError> {
     if req.orders.len() > 500 { return Err(err(StatusCode::BAD_REQUEST, "Too many items (max 500)")); }
     // Verify user owns all tasks (root can reorder any)
-    if claims.role != "root" && !req.orders.is_empty() {
+    if !auth::is_admin_or_root(&claims) && !req.orders.is_empty() {
         let ids: Vec<i64> = req.orders.iter().map(|&(id, _)| id).collect();
         let ph = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
         let q = format!("SELECT COUNT(*) as c FROM tasks WHERE id IN ({}) AND user_id != ?", ph);

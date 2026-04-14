@@ -6,7 +6,7 @@ pub struct UserHoursQuery { pub from: Option<String>, pub to: Option<String> }
 
 #[utoipa::path(get, path = "/api/reports/user-hours", responses((status = 200)), security(("bearer" = [])))]
 pub async fn user_hours_report(State(engine): State<AppState>, claims: Claims, Query(q): Query<UserHoursQuery>) -> ApiResult<Vec<serde_json::Value>> {
-    if claims.role != "root" { return Err(err(StatusCode::FORBIDDEN, "Root only")); }
+    if !auth::is_admin_or_root(&claims) { return Err(err(StatusCode::FORBIDDEN, "Admin or root required")); }
     let from = q.from.as_deref().unwrap_or("2000-01-01");
     let to = q.to.as_deref().unwrap_or("2099-12-31");
     if chrono::NaiveDate::parse_from_str(from, "%Y-%m-%d").is_err() { return Err(err(StatusCode::BAD_REQUEST, "from must be YYYY-MM-DD")); }
@@ -27,7 +27,7 @@ pub struct TimeTrackingQuery { pub from: Option<String>, pub to: Option<String>,
 
 #[utoipa::path(get, path = "/api/reports/time-tracking", responses((status = 200)), security(("bearer" = [])))]
 pub async fn time_tracking_report(State(engine): State<AppState>, claims: Claims, Query(q): Query<TimeTrackingQuery>) -> Result<axum::response::Response, ApiError> {
-    if claims.role != "root" { return Err(err(StatusCode::FORBIDDEN, "Root only")); }
+    if !auth::is_admin_or_root(&claims) { return Err(err(StatusCode::FORBIDDEN, "Admin or root required")); }
     let from = q.from.as_deref().unwrap_or("2000-01-01");
     let to = q.to.as_deref().unwrap_or("2099-12-31");
     let to_ts = format!("{}T23:59:59", to);

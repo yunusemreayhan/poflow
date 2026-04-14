@@ -17,7 +17,7 @@ pub async fn list_custom_statuses(State(engine): State<AppState>, _claims: Claim
 
 #[utoipa::path(post, path = "/api/statuses", request_body = CreateCustomStatusRequest, responses((status = 201, body = db::CustomStatus)), security(("bearer" = [])))]
 pub async fn create_custom_status(State(engine): State<AppState>, claims: Claims, Json(req): Json<CreateCustomStatusRequest>) -> Result<(StatusCode, Json<db::CustomStatus>), ApiError> {
-    if claims.role != "root" { return Err(err(StatusCode::FORBIDDEN, "Only root can create statuses")); }
+    if !auth::is_admin_or_root(&claims) { return Err(err(StatusCode::FORBIDDEN, "Admin or root required")); }
     let name = req.name.trim().to_lowercase().replace(' ', "_");
     if name.is_empty() { return Err(err(StatusCode::BAD_REQUEST, "Status name cannot be empty")); }
     if name.len() > 50 { return Err(err(StatusCode::BAD_REQUEST, "Status name too long (max 50)")); }
@@ -41,7 +41,7 @@ pub async fn create_custom_status(State(engine): State<AppState>, claims: Claims
 
 #[utoipa::path(put, path = "/api/statuses/{id}", request_body = CreateCustomStatusRequest, responses((status = 200, body = db::CustomStatus)), security(("bearer" = [])))]
 pub async fn update_custom_status(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>, Json(req): Json<CreateCustomStatusRequest>) -> ApiResult<db::CustomStatus> {
-    if claims.role != "root" { return Err(err(StatusCode::FORBIDDEN, "Only root can update statuses")); }
+    if !auth::is_admin_or_root(&claims) { return Err(err(StatusCode::FORBIDDEN, "Admin or root required")); }
     let name = req.name.trim().to_lowercase().replace(' ', "_");
     if name.is_empty() { return Err(err(StatusCode::BAD_REQUEST, "Status name cannot be empty")); }
     if name.len() > 50 { return Err(err(StatusCode::BAD_REQUEST, "Status name too long (max 50)")); }
@@ -57,7 +57,7 @@ pub async fn update_custom_status(State(engine): State<AppState>, claims: Claims
 
 #[utoipa::path(delete, path = "/api/statuses/{id}", responses((status = 204)), security(("bearer" = [])))]
 pub async fn delete_custom_status(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>) -> Result<StatusCode, ApiError> {
-    if claims.role != "root" { return Err(err(StatusCode::FORBIDDEN, "Only root can delete statuses")); }
+    if !auth::is_admin_or_root(&claims) { return Err(err(StatusCode::FORBIDDEN, "Admin or root required")); }
     db::delete_custom_status(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Status not found"))?;
     Ok(StatusCode::NO_CONTENT)
 }

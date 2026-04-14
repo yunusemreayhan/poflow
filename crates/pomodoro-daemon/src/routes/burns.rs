@@ -21,7 +21,7 @@ pub async fn log_burn(State(engine): State<AppState>, claims: Claims, Path(id): 
         return Err(err(StatusCode::BAD_REQUEST, "Task does not belong to this sprint"));
     }
     // Authorization: must be sprint owner, task owner, assigned to task, or root
-    if claims.role != "root" && sprint.created_by_id != claims.user_id && task.user_id != claims.user_id {
+    if !auth::is_admin_or_root(&claims) && sprint.created_by_id != claims.user_id && task.user_id != claims.user_id {
         let assignees = db::list_assignees(&engine.pool, req.task_id).await.map_err(internal)?;
         if !assignees.contains(&claims.username) {
             return Err(err(StatusCode::FORBIDDEN, "Not assigned to this task"));
@@ -44,7 +44,7 @@ pub async fn cancel_burn(State(engine): State<AppState>, claims: Claims, Path((s
     let burn = db::get_burn(&engine.pool, burn_id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Burn not found"))?;
     if burn.sprint_id != Some(sprint_id) { return Err(err(StatusCode::BAD_REQUEST, "Burn does not belong to this sprint")); }
     if burn.cancelled != 0 { return Err(err(StatusCode::BAD_REQUEST, "Burn already cancelled")); }
-    if burn.user_id != claims.user_id && claims.role != "root" {
+    if burn.user_id != claims.user_id && !auth::is_admin_or_root(&claims) {
         return Err(err(StatusCode::FORBIDDEN, "Not owner"));
     }
     let b = db::cancel_burn(&engine.pool, burn_id, claims.user_id).await.map_err(internal)?;

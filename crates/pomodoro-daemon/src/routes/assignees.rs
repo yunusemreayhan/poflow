@@ -11,7 +11,7 @@ pub async fn list_assignees(State(engine): State<AppState>, _claims: Claims, Pat
 pub async fn add_assignee(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>, Json(req): Json<AssignRequest>) -> Result<StatusCode, ApiError> {
     // S1: Verify task exists and user owns it (or is root)
     let task = db::get_task(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Task not found"))?;
-    if task.user_id != claims.user_id && claims.role != "root" { return Err(err(StatusCode::FORBIDDEN, "Not your task")); }
+    if task.user_id != claims.user_id && !auth::is_admin_or_root(&claims) { return Err(err(StatusCode::FORBIDDEN, "Not your task")); }
     let uid = db::get_user_id_by_username(&engine.pool, &req.username).await.map_err(internal)?.ok_or_else(|| err(StatusCode::NOT_FOUND, "User not found"))?;
     db::add_assignee(&engine.pool, id, uid).await.map_err(internal)?;
     // BL21: Notify assigned user

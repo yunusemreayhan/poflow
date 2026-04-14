@@ -194,7 +194,17 @@ impl FromRequestParts<std::sync::Arc<crate::engine::Engine>> for Claims {
 
 /// Check if the authenticated user owns the resource or is root
 pub fn is_owner_or_root(resource_user_id: i64, claims: &Claims) -> bool {
-    claims.user_id == resource_user_id || claims.role == "root"
+    claims.user_id == resource_user_id || claims.role == "root" || claims.role == "admin"
+}
+
+/// Check if user is admin or root (for content management operations)
+pub fn is_admin_or_root(claims: &Claims) -> bool {
+    claims.role == "root" || claims.role == "admin"
+}
+
+/// Check if user owns the resource, or is admin/root
+pub fn is_owner_or_privileged(resource_user_id: i64, claims: &Claims) -> bool {
+    claims.user_id == resource_user_id || is_admin_or_root(claims)
 }
 
 /// Remove a user from the verified-user cache (call on user deletion)

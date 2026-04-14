@@ -34,7 +34,7 @@ pub async fn create_room(State(engine): State<AppState>, claims: Claims, Json(re
 pub async fn get_room_state(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>) -> ApiResult<db::RoomState> {
     // S2: Verify membership (or root)
     let state = db::get_room_state(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Room not found"))?;
-    if claims.role != "root" && !state.members.iter().any(|m| m.username == claims.username) {
+    if !auth::is_admin_or_root(&claims) && !state.members.iter().any(|m| m.username == claims.username) {
         return Err(err(StatusCode::FORBIDDEN, "Not a member of this room"));
     }
     Ok(Json(state))
@@ -68,7 +68,7 @@ pub async fn leave_room(State(engine): State<AppState>, claims: Claims, Path(id)
 
 #[utoipa::path(delete, path = "/api/rooms/{id}/members/{username}", responses((status = 204)), security(("bearer" = [])))]
 pub async fn kick_member(State(engine): State<AppState>, claims: Claims, Path((id, username)): Path<(i64, String)>) -> Result<StatusCode, ApiError> {
-    if !db::is_room_admin(&engine.pool, id, claims.user_id).await.map_err(internal)? && claims.role != "root" {
+    if !db::is_room_admin(&engine.pool, id, claims.user_id).await.map_err(internal)? && !auth::is_admin_or_root(&claims) {
         return Err(err(StatusCode::FORBIDDEN, "Admin only"));
     }
     let uid = db::get_user_id_by_username(&engine.pool, &username).await.map_err(internal)?.ok_or_else(|| err(StatusCode::NOT_FOUND, "User not found"))?;
@@ -80,7 +80,7 @@ pub async fn kick_member(State(engine): State<AppState>, claims: Claims, Path((i
 
 #[utoipa::path(put, path = "/api/rooms/{id}/role", request_body = RoomRoleRequest, responses((status = 200)), security(("bearer" = [])))]
 pub async fn set_room_role(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>, Json(req): Json<RoomRoleRequest>) -> Result<StatusCode, ApiError> {
-    if !db::is_room_admin(&engine.pool, id, claims.user_id).await.map_err(internal)? && claims.role != "root" {
+    if !db::is_room_admin(&engine.pool, id, claims.user_id).await.map_err(internal)? && !auth::is_admin_or_root(&claims) {
         return Err(err(StatusCode::FORBIDDEN, "Admin only"));
     }
     if !VALID_ROOM_ROLES.contains(&req.role.as_str()) { return Err(err(StatusCode::BAD_REQUEST, format!("Invalid room role '{}'. Must be one of: {}", req.role, VALID_ROOM_ROLES.join(", ")))); }
@@ -91,7 +91,7 @@ pub async fn set_room_role(State(engine): State<AppState>, claims: Claims, Path(
 
 #[utoipa::path(post, path = "/api/rooms/{id}/start-voting", request_body = StartVotingRequest, responses((status = 200, body = db::Room)), security(("bearer" = [])))]
 pub async fn start_voting(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>, Json(req): Json<StartVotingRequest>) -> ApiResult<db::Room> {
-    if !db::is_room_admin(&engine.pool, id, claims.user_id).await.map_err(internal)? && claims.role != "root" {
+    if !db::is_room_admin(&engine.pool, id, claims.user_id).await.map_err(internal)? && !auth::is_admin_or_root(&claims) {
         return Err(err(StatusCode::FORBIDDEN, "Admin only"));
     }
     // V8: Verify task exists and is not soft-deleted
@@ -107,7 +107,7 @@ pub async fn cast_vote(State(engine): State<AppState>, claims: Claims, Path(id):
     if room.status != "voting" { return Err(err(StatusCode::BAD_REQUEST, "Room is not in voting state")); }
     // Verify user is a room member
     let members = db::get_room_members(&engine.pool, id).await.map_err(internal)?;
-    if !members.iter().any(|m| m.user_id == claims.user_id) && claims.role != "root" {
+    if !members.iter().any(|m| m.user_id == claims.user_id) && !auth::is_admin_or_root(&claims) {
         return Err(err(StatusCode::FORBIDDEN, "Not a room member"));
     }
     // V3: Observers cannot vote
@@ -122,7 +122,7 @@ pub async fn cast_vote(State(engine): State<AppState>, claims: Claims, Path(id):
 
 #[utoipa::path(post, path = "/api/rooms/{id}/reveal", responses((status = 200, body = db::Room)), security(("bearer" = [])))]
 pub async fn reveal_votes(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>) -> ApiResult<db::Room> {
-    if !db::is_room_admin(&engine.pool, id, claims.user_id).await.map_err(internal)? && claims.role != "root" {
+    if !db::is_room_admin(&engine.pool, id, claims.user_id).await.map_err(internal)? && !auth::is_admin_or_root(&claims) {
         return Err(err(StatusCode::FORBIDDEN, "Admin only"));
     }
     let r = db::reveal_votes(&engine.pool, id).await.map_err(internal)?;
@@ -132,7 +132,7 @@ pub async fn reveal_votes(State(engine): State<AppState>, claims: Claims, Path(i
 
 #[utoipa::path(post, path = "/api/rooms/{id}/accept", request_body = AcceptEstimateRequest, responses((status = 200, body = db::Task)), security(("bearer" = [])))]
 pub async fn accept_estimate(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>, Json(req): Json<AcceptEstimateRequest>) -> ApiResult<db::Task> {
-    if !db::is_room_admin(&engine.pool, id, claims.user_id).await.map_err(internal)? && claims.role != "root" {
+    if !db::is_room_admin(&engine.pool, id, claims.user_id).await.map_err(internal)? && !auth::is_admin_or_root(&claims) {
         return Err(err(StatusCode::FORBIDDEN, "Admin only"));
     }
     if req.value < 0.0 || req.value > 10000.0 { return Err(err(StatusCode::BAD_REQUEST, "Estimate value must be 0-10000")); }
@@ -160,7 +160,7 @@ pub async fn accept_estimate(State(engine): State<AppState>, claims: Claims, Pat
 
 #[utoipa::path(post, path = "/api/rooms/{id}/close", responses((status = 200)), security(("bearer" = [])))]
 pub async fn close_room(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>) -> Result<StatusCode, ApiError> {
-    if !db::is_room_admin(&engine.pool, id, claims.user_id).await.map_err(internal)? && claims.role != "root" {
+    if !db::is_room_admin(&engine.pool, id, claims.user_id).await.map_err(internal)? && !auth::is_admin_or_root(&claims) {
         return Err(err(StatusCode::FORBIDDEN, "Admin only"));
     }
     db::set_room_status(&engine.pool, id, "closed").await.map_err(internal)?;
@@ -174,7 +174,7 @@ pub async fn close_room(State(engine): State<AppState>, claims: Claims, Path(id)
 pub async fn export_room_history(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>) -> Result<axum::response::Response, ApiError> {
     // B4: Verify room membership
     let members = db::get_room_members(&engine.pool, id).await.map_err(internal)?;
-    if !members.iter().any(|m| m.user_id == claims.user_id) && claims.role != "root" {
+    if !members.iter().any(|m| m.user_id == claims.user_id) && !auth::is_admin_or_root(&claims) {
         return Err(err(StatusCode::FORBIDDEN, "Not a room member"));
     }
     let state = db::get_room_state(&engine.pool, id).await.map_err(internal)?;

@@ -89,7 +89,7 @@ pub async fn download_attachment(State(engine): State<AppState>, _claims: Claims
 #[utoipa::path(delete, path = "/api/attachments/{id}", responses((status = 204)), security(("bearer" = [])))]
 pub async fn delete_attachment(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>) -> Result<StatusCode, ApiError> {
     let att = db::get_attachment(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Attachment not found"))?;
-    if att.user_id != claims.user_id && claims.role != "root" {
+    if att.user_id != claims.user_id && !auth::is_admin_or_root(&claims) {
         return Err(err(StatusCode::FORBIDDEN, "Not owner"));
     }
     let key = db::delete_attachment(&engine.pool, id).await.map_err(internal)?;

@@ -16,7 +16,7 @@ pub async fn add_time_report(State(engine): State<AppState>, claims: Claims, Pat
     // Verify task exists and user is owner, assignee, or root
     let task = db::get_task(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Task not found"))?;
     if task.deleted_at.is_some() { return Err(err(StatusCode::BAD_REQUEST, "Cannot log time on deleted tasks")); }
-    if task.user_id != claims.user_id && claims.role != "root" {
+    if task.user_id != claims.user_id && !auth::is_admin_or_root(&claims) {
         let assignees = db::list_assignees(&engine.pool, id).await.unwrap_or_default();
         if !assignees.contains(&claims.username) {
             return Err(err(StatusCode::FORBIDDEN, "Not task owner or assignee"));

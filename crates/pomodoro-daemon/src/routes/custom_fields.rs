@@ -25,7 +25,7 @@ pub async fn list_custom_fields(State(engine): State<AppState>, _claims: Claims)
 
 #[utoipa::path(post, path = "/api/fields", request_body = CreateFieldRequest, responses((status = 201, body = db::CustomField)), security(("bearer" = [])))]
 pub async fn create_custom_field(State(engine): State<AppState>, claims: Claims, Json(req): Json<CreateFieldRequest>) -> Result<(StatusCode, Json<db::CustomField>), ApiError> {
-    if claims.role != "root" { return Err(err(StatusCode::FORBIDDEN, "Only root can create fields")); }
+    if !auth::is_admin_or_root(&claims) { return Err(err(StatusCode::FORBIDDEN, "Admin or root required")); }
     let name = req.name.trim();
     if name.is_empty() || name.len() > 100 { return Err(err(StatusCode::BAD_REQUEST, "Field name must be 1-100 chars")); }
     let ft = req.field_type.as_deref().unwrap_or("text");
@@ -44,7 +44,7 @@ pub async fn create_custom_field(State(engine): State<AppState>, claims: Claims,
 
 #[utoipa::path(put, path = "/api/fields/{id}", request_body = CreateFieldRequest, responses((status = 200, body = db::CustomField)), security(("bearer" = [])))]
 pub async fn update_custom_field(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>, Json(req): Json<CreateFieldRequest>) -> ApiResult<db::CustomField> {
-    if claims.role != "root" { return Err(err(StatusCode::FORBIDDEN, "Only root can update fields")); }
+    if !auth::is_admin_or_root(&claims) { return Err(err(StatusCode::FORBIDDEN, "Admin or root required")); }
     let name = req.name.trim();
     if name.is_empty() || name.len() > 100 { return Err(err(StatusCode::BAD_REQUEST, "Field name must be 1-100 chars")); }
     let ft = req.field_type.as_deref().unwrap_or("text");
@@ -56,7 +56,7 @@ pub async fn update_custom_field(State(engine): State<AppState>, claims: Claims,
 
 #[utoipa::path(delete, path = "/api/fields/{id}", responses((status = 204)), security(("bearer" = [])))]
 pub async fn delete_custom_field(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>) -> Result<StatusCode, ApiError> {
-    if claims.role != "root" { return Err(err(StatusCode::FORBIDDEN, "Only root can delete fields")); }
+    if !auth::is_admin_or_root(&claims) { return Err(err(StatusCode::FORBIDDEN, "Admin or root required")); }
     db::delete_custom_field(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Field not found"))?;
     Ok(StatusCode::NO_CONTENT)
 }
