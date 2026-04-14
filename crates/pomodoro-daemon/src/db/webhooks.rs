@@ -73,7 +73,7 @@ pub async fn migrate_legacy_secrets(pool: &Pool) {
         .fetch_all(pool).await.unwrap_or_default();
     for (id, stored) in rows {
         // Skip if already AES-GCM format (contains colon with 24-char nonce hex)
-        if stored.split_once(':').map_or(false, |(n, _)| n.len() == 24) { continue; }
+        if stored.split_once(':').is_some_and(|(n, _)| n.len() == 24) { continue; }
         // Try XOR decrypt, then re-encrypt with AES-GCM
         if let Some(plaintext) = decrypt_secret_xor(&stored) {
             if let Ok(new_encrypted) = encrypt_secret(&plaintext) {

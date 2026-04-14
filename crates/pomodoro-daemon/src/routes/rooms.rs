@@ -179,11 +179,11 @@ pub async fn export_room_history(State(engine): State<AppState>, claims: Claims,
     }
     let state = db::get_room_state(&engine.pool, id).await.map_err(internal)?;
     let body = serde_json::to_vec(&state.vote_history).map_err(internal)?;
-    Ok(axum::response::Response::builder()
+    axum::response::Response::builder()
         .status(StatusCode::OK)
         .header("content-type", "application/json")
         .header("content-disposition", format!("attachment; filename=\"room_{}_history.json\"", id))
-        .body(axum::body::Body::from(body)).map_err(|e| internal(e.to_string()))?)
+        .body(axum::body::Body::from(body)).map_err(|e| internal(e.to_string()))
 }
 
 // --- Sprints ---

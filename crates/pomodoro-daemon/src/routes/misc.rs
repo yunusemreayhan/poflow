@@ -60,10 +60,10 @@ pub async fn get_tasks_full(State(engine): State<AppState>, _claims: Claims, hea
 
     if let Some(if_none_match) = headers.get("if-none-match").and_then(|v| v.to_str().ok()) {
         if if_none_match == etag {
-            return Ok(axum::response::Response::builder()
+            return axum::response::Response::builder()
                 .status(StatusCode::NOT_MODIFIED)
                 .header("etag", &etag)
-                .body(axum::body::Body::empty()).map_err(|e| internal(e.to_string()))?);
+                .body(axum::body::Body::empty()).map_err(|e| internal(e.to_string()));
         }
     }
 
@@ -85,11 +85,11 @@ pub async fn get_tasks_full(State(engine): State<AppState>, _claims: Claims, hea
         labels: labels.map_err(internal)?,
     };
     let body = serde_json::to_vec(&resp).map_err(internal)?;
-    Ok(axum::response::Response::builder()
+    axum::response::Response::builder()
         .status(StatusCode::OK)
         .header("content-type", "application/json")
         .header("etag", &etag)
-        .body(axum::body::Body::from(body)).map_err(|e| internal(e.to_string()))?)
+        .body(axum::body::Body::from(body)).map_err(|e| internal(e.to_string()))
 }
 
 #[derive(Deserialize)]

@@ -264,21 +264,21 @@ pub async fn list_tasks(State(engine): State<AppState>, _claims: Claims, Query(q
             .header("x-page", page.to_string())
             .header("x-per-page", per_page.to_string());
     }
-    Ok(resp.body(axum::body::Body::from(body)).map_err(|e| internal(e.to_string()))?)
+    resp.body(axum::body::Body::from(body)).map_err(|e| internal(e.to_string()))
 }
 
 #[utoipa::path(post, path = "/api/tasks", request_body = CreateTaskRequest, responses((status = 201, body = db::Task), (status = 400, body = ApiErrorBody), (status = 401), (status = 403, body = ApiErrorBody)), security(("bearer" = [])))]
 pub async fn create_task(State(engine): State<AppState>, claims: Claims, Json(req): Json<CreateTaskRequest>) -> Result<(StatusCode, Json<db::Task>), ApiError> {
     if req.title.trim().is_empty() { return Err(err(StatusCode::BAD_REQUEST, "Title cannot be empty")); }
     if req.title.len() > 500 { return Err(err(StatusCode::BAD_REQUEST, "Title too long (max 500 chars)")); }
-    if req.description.as_ref().map_or(false, |d| d.len() > 10000) { return Err(err(StatusCode::BAD_REQUEST, "Description too long (max 10000 chars)")); }
-    if req.project.as_ref().map_or(false, |p| p.len() > 200) { return Err(err(StatusCode::BAD_REQUEST, "Project too long (max 200 chars)")); }
-    if req.tags.as_ref().map_or(false, |t| t.len() > 500) { return Err(err(StatusCode::BAD_REQUEST, "Tags too long (max 500 chars)")); }
+    if req.description.as_ref().is_some_and(|d| d.len() > 10000) { return Err(err(StatusCode::BAD_REQUEST, "Description too long (max 10000 chars)")); }
+    if req.project.as_ref().is_some_and(|p| p.len() > 200) { return Err(err(StatusCode::BAD_REQUEST, "Project too long (max 200 chars)")); }
+    if req.tags.as_ref().is_some_and(|t| t.len() > 500) { return Err(err(StatusCode::BAD_REQUEST, "Tags too long (max 500 chars)")); }
     let priority = req.priority.unwrap_or(3);
-    if priority < 1 || priority > 5 { return Err(err(StatusCode::BAD_REQUEST, "Priority must be 1-5")); }
+    if !(1..=5).contains(&priority) { return Err(err(StatusCode::BAD_REQUEST, "Priority must be 1-5")); }
     let estimated = req.estimated.unwrap_or(1);
     if estimated < 0 { return Err(err(StatusCode::BAD_REQUEST, "Estimated cannot be negative")); }
-    if req.estimated_hours.map_or(false, |h| h < 0.0) { return Err(err(StatusCode::BAD_REQUEST, "Estimated hours cannot be negative")); }
+    if req.estimated_hours.is_some_and(|h| h < 0.0) { return Err(err(StatusCode::BAD_REQUEST, "Estimated hours cannot be negative")); }
     if let Some(ref d) = req.due_date { if !valid_date(d) { return Err(err(StatusCode::BAD_REQUEST, "due_date must be YYYY-MM-DD")); } }
     // BL6: Validate parent_id exists and belongs to user (or is root)
     if let Some(pid) = req.parent_id {
@@ -323,8 +323,8 @@ pub async fn update_task(State(engine): State<AppState>, claims: Claims, Path(id
             return Err(err(StatusCode::FORBIDDEN, "Not owner or assignee"));
         }
     }
-    if let Some(ref t) = req.title { if t.trim().is_empty() { return Err(err(StatusCode::BAD_REQUEST, "Title cannot be empty")); } if t.len() > 500 { return Err(err(StatusCode::BAD_REQUEST, "Title too long (max 500)")); } }
-    if let Some(ref d) = req.description { if d.as_ref().map_or(false, |d| d.len() > 10000) { return Err(err(StatusCode::BAD_REQUEST, "Description too long")); } }
+    if let Some(ref t) = req.title { if t.trim().is_empty() { return Err(err(StatusCode::BAD_REQUEST, "Title cannot be empty")); } else if t.len() > 500 { return Err(err(StatusCode::BAD_REQUEST, "Title too long (max 500)")); } }
+    if let Some(ref d) = req.description { if d.as_ref().is_some_and(|d| d.len() > 10000) { return Err(err(StatusCode::BAD_REQUEST, "Description too long")); } }
     if let Some(ref s) = req.status {
         validate_task_status(s)?;
         if !VALID_TASK_STATUSES.contains(&s.as_str()) {
@@ -332,10 +332,10 @@ pub async fn update_task(State(engine): State<AppState>, claims: Claims, Path(id
                 .ok_or_else(|| err(StatusCode::BAD_REQUEST, format!("Unknown status '{}'. Create it via POST /api/statuses first", s)))?;
         }
     }
-    if let Some(p) = req.priority { if p < 1 || p > 5 { return Err(err(StatusCode::BAD_REQUEST, "Priority must be 1-5")); } }
+    if let Some(p) = req.priority { if !(1..=5).contains(&p) { return Err(err(StatusCode::BAD_REQUEST, "Priority must be 1-5")); } }
     if let Some(e) = req.estimated { if e < 0 { return Err(err(StatusCode::BAD_REQUEST, "Estimated cannot be negative")); } }
     if let Some(h) = req.estimated_hours { if h < 0.0 { return Err(err(StatusCode::BAD_REQUEST, "Estimated hours cannot be negative")); } }
-    if let Some(ref dd) = req.due_date { if let Some(ref d) = dd { if !valid_date(d) { return Err(err(StatusCode::BAD_REQUEST, "due_date must be YYYY-MM-DD")); } } }
+    if let Some(Some(ref d)) = req.due_date { if !valid_date(d) { return Err(err(StatusCode::BAD_REQUEST, "due_date must be YYYY-MM-DD")); } }
     // V7: Prevent circular parent_id references
     if let Some(Some(new_parent)) = req.parent_id {
         if new_parent == id { return Err(err(StatusCode::BAD_REQUEST, "Task cannot be its own parent")); }
@@ -354,7 +354,7 @@ pub async fn update_task(State(engine): State<AppState>, claims: Claims, Path(id
             return Err(err(StatusCode::CONFLICT, "Task was modified by another user. Please refresh and try again."));
         }
     }
-    if let Some(Some(wdm)) = req.work_duration_minutes { if wdm < 1 || wdm > 480 { return Err(err(StatusCode::BAD_REQUEST, "work_duration_minutes must be 1-480")); } }
+    if let Some(Some(wdm)) = req.work_duration_minutes { if !(1..=480).contains(&wdm) { return Err(err(StatusCode::BAD_REQUEST, "work_duration_minutes must be 1-480")); } }
     let t = db::update_task(&engine.pool, id, req.title.as_deref(),
         req.description.as_ref().map(|o| o.as_deref()),
         req.project.as_ref().map(|o| o.as_deref()),

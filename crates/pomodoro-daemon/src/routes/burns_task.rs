@@ -11,8 +11,8 @@ pub async fn list_time_reports(State(engine): State<AppState>, _claims: Claims, 
 pub async fn add_time_report(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>, Json(req): Json<AddTimeReportRequest>) -> Result<(StatusCode, Json<db::BurnEntry>), ApiError> {
     if req.hours <= 0.0 { return Err(err(StatusCode::BAD_REQUEST, "Hours must be positive")); }
     if req.hours > 24.0 { return Err(err(StatusCode::BAD_REQUEST, "Hours must be at most 24")); }
-    if req.points.map_or(false, |p| p < 0.0 || p > 1000.0) { return Err(err(StatusCode::BAD_REQUEST, "Points must be 0-1000")); }
-    if req.description.as_ref().map_or(false, |d| d.len() > 5000) { return Err(err(StatusCode::BAD_REQUEST, "Description too long (max 5000)")); }
+    if req.points.is_some_and(|p| !(0.0..=1000.0).contains(&p)) { return Err(err(StatusCode::BAD_REQUEST, "Points must be 0-1000")); }
+    if req.description.as_ref().is_some_and(|d| d.len() > 5000) { return Err(err(StatusCode::BAD_REQUEST, "Description too long (max 5000)")); }
     // Verify task exists and user is owner, assignee, or root
     let task = db::get_task(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Task not found"))?;
     if task.deleted_at.is_some() { return Err(err(StatusCode::BAD_REQUEST, "Cannot log time on deleted tasks")); }

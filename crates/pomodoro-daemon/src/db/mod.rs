@@ -355,12 +355,12 @@ async fn migrate(pool: &Pool) -> Result<()> {
     // Migration 1: Add retro_notes to sprints
     if !applied_set.contains(&1) {
         if let Err(e) = sqlx::query("ALTER TABLE sprints ADD COLUMN retro_notes TEXT").execute(pool).await { log_migration_err("ALTER TABLE sprints ADD COLUMN retro_notes TEXT", e); }
-        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (1, ?)").bind(&now_str()).execute(pool).await.ok();
+        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (1, ?)").bind(now_str()).execute(pool).await.ok();
     }
     // Migration 2: Soft delete support
     if !applied_set.contains(&2) {
         if let Err(e) = sqlx::query("ALTER TABLE tasks ADD COLUMN deleted_at TEXT").execute(pool).await { log_migration_err("ALTER TABLE tasks ADD COLUMN deleted_at TEXT", e); }
-        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (2, ?)").bind(&now_str()).execute(pool).await.ok();
+        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (2, ?)").bind(now_str()).execute(pool).await.ok();
     }
     // Migration 3: Notification preferences per event type
     if !applied_set.contains(&3) {
@@ -370,18 +370,18 @@ async fn migrate(pool: &Pool) -> Result<()> {
             enabled    INTEGER NOT NULL DEFAULT 1,
             PRIMARY KEY (user_id, event_type)
         )").execute(pool).await.ok();
-        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (3, ?)").bind(&now_str()).execute(pool).await.ok();
+        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (3, ?)").bind(now_str()).execute(pool).await.ok();
     }
 
     // Migration 4: Sprint capacity hours
     if !applied_set.contains(&4) {
         if let Err(e) = sqlx::query("ALTER TABLE sprints ADD COLUMN capacity_hours REAL").execute(pool).await { log_migration_err("ALTER TABLE sprints ADD COLUMN capacity_hours REAL", e); }
-        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (4, ?)").bind(&now_str()).execute(pool).await.ok();
+        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (4, ?)").bind(now_str()).execute(pool).await.ok();
     }
     // Migration 5: Per-task work duration override
     if !applied_set.contains(&5) {
         if let Err(e) = sqlx::query("ALTER TABLE tasks ADD COLUMN work_duration_minutes INTEGER").execute(pool).await { log_migration_err("ALTER TABLE tasks ADD COLUMN work_duration_minutes INTEGER", e); }
-        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (5, ?)").bind(&now_str()).execute(pool).await.ok();
+        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (5, ?)").bind(now_str()).execute(pool).await.ok();
     }
     // Migration 6: Task watchers
     if !applied_set.contains(&6) {
@@ -391,11 +391,11 @@ async fn migrate(pool: &Pool) -> Result<()> {
             created_at TEXT NOT NULL,
             PRIMARY KEY (task_id, user_id)
         )").execute(pool).await.ok();
-        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (6, ?)").bind(&now_str()).execute(pool).await.ok();
+        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (6, ?)").bind(now_str()).execute(pool).await.ok();
     }
     // Migration 7: Task dependencies (table already exists from initial schema, this is a no-op)
     if !applied_set.contains(&7) {
-        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (7, ?)").bind(&now_str()).execute(pool).await.ok();
+        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (7, ?)").bind(now_str()).execute(pool).await.ok();
     }
     // Migration 8: FTS5 full-text search index on tasks
     if !applied_set.contains(&8) {
@@ -411,7 +411,7 @@ async fn migrate(pool: &Pool) -> Result<()> {
             tracing::warn!("FTS5 not available — search will use LIKE fallback");
             tasks::set_fts5_available(false);
         }
-        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (8, ?)").bind(&now_str()).execute(pool).await.ok();
+        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (8, ?)").bind(now_str()).execute(pool).await.ok();
     }
     // Migration 9: Fix FTS5 — recreate as standalone table with proper triggers
     if !applied_set.contains(&9) {
@@ -426,13 +426,13 @@ async fn migrate(pool: &Pool) -> Result<()> {
             sqlx::query("CREATE TRIGGER IF NOT EXISTS tasks_fts_delete AFTER DELETE ON tasks BEGIN DELETE FROM tasks_fts WHERE rowid=old.id; END").execute(pool).await.ok();
             tasks::set_fts5_available(true);
         }
-        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (9, ?)").bind(&now_str()).execute(pool).await.ok();
+        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (9, ?)").bind(now_str()).execute(pool).await.ok();
     }
 
     // Migration 10: Add password_changed_at to users for token invalidation after password reset
     if !applied_set.contains(&10) {
         if let Err(e) = sqlx::query("ALTER TABLE users ADD COLUMN password_changed_at TEXT").execute(pool).await { log_migration_err("ALTER TABLE users ADD COLUMN password_changed_at TEXT", e); }
-        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (10, ?)").bind(&now_str()).execute(pool).await.ok();
+        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (10, ?)").bind(now_str()).execute(pool).await.ok();
     }
 
     // Migration 11: Achievements table
@@ -444,7 +444,7 @@ async fn migrate(pool: &Pool) -> Result<()> {
             unlocked_at     TEXT NOT NULL,
             UNIQUE(user_id, achievement_type)
         )").execute(pool).await.ok();
-        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (11, ?)").bind(&now_str()).execute(pool).await.ok();
+        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (11, ?)").bind(now_str()).execute(pool).await.ok();
     }
 
     // Migration 12: Task links (GitHub/GitLab commits, PRs, external URLs)
@@ -457,20 +457,20 @@ async fn migrate(pool: &Pool) -> Result<()> {
             title       TEXT NOT NULL,
             created_at  TEXT NOT NULL
         )").execute(pool).await.ok();
-        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (12, ?)").bind(&now_str()).execute(pool).await.ok();
+        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (12, ?)").bind(now_str()).execute(pool).await.ok();
     }
 
     // Migration 13: Threaded comments (parent_id for replies)
     if !applied_set.contains(&13) {
         if let Err(e) = sqlx::query("ALTER TABLE comments ADD COLUMN parent_id INTEGER REFERENCES comments(id) ON DELETE CASCADE").execute(pool).await { log_migration_err("ALTER TABLE comments ADD COLUMN parent_id", e); }
-        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (13, ?)").bind(&now_str()).execute(pool).await.ok();
+        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (13, ?)").bind(now_str()).execute(pool).await.ok();
     }
 
     // Migration 14: PERT estimates (optimistic/pessimistic hours)
     if !applied_set.contains(&14) {
         if let Err(e) = sqlx::query("ALTER TABLE tasks ADD COLUMN estimate_optimistic REAL").execute(pool).await { log_migration_err("ALTER TABLE tasks ADD COLUMN estimate_optimistic", e); }
         if let Err(e) = sqlx::query("ALTER TABLE tasks ADD COLUMN estimate_pessimistic REAL").execute(pool).await { log_migration_err("ALTER TABLE tasks ADD COLUMN estimate_pessimistic", e); }
-        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (14, ?)").bind(&now_str()).execute(pool).await.ok();
+        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (14, ?)").bind(now_str()).execute(pool).await.ok();
     }
 
     // Migration 15: Automation rules
@@ -485,7 +485,7 @@ async fn migrate(pool: &Pool) -> Result<()> {
             enabled         INTEGER NOT NULL DEFAULT 1,
             created_at      TEXT NOT NULL
         )").execute(pool).await.ok();
-        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (15, ?)").bind(&now_str()).execute(pool).await.ok();
+        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (15, ?)").bind(now_str()).execute(pool).await.ok();
     }
 
     // Migration 16: Shared timer sessions (pair/mob programming)
@@ -496,7 +496,7 @@ async fn migrate(pool: &Pool) -> Result<()> {
             joined_at   TEXT NOT NULL,
             PRIMARY KEY (session_id, user_id)
         )").execute(pool).await.ok();
-        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (16, ?)").bind(&now_str()).execute(pool).await.ok();
+        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (16, ?)").bind(now_str()).execute(pool).await.ok();
     }
 
     // Migration 17: Add missing columns to user_configs (theme, notify_desktop, notify_sound)
@@ -504,7 +504,7 @@ async fn migrate(pool: &Pool) -> Result<()> {
         if let Err(e) = sqlx::query("ALTER TABLE user_configs ADD COLUMN theme TEXT").execute(pool).await { log_migration_err("ALTER TABLE user_configs ADD COLUMN theme", e); }
         if let Err(e) = sqlx::query("ALTER TABLE user_configs ADD COLUMN notify_desktop INTEGER DEFAULT 1").execute(pool).await { log_migration_err("ALTER TABLE user_configs ADD COLUMN notify_desktop", e); }
         if let Err(e) = sqlx::query("ALTER TABLE user_configs ADD COLUMN notify_sound INTEGER DEFAULT 1").execute(pool).await { log_migration_err("ALTER TABLE user_configs ADD COLUMN notify_sound", e); }
-        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (17, ?)").bind(&now_str()).execute(pool).await.ok();
+        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (17, ?)").bind(now_str()).execute(pool).await.ok();
     }
 
     // Migration 18: Custom task statuses (Jira-like workflows)
@@ -519,7 +519,7 @@ async fn migrate(pool: &Pool) -> Result<()> {
             created_at  TEXT NOT NULL
         )").execute(pool).await.ok();
         sqlx::query("CREATE UNIQUE INDEX IF NOT EXISTS idx_custom_statuses_name ON custom_statuses(name)").execute(pool).await.ok();
-        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (18, ?)").bind(&now_str()).execute(pool).await.ok();
+        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (18, ?)").bind(now_str()).execute(pool).await.ok();
     }
 
     // Migration 19: Custom fields on tasks (Jira-like custom fields)
@@ -542,7 +542,7 @@ async fn migrate(pool: &Pool) -> Result<()> {
             value       TEXT,
             UNIQUE(task_id, field_id)
         )").execute(pool).await.ok();
-        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (19, ?)").bind(&now_str()).execute(pool).await.ok();
+        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (19, ?)").bind(now_str()).execute(pool).await.ok();
     }
 
     // Migration 20: Task checklists (lightweight sub-items)
@@ -555,7 +555,7 @@ async fn migrate(pool: &Pool) -> Result<()> {
             sort_order  INTEGER NOT NULL DEFAULT 0,
             created_at  TEXT NOT NULL
         )").execute(pool).await.ok();
-        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (20, ?)").bind(&now_str()).execute(pool).await.ok();
+        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (20, ?)").bind(now_str()).execute(pool).await.ok();
     }
 
     sqlx::query("CREATE TABLE IF NOT EXISTS task_attachments (

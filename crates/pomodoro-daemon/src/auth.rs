@@ -43,7 +43,7 @@ fn secret() -> &'static [u8] {
             panic!("SECURITY: Failed to generate JWT secret via getrandom: {}. Set POMODORO_JWT_SECRET env var.", e);
         }
         if let Some(parent) = secret_path.parent() { std::fs::create_dir_all(parent).ok(); }
-        std::fs::write(&secret_path, &buf).ok();
+        std::fs::write(&secret_path, buf).ok();
         #[cfg(unix)] {
             use std::os::unix::fs::PermissionsExt;
             std::fs::set_permissions(&secret_path, std::fs::Permissions::from_mode(0o600)).ok();
@@ -145,11 +145,10 @@ impl FromRequestParts<std::sync::Arc<crate::engine::Engine>> for Claims {
         async move {
             // CSRF: require x-requested-with header on state-changing requests
             let method = &parts.method;
-            if method != axum::http::Method::GET && method != axum::http::Method::HEAD && method != axum::http::Method::OPTIONS {
-                if parts.headers.get("x-requested-with").is_none() {
+            if method != axum::http::Method::GET && method != axum::http::Method::HEAD && method != axum::http::Method::OPTIONS
+                && parts.headers.get("x-requested-with").is_none() {
                     return Err(axum::http::StatusCode::FORBIDDEN);
                 }
-            }
             let header = parts.headers.get("authorization")
                 .and_then(|v| v.to_str().ok())
                 .ok_or(axum::http::StatusCode::UNAUTHORIZED)?;

@@ -51,9 +51,8 @@ pub async fn cleanup_orphaned_attachments(pool: &Pool) -> Result<u64> {
     if let Ok(entries) = std::fs::read_dir(&dir) {
         for entry in entries.flatten() {
             let name = entry.file_name().to_string_lossy().to_string();
-            if !db_set.contains(&name) {
-                if std::fs::remove_file(entry.path()).is_ok() { removed += 1; }
-            }
+            if !db_set.contains(&name)
+                && std::fs::remove_file(entry.path()).is_ok() { removed += 1; }
         }
     }
     Ok(removed)

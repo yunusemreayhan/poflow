@@ -49,21 +49,21 @@ pub async fn time_tracking_report(State(engine): State<AppState>, claims: Claims
         for (user, project, week, hours, sessions) in &rows {
             csv.push_str(&format!("{},{},{},{:.2},{}\n", user, project, week, hours, sessions));
         }
-        return Ok(axum::response::Response::builder()
+        return axum::response::Response::builder()
             .status(StatusCode::OK)
             .header("content-type", "text/csv")
             .header("content-disposition", "attachment; filename=\"time-tracking.csv\"")
-            .body(axum::body::Body::from(csv)).map_err(|e| internal(e.to_string()))?);
+            .body(axum::body::Body::from(csv)).map_err(|e| internal(e.to_string()));
     }
 
     let data: Vec<serde_json::Value> = rows.into_iter().map(|(u, p, w, h, s)| {
         serde_json::json!({"username": u, "project": p, "week": w, "hours": (h * 100.0).round() / 100.0, "sessions": s})
     }).collect();
-    Ok(axum::response::Response::builder()
+    axum::response::Response::builder()
         .status(StatusCode::OK)
         .header("content-type", "application/json")
         .body(axum::body::Body::from(serde_json::to_vec(&data).map_err(|e| internal(e.to_string()))?))
-        .map_err(|e| internal(e.to_string()))?)
+        .map_err(|e| internal(e.to_string()))
 }
 
 #[utoipa::path(get, path = "/api/history", responses((status = 200, body = Vec<db::SessionWithPath>)), security(("bearer" = [])))]
@@ -336,7 +336,7 @@ pub async fn activity_feed(State(engine): State<AppState>, _claims: Claims, Quer
     let mut items: Vec<serde_json::Value> = Vec::new();
 
     // Audit log entries
-    if types.as_ref().map_or(true, |t| t.iter().any(|x| *x == "audit" || *x == "all")) {
+    if types.as_ref().is_none_or(|t| t.iter().any(|x| *x == "audit" || *x == "all")) {
         let rows: Vec<(String, String, Option<String>, String, String)> = sqlx::query_as(
             "SELECT a.action, a.entity_type, a.detail, a.created_at, u.username FROM audit_log a JOIN users u ON a.user_id = u.id WHERE a.created_at > ? ORDER BY a.created_at DESC LIMIT ?")
             .bind(since).bind(limit).fetch_all(&engine.pool).await.map_err(internal)?;
@@ -346,7 +346,7 @@ pub async fn activity_feed(State(engine): State<AppState>, _claims: Claims, Quer
     }
 
     // Recent comments
-    if types.as_ref().map_or(true, |t| t.iter().any(|x| *x == "comment" || *x == "all")) {
+    if types.as_ref().is_none_or(|t| t.iter().any(|x| *x == "comment" || *x == "all")) {
         let rows: Vec<(i64, i64, String, String, String)> = sqlx::query_as(
             "SELECT c.id, c.task_id, c.content, c.created_at, u.username FROM comments c JOIN users u ON c.user_id = u.id WHERE c.created_at > ? ORDER BY c.created_at DESC LIMIT ?")
             .bind(since).bind(limit).fetch_all(&engine.pool).await.map_err(internal)?;

@@ -2,7 +2,7 @@ use super::*;
 
 pub async fn watch_task(pool: &Pool, task_id: i64, user_id: i64) -> Result<()> {
     sqlx::query("INSERT OR IGNORE INTO task_watchers (task_id, user_id, created_at) VALUES (?,?,?)")
-        .bind(task_id).bind(user_id).bind(&now_str()).execute(pool).await?;
+        .bind(task_id).bind(user_id).bind(now_str()).execute(pool).await?;
     Ok(())
 }
 

@@ -14,7 +14,7 @@ pub struct AuditEntry {
 
 pub async fn audit(pool: &Pool, user_id: i64, action: &str, entity_type: &str, entity_id: Option<i64>, detail: Option<&str>) -> Result<()> {
     sqlx::query("INSERT INTO audit_log (user_id, action, entity_type, entity_id, detail, created_at) VALUES (?,?,?,?,?,?)")
-        .bind(user_id).bind(action).bind(entity_type).bind(entity_id).bind(detail).bind(&now_str())
+        .bind(user_id).bind(action).bind(entity_type).bind(entity_id).bind(detail).bind(now_str())
         .execute(pool).await?;
     Ok(())
 }

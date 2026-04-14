@@ -95,14 +95,14 @@ pub async fn create_backup(State(engine): State<AppState>, claims: Claims) -> Re
         backups.sort_by_key(|e| std::cmp::Reverse(e.file_name()));
         for old in backups.into_iter().skip(10) { std::fs::remove_file(old.path()).ok(); }
     }
-    Ok(axum::response::Response::builder()
+    axum::response::Response::builder()
         .status(StatusCode::OK)
         .header("content-type", "application/json")
         .body(axum::body::Body::from(serde_json::to_vec(&serde_json::json!({
             "path": backup_path.display().to_string(),
             "size_bytes": size,
         })).map_err(|e| internal(e.to_string()))?))
-        .map_err(|e| internal(e.to_string()))?)
+        .map_err(|e| internal(e.to_string()))
 }
 
 // O3: List available backups
@@ -164,7 +164,7 @@ pub async fn restore_backup(State(engine): State<AppState>, claims: Claims, Json
         tokio::time::sleep(std::time::Duration::from_millis(500)).await;
         std::process::exit(0);
     });
-    Ok(axum::response::Response::builder()
+    axum::response::Response::builder()
         .status(StatusCode::OK)
         .header("content-type", "application/json")
         .body(axum::body::Body::from(serde_json::to_vec(&serde_json::json!({
@@ -172,5 +172,5 @@ pub async fn restore_backup(State(engine): State<AppState>, claims: Claims, Json
             "safety_backup": safety.display().to_string(),
             "note": "Server is restarting to apply the restored database"
         })).map_err(|e| internal(e.to_string()))?))
-        .map_err(|e| internal(e.to_string()))?)
+        .map_err(|e| internal(e.to_string()))
 }

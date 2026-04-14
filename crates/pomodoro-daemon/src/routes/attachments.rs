@@ -76,14 +76,14 @@ pub async fn download_attachment(State(engine): State<AppState>, _claims: Claims
         "application/octet-stream"
     };
 
-    Ok(axum::response::Response::builder()
+    axum::response::Response::builder()
         .status(StatusCode::OK)
         .header("content-type", safe_mime)
         .header("content-disposition", format!("attachment; filename=\"{}\"", att.filename.replace('"', "_")))
         .header("content-security-policy", "default-src 'none'")
         .header("x-content-type-options", "nosniff")
         .body(axum::body::Body::from_stream(stream))
-        .map_err(|e| internal(e.to_string()))?)
+        .map_err(|e| internal(e.to_string()))
 }
 
 #[utoipa::path(delete, path = "/api/attachments/{id}", responses((status = 204)), security(("bearer" = [])))]

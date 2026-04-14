@@ -106,11 +106,11 @@ pub async fn export_burns(State(engine): State<AppState>, claims: Claims, Path(s
             escape_csv(&b.username), escape_csv(&b.source),
             escape_csv(b.note.as_deref().unwrap_or(""))));
     }
-    Ok(axum::response::Response::builder()
+    axum::response::Response::builder()
         .status(StatusCode::OK)
         .header("content-type", "text/csv")
         .header("content-disposition", &format!("attachment; filename=\"burns_sprint_{}.csv\"", sprint_id))
-        .body(axum::body::Body::from(csv)).map_err(|e| internal(e.to_string()))?)
+        .body(axum::body::Body::from(csv)).map_err(|e| internal(e.to_string()))
 }
 
 #[derive(Deserialize, utoipa::ToSchema)]
@@ -278,11 +278,11 @@ pub async fn export_ical(State(engine): State<AppState>, claims: Claims) -> Resu
     }
     ical.push_str("END:VCALENDAR\r\n");
 
-    Ok(axum::response::Response::builder()
+    axum::response::Response::builder()
         .status(StatusCode::OK)
         .header("content-type", "text/calendar; charset=utf-8")
         .header("content-disposition", "attachment; filename=\"pomodoro.ics\"")
-        .body(axum::body::Body::from(ical)).map_err(|e| internal(e.to_string()))?)
+        .body(axum::body::Body::from(ical)).map_err(|e| internal(e.to_string()))
 }
 
 fn ical_escape(s: &str) -> String {

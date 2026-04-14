@@ -52,5 +52,5 @@ pub async fn remove_team_root_task(pool: &Pool, team_id: i64, task_id: i64) -> R
 pub async fn is_team_admin(pool: &Pool, team_id: i64, user_id: i64) -> Result<bool> {
     let row: Option<(String,)> = sqlx::query_as("SELECT role FROM team_members WHERE team_id = ? AND user_id = ?")
         .bind(team_id).bind(user_id).fetch_optional(pool).await?;
-    Ok(row.map_or(false, |r| r.0 == "admin"))
+    Ok(row.is_some_and(|r| r.0 == "admin"))
 }

@@ -31,7 +31,7 @@ fn is_private_ip(ip: &IpAddr) -> bool {
 async fn is_safe_url(url: &str) -> Option<(String, std::net::SocketAddr)> {
     let Ok(parsed) = url::Url::parse(url) else { return None };
     if !matches!(parsed.scheme(), "http" | "https") { return None; }
-    let Some(host) = parsed.host_str() else { return None };
+    let host = parsed.host_str()?;
     let port = parsed.port().unwrap_or(if parsed.scheme() == "https" { 443 } else { 80 });
     // Direct IP check
     if let Ok(ip) = host.parse::<IpAddr>() {

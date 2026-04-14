@@ -138,7 +138,7 @@ impl utoipa::Modify for SecurityAddon {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let json_logs = std::env::var("POMODORO_LOG_JSON").map_or(false, |v| v == "1" || v.to_lowercase() == "true");
+    let json_logs = std::env::var("POMODORO_LOG_JSON").is_ok_and(|v| v == "1" || v.to_lowercase() == "true");
     let filter = tracing_subscriber::EnvFilter::from_default_env()
         .add_directive("pomodoro_daemon=info".parse()?);
     if json_logs {

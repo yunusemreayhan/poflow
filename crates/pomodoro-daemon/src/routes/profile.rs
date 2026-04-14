@@ -53,9 +53,9 @@ pub async fn get_notif_prefs(State(engine): State<AppState>, claims: Claims) -> 
 
 #[utoipa::path(put, path = "/api/profile/notifications", responses((status = 200)), security(("bearer" = [])))]
 pub async fn update_notif_prefs(State(engine): State<AppState>, claims: Claims, Json(prefs): Json<Vec<NotifPref>>) -> Result<StatusCode, ApiError> {
-    if prefs.len() > EVENT_TYPES.len() { return Err(err(StatusCode::BAD_REQUEST, &format!("Too many prefs (max {})", EVENT_TYPES.len()))); }
+    if prefs.len() > EVENT_TYPES.len() { return Err(err(StatusCode::BAD_REQUEST, format!("Too many prefs (max {})", EVENT_TYPES.len()))); }
     for p in &prefs {
-        if !EVENT_TYPES.contains(&p.event_type.as_str()) { return Err(err(StatusCode::BAD_REQUEST, &format!("Unknown event type: {}", p.event_type))); }
+        if !EVENT_TYPES.contains(&p.event_type.as_str()) { return Err(err(StatusCode::BAD_REQUEST, format!("Unknown event type: {}", p.event_type))); }
         sqlx::query("INSERT INTO notification_prefs (user_id, event_type, enabled) VALUES (?, ?, ?) ON CONFLICT(user_id, event_type) DO UPDATE SET enabled = excluded.enabled")
             .bind(claims.user_id).bind(&p.event_type).bind(p.enabled).execute(&engine.pool).await.map_err(internal)?;
     }

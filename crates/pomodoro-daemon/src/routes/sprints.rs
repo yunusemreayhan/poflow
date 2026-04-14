@@ -17,13 +17,13 @@ pub async fn list_sprints(State(engine): State<AppState>, _claims: Claims, Query
 pub async fn create_sprint(State(engine): State<AppState>, claims: Claims, Json(req): Json<CreateSprintRequest>) -> Result<(StatusCode, Json<db::Sprint>), ApiError> {
     if req.name.trim().is_empty() { return Err(err(StatusCode::BAD_REQUEST, "Sprint name cannot be empty")); }
     if req.name.len() > 200 { return Err(err(StatusCode::BAD_REQUEST, "Sprint name too long (max 200 chars)")); }
-    if req.goal.as_ref().map_or(false, |g| g.len() > 1000) { return Err(err(StatusCode::BAD_REQUEST, "Goal too long (max 1000 chars)")); }
-    if req.project.as_ref().map_or(false, |p| p.len() > 200) { return Err(err(StatusCode::BAD_REQUEST, "Project name too long (max 200 chars)")); }
+    if req.goal.as_ref().is_some_and(|g| g.len() > 1000) { return Err(err(StatusCode::BAD_REQUEST, "Goal too long (max 1000 chars)")); }
+    if req.project.as_ref().is_some_and(|p| p.len() > 200) { return Err(err(StatusCode::BAD_REQUEST, "Project name too long (max 200 chars)")); }
     if let Some(ref d) = req.start_date { if chrono::NaiveDate::parse_from_str(d, "%Y-%m-%d").is_err() { return Err(err(StatusCode::BAD_REQUEST, "start_date must be YYYY-MM-DD")); } }
     if let Some(ref d) = req.end_date { if chrono::NaiveDate::parse_from_str(d, "%Y-%m-%d").is_err() { return Err(err(StatusCode::BAD_REQUEST, "end_date must be YYYY-MM-DD")); } }
     // V4: Validate end_date >= start_date
     if let (Some(ref s), Some(ref e)) = (&req.start_date, &req.end_date) { if e < s { return Err(err(StatusCode::BAD_REQUEST, "end_date must be on or after start_date")); } }
-    if let Some(ch) = req.capacity_hours { if ch < 0.0 || ch > 10000.0 { return Err(err(StatusCode::BAD_REQUEST, "capacity_hours must be 0-10000")); } }
+    if let Some(ch) = req.capacity_hours { if !(0.0..=10000.0).contains(&ch) { return Err(err(StatusCode::BAD_REQUEST, "capacity_hours must be 0-10000")); } }
     let s = db::create_sprint(&engine.pool, claims.user_id, &req.name, req.project.as_deref(), req.goal.as_deref(), req.start_date.as_deref(), req.end_date.as_deref(), req.capacity_hours)
         .await.map_err(internal)?;
     db::audit(&engine.pool, claims.user_id, "create", "sprint", Some(s.id), Some(&s.name)).await.ok();
@@ -41,12 +41,12 @@ pub async fn get_sprint_detail(State(engine): State<AppState>, _claims: Claims, 
 #[utoipa::path(put, path = "/api/sprints/{id}", request_body = UpdateSprintRequest, responses((status = 200, body = db::Sprint)), security(("bearer" = [])))]
 pub async fn update_sprint(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>, Json(req): Json<UpdateSprintRequest>) -> ApiResult<db::Sprint> {
     let sprint = get_owned_sprint(&engine.pool, id, &claims).await?;
-    if req.goal.as_ref().and_then(|o| o.as_ref()).map_or(false, |g| g.len() > 1000) { return Err(err(StatusCode::BAD_REQUEST, "Goal too long (max 1000)")); }
-    if let Some(ref name) = req.name { if name.trim().is_empty() { return Err(err(StatusCode::BAD_REQUEST, "Sprint name cannot be empty")); } if name.len() > 200 { return Err(err(StatusCode::BAD_REQUEST, "Sprint name too long (max 200)")); } }
-    if req.project.as_ref().and_then(|o| o.as_ref()).map_or(false, |p| p.len() > 200) { return Err(err(StatusCode::BAD_REQUEST, "Project too long (max 200)")); }
-    if req.retro_notes.as_ref().and_then(|o| o.as_ref()).map_or(false, |r| r.len() > 10000) { return Err(err(StatusCode::BAD_REQUEST, "Retro notes too long (max 10000)")); }
+    if req.goal.as_ref().and_then(|o| o.as_ref()).is_some_and(|g| g.len() > 1000) { return Err(err(StatusCode::BAD_REQUEST, "Goal too long (max 1000)")); }
+    if let Some(ref name) = req.name { if name.trim().is_empty() { return Err(err(StatusCode::BAD_REQUEST, "Sprint name cannot be empty")); } else if name.len() > 200 { return Err(err(StatusCode::BAD_REQUEST, "Sprint name too long (max 200)")); } }
+    if req.project.as_ref().and_then(|o| o.as_ref()).is_some_and(|p| p.len() > 200) { return Err(err(StatusCode::BAD_REQUEST, "Project too long (max 200)")); }
+    if req.retro_notes.as_ref().and_then(|o| o.as_ref()).is_some_and(|r| r.len() > 10000) { return Err(err(StatusCode::BAD_REQUEST, "Retro notes too long (max 10000)")); }
     if req.status.is_some() { return Err(err(StatusCode::BAD_REQUEST, "Use /start or /complete endpoints to change sprint status")); }
-    if let Some(Some(cap)) = req.capacity_hours { if cap < 0.0 || cap > 10000.0 { return Err(err(StatusCode::BAD_REQUEST, "capacity_hours must be 0-10000")); } }
+    if let Some(Some(cap)) = req.capacity_hours { if !(0.0..=10000.0).contains(&cap) { return Err(err(StatusCode::BAD_REQUEST, "capacity_hours must be 0-10000")); } }
     // V1-v23: Validate date format on update (create_sprint validates, update_sprint didn't)
     if let Some(Some(ref d)) = req.start_date { if chrono::NaiveDate::parse_from_str(d, "%Y-%m-%d").is_err() { return Err(err(StatusCode::BAD_REQUEST, "start_date must be YYYY-MM-DD")); } }
     if let Some(Some(ref d)) = req.end_date { if chrono::NaiveDate::parse_from_str(d, "%Y-%m-%d").is_err() { return Err(err(StatusCode::BAD_REQUEST, "end_date must be YYYY-MM-DD")); } }

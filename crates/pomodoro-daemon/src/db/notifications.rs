@@ -25,7 +25,7 @@ pub async fn create_notification(pool: &Pool, user_id: i64, kind: &str, message:
             .bind(user_id).bind(user_id).execute(pool).await?;
     }
     sqlx::query("INSERT INTO notifications (user_id, kind, message, entity_type, entity_id, created_at) VALUES (?, ?, ?, ?, ?, ?)")
-        .bind(user_id).bind(kind).bind(message).bind(entity_type).bind(entity_id).bind(&now_str())
+        .bind(user_id).bind(kind).bind(message).bind(entity_type).bind(entity_id).bind(now_str())
         .execute(pool).await?;
     Ok(())
 }

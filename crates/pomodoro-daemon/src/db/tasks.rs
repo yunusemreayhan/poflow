@@ -44,6 +44,7 @@ fn append_team_scope_filter(q: &mut String, ids: &[i64]) -> bool {
 
 pub const TASK_SELECT: &str = "SELECT t.id, t.parent_id, t.user_id, u.username as user, t.title, t.description, t.project, t.tags, t.priority, t.estimated, t.actual, t.estimated_hours, t.remaining_points, t.due_date, t.status, t.sort_order, t.created_at, t.updated_at, COALESCE(ac.cnt, 0) as attachment_count, t.deleted_at, t.work_duration_minutes, t.estimate_optimistic, t.estimate_pessimistic FROM tasks t JOIN users u ON t.user_id = u.id LEFT JOIN (SELECT task_id, COUNT(*) as cnt FROM task_attachments GROUP BY task_id) ac ON ac.task_id = t.id";
 
+#[allow(clippy::too_many_arguments)]
 pub async fn create_task(pool: &Pool, user_id: i64, parent_id: Option<i64>, title: &str, description: Option<&str>, project: Option<&str>, tags: Option<&str>, priority: i64, estimated: i64, estimated_hours: f64, remaining_points: f64, due_date: Option<&str>) -> Result<Task> {
     let now = now_str();
     let max_order: (i64,) = match parent_id {
@@ -132,6 +133,7 @@ pub async fn list_tasks_paged(pool: &Pool, f: TaskFilter<'_>, limit: i64, offset
     Ok(query.fetch_all(pool).await?)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn update_task(pool: &Pool, id: i64, title: Option<&str>, description: Option<Option<&str>>, project: Option<Option<&str>>, tags: Option<Option<&str>>, priority: Option<i64>, estimated: Option<i64>, estimated_hours: Option<f64>, remaining_points: Option<f64>, due_date: Option<Option<&str>>, status: Option<&str>, sort_order: Option<i64>, parent_id: Option<Option<i64>>, work_duration_minutes: Option<Option<i64>>, estimate_optimistic: Option<Option<f64>>, estimate_pessimistic: Option<Option<f64>>) -> Result<Task> {
     let now = now_str();
     let existing = get_task(pool, id).await?;

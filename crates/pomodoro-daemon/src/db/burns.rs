@@ -3,6 +3,7 @@ use super::*;
 
 const BURN_SELECT: &str = "SELECT b.id, b.sprint_id, b.task_id, b.session_id, b.user_id, u.username, b.points, b.hours, b.source, b.note, b.cancelled, b.cancelled_by_id, cu.username as cancelled_by, b.created_at FROM burn_log b JOIN users u ON b.user_id = u.id LEFT JOIN users cu ON b.cancelled_by_id = cu.id";
 
+#[allow(clippy::too_many_arguments)]
 pub async fn log_burn(pool: &Pool, sprint_id: Option<i64>, task_id: i64, session_id: Option<i64>, user_id: i64, points: f64, hours: f64, source: &str, note: Option<&str>) -> Result<BurnEntry> {
     let now = now_str();
     let id = sqlx::query("INSERT INTO burn_log (sprint_id, task_id, session_id, user_id, points, hours, source, note, created_at) VALUES (?,?,?,?,?,?,?,?,?)")
