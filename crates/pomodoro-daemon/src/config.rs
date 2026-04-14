@@ -27,6 +27,8 @@ pub struct Config {
     pub cors_origins: Vec<String>,
     #[serde(default = "default_auto_archive_days")]
     pub auto_archive_days: u32,
+    #[serde(default = "default_true")]
+    pub allow_registration: bool,
 }
 
 fn default_bind_address() -> String { "127.0.0.1".to_string() }
@@ -34,6 +36,7 @@ fn default_bind_port() -> u16 { 9090 }
 fn default_estimation_mode() -> String { "hours".to_string() }
 fn default_theme() -> String { "dark".to_string() }
 fn default_auto_archive_days() -> u32 { 90 }
+fn default_true() -> bool { true }
 
 impl Default for Config {
     fn default() -> Self {
@@ -54,6 +57,7 @@ impl Default for Config {
             theme: "dark".to_string(),
             cors_origins: vec![],
             auto_archive_days: 90,
+            allow_registration: true,
         }
     }
 }

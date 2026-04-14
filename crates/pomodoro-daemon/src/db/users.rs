@@ -2,8 +2,9 @@ use super::*;
 
 
 pub(crate) async fn seed_root_user(pool: &Pool) -> Result<()> {
-    let count = user_count(pool).await?;
-    if count == 0 {
+    let (root_count,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM users WHERE role = 'root'")
+        .fetch_one(pool).await?;
+    if root_count == 0 {
         let password = std::env::var("POMODORO_ROOT_PASSWORD").unwrap_or_else(|_| {
             let mut buf = [0u8; 16];
             getrandom::fill(&mut buf).expect("getrandom failed for root password");
@@ -66,8 +67,8 @@ pub async fn delete_user(pool: &Pool, id: i64) -> Result<()> {
     let target: Option<(i64,)> = sqlx::query_as("SELECT id FROM users WHERE role = 'root' AND id != ? LIMIT 1")
         .bind(id).fetch_optional(&mut *tx).await?;
     let target_id = target.map(|(id,)| id).ok_or_else(|| anyhow::anyhow!("No other root user to reassign resources to"))?;
-    sqlx::query("DELETE FROM burn_log WHERE user_id = ?").bind(id).execute(&mut *tx).await?;
-    sqlx::query("DELETE FROM comments WHERE user_id = ?").bind(id).execute(&mut *tx).await?;
+    sqlx::query("UPDATE burn_log SET user_id = ? WHERE user_id = ?").bind(target_id).bind(id).execute(&mut *tx).await?;
+    sqlx::query("UPDATE comments SET user_id = ? WHERE user_id = ?").bind(target_id).bind(id).execute(&mut *tx).await?;
     sqlx::query("DELETE FROM task_assignees WHERE user_id = ?").bind(id).execute(&mut *tx).await?;
     sqlx::query("DELETE FROM room_members WHERE user_id = ?").bind(id).execute(&mut *tx).await?;
     sqlx::query("DELETE FROM room_votes WHERE user_id = ?").bind(id).execute(&mut *tx).await?;

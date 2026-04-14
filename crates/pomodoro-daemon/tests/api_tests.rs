@@ -1098,6 +1098,39 @@ async fn test_delete_user_cascade() {
 }
 
 #[tokio::test]
+async fn test_delete_user_preserves_comments_and_burns() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let (tok2, uid) = register_user_full(&app, "burnuser", "BurnUs111").await;
+    // Root creates task and sprint
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"BurnTask"})))).await.unwrap();
+    let tid = body_json(resp).await["id"].as_i64().unwrap();
+    // burnuser comments on the task
+    let resp = app.clone().oneshot(auth_req("POST", &format!("/api/tasks/{}/comments", tid), &tok2, Some(json!({"content":"Important context"})))).await.unwrap();
+    assert_eq!(resp.status(), 201);
+    // Create sprint, add task, start, log burn as burnuser
+    let resp = app.clone().oneshot(auth_req("POST", "/api/sprints", &tok, Some(json!({"name":"BS"})))).await.unwrap();
+    let sid = body_json(resp).await["id"].as_i64().unwrap();
+    app.clone().oneshot(auth_req("POST", &format!("/api/sprints/{}/tasks", sid), &tok, Some(json!({"task_ids":[tid]})))).await.unwrap();
+    app.clone().oneshot(auth_req("POST", &format!("/api/sprints/{}/start", sid), &tok, None)).await.unwrap();
+    // Assign burnuser so they can log burns
+    app.clone().oneshot(auth_req("POST", &format!("/api/tasks/{}/assignees", tid), &tok, Some(json!({"username":"burnuser"})))).await.unwrap();
+    app.clone().oneshot(auth_req("POST", &format!("/api/sprints/{}/burn", sid), &tok2, Some(json!({"task_id":tid,"points":5.0})))).await.unwrap();
+    // Delete burnuser
+    let resp = app.clone().oneshot(auth_req("DELETE", &format!("/api/admin/users/{}", uid), &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 204);
+    // Comments should still exist (reassigned to root)
+    let resp = app.clone().oneshot(auth_req("GET", &format!("/api/tasks/{}", tid), &tok, None)).await.unwrap();
+    let detail = body_json(resp).await;
+    let comments = detail["comments"].as_array().unwrap();
+    assert!(comments.iter().any(|c| c["content"] == "Important context"), "Comment should survive user deletion");
+    // Burns should still exist
+    let resp = app.clone().oneshot(auth_req("GET", &format!("/api/sprints/{}/burns", sid), &tok, None)).await.unwrap();
+    let burns = body_json(resp).await;
+    assert!(!burns.as_array().unwrap().is_empty(), "Burns should survive user deletion");
+}
+
+#[tokio::test]
 async fn test_snapshot_sprint_points_not_double_counted() {
     let app = app().await;
     let tok = login_root(&app).await;
@@ -5200,6 +5233,21 @@ async fn flow_register_duplicate_rejected() {
     register_user_full(&app, "dup", "TestPass1").await;
     let resp = app.clone().oneshot(json_req("POST", "/api/auth/register", Some(json!({"username":"dup","password":"TestPass1"})))).await.unwrap();
     assert_eq!(resp.status(), 409);
+}
+
+#[tokio::test]
+async fn flow_register_disabled_via_env() {
+    // This test uses POMODORO_ALLOW_REGISTRATION=false to disable registration
+    // We can't set env vars safely in parallel tests, so we test via config instead
+    let pool = pomodoro_daemon::db::connect_memory().await.unwrap();
+    let mut config = pomodoro_daemon::config::Config::default();
+    config.allow_registration = false;
+    let engine = Arc::new(pomodoro_daemon::engine::Engine::new(pool, config).await);
+    let app = pomodoro_daemon::build_router(engine).await;
+    let resp = app.clone().oneshot(json_req("POST", "/api/auth/register", Some(json!({"username":"blocked","password":"Block1234"})))).await.unwrap();
+    assert_eq!(resp.status(), 403, "Registration should be disabled");
+    let body = body_json(resp).await;
+    assert!(body["error"].as_str().unwrap().contains("disabled"));
 }
 
 // ---- Flow: user-login, jwt-token-validation ----
