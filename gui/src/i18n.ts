@@ -11,6 +11,8 @@ export interface Locale {
   sprints: string;
   rooms: string;
   kanban: string;
+  gantt: string;
+  roadmap: string;
   calendar: string;
   skipToContent: string;
   api: string;

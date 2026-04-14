@@ -10,6 +10,8 @@ const en: Locale = {
   sprints: "Sprints",
   rooms: "Rooms",
   kanban: "Kanban",
+  gantt: "Gantt",
+  roadmap: "Roadmap",
   calendar: "Calendar",
   skipToContent: "Skip to content",
   api: "API",

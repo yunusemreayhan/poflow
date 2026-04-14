@@ -10,6 +10,8 @@ const tr: Locale = {
   sprints: "Sprintler",
   rooms: "Odalar",
   kanban: "Kanban",
+  gantt: "Gantt",
+  roadmap: "Yol Haritası",
   calendar: "Takvim",
   skipToContent: "İçeriğe geç",
   api: "API",

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence, MotionConfig } from "framer-motion";
-import { Timer as TimerIcon, ListTodo, BarChart3, Settings as SettingsIcon, Wifi, WifiOff, Code2, LogOut, Users, Zap, Sun, Moon, RefreshCw, LayoutDashboard, Bell, CalendarDays, Columns3 } from "lucide-react";
+import { Timer as TimerIcon, ListTodo, BarChart3, Settings as SettingsIcon, Wifi, WifiOff, Code2, LogOut, Users, Zap, Sun, Moon, RefreshCw, LayoutDashboard, Bell, CalendarDays, Columns3, GanttChart as GanttIcon, Map } from "lucide-react";
 import { useStore } from "./store/store";
 import { useT } from "./i18n";
 import { apiCall } from "./store/api";
@@ -16,12 +16,16 @@ import Rooms from "./components/Rooms";
 import Sprints from "./components/Sprints";
 import CalendarView from "./components/CalendarView";
 import KanbanBoard from "./components/KanbanBoard";
+import GanttChart from "./components/GanttChart";
+import RoadmapView from "./components/RoadmapView";
 
 const TABS = [
   { id: "timer", icon: TimerIcon, labelKey: "timer" },
   { id: "dashboard", icon: LayoutDashboard, labelKey: "dashboard" },
   { id: "tasks", icon: ListTodo, labelKey: "tasks" },
   { id: "kanban", icon: Columns3, labelKey: "kanban" },
+  { id: "gantt", icon: GanttIcon, labelKey: "gantt" },
+  { id: "roadmap", icon: Map, labelKey: "roadmap" },
   { id: "calendar", icon: CalendarDays, labelKey: "calendar" },
   { id: "sprints", icon: Zap, labelKey: "sprints" },
   { id: "rooms", icon: Users, labelKey: "rooms" },
@@ -281,6 +285,8 @@ export default function App() {
             {!focusMode && activeTab === "dashboard" && <Dashboard />}
             <div style={{ display: !focusMode && activeTab === "tasks" ? undefined : "none" }}><TaskList /></div>
             {!focusMode && activeTab === "kanban" && <KanbanBoard />}
+            {!focusMode && activeTab === "gantt" && <GanttChart />}
+            {!focusMode && activeTab === "roadmap" && <RoadmapView />}
             {!focusMode && activeTab === "calendar" && <CalendarView />}
             {!focusMode && activeTab === "sprints" && <Sprints />}
             {!focusMode && activeTab === "rooms" && <Rooms />}
