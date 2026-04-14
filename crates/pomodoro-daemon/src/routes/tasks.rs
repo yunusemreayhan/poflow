@@ -369,6 +369,17 @@ pub async fn update_task(State(engine): State<AppState>, claims: Claims, Path(id
     // BL3: Auto-unblock dependents when task is completed or done
     if req.status.as_deref() == Some("completed") || req.status.as_deref() == Some("done") {
         auto_unblock_dependents(&engine, id).await;
+        // F19: Run "all subtasks done" automations
+        crate::automation::run_all_subtasks_done(&engine.pool, id).await;
+    }
+    // F19: Run status change automations
+    if let Some(ref new_status) = req.status {
+        if new_status != &task.status {
+            let pool = engine.pool.clone();
+            let old = task.status.clone();
+            let new_s = new_status.clone();
+            tokio::spawn(async move { crate::automation::run_status_changed(&pool, id, &old, &new_s).await; });
+        }
     }
     crate::webhook::dispatch(engine.pool.clone(), "task.updated", serde_json::json!({"id": id}));
     engine.notify(ChangeEvent::Tasks);

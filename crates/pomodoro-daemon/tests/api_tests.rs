@@ -7503,3 +7503,76 @@ async fn test_sla_report_non_admin_rejected() {
     let resp = app.clone().oneshot(auth_req("GET", "/api/reports/sla", &user_tok, None)).await.unwrap();
     assert_eq!(resp.status(), 403);
 }
+
+// ============================================================
+// Automation rule execution (F19)
+// ============================================================
+
+#[tokio::test]
+async fn test_automation_status_change_fires() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    // Create automation: when task becomes completed, set priority to 1
+    let resp = app.clone().oneshot(auth_req("POST", "/api/automations", &tok, Some(json!({
+        "name": "Lower priority on complete",
+        "trigger_event": "task.status_changed",
+        "condition_json": "{\"to_status\":\"completed\"}",
+        "action_json": "{\"set_priority\":1}"
+    })))).await.unwrap();
+    assert_eq!(resp.status(), 201);
+    // Create task with priority 5
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"AutoTask","priority":5})))).await.unwrap();
+    let tid = body_json(resp).await["id"].as_i64().unwrap();
+    // Change status to completed
+    app.clone().oneshot(auth_req("PUT", &format!("/api/tasks/{}", tid), &tok, Some(json!({"status":"completed"})))).await.unwrap();
+    // Wait for async automation to fire
+    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+    // Check priority was changed to 1
+    let resp = app.clone().oneshot(auth_req("GET", &format!("/api/tasks/{}", tid), &tok, None)).await.unwrap();
+    let detail = body_json(resp).await;
+    assert_eq!(detail["task"]["priority"], 1, "Automation should have set priority to 1");
+}
+
+#[tokio::test]
+async fn test_automation_condition_filters() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    // Create automation: only fires when going from in_progress to completed
+    app.clone().oneshot(auth_req("POST", "/api/automations", &tok, Some(json!({
+        "name": "Specific transition",
+        "trigger_event": "task.status_changed",
+        "condition_json": "{\"from_status\":\"in_progress\",\"to_status\":\"completed\"}",
+        "action_json": "{\"set_priority\":1}"
+    })))).await.unwrap();
+    // Create task, go directly from backlog to completed (should NOT fire)
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"CondTask","priority":5})))).await.unwrap();
+    let tid = body_json(resp).await["id"].as_i64().unwrap();
+    app.clone().oneshot(auth_req("PUT", &format!("/api/tasks/{}", tid), &tok, Some(json!({"status":"completed"})))).await.unwrap();
+    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+    let resp = app.clone().oneshot(auth_req("GET", &format!("/api/tasks/{}", tid), &tok, None)).await.unwrap();
+    assert_eq!(body_json(resp).await["task"]["priority"], 5, "Automation should NOT fire for backlog→completed");
+}
+
+#[tokio::test]
+async fn test_automation_all_subtasks_done() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    // Create automation: when all subtasks done, mark parent as completed
+    app.clone().oneshot(auth_req("POST", "/api/automations", &tok, Some(json!({
+        "name": "Auto-complete parent",
+        "trigger_event": "task.all_subtasks_done",
+        "condition_json": "{}",
+        "action_json": "{\"set_status\":\"completed\"}"
+    })))).await.unwrap();
+    // Create parent + child
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"Parent"})))).await.unwrap();
+    let pid = body_json(resp).await["id"].as_i64().unwrap();
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"Child","parent_id":pid})))).await.unwrap();
+    let cid = body_json(resp).await["id"].as_i64().unwrap();
+    // Complete the child
+    app.clone().oneshot(auth_req("PUT", &format!("/api/tasks/{}", cid), &tok, Some(json!({"status":"completed"})))).await.unwrap();
+    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+    // Parent should be auto-completed
+    let resp = app.clone().oneshot(auth_req("GET", &format!("/api/tasks/{}", pid), &tok, None)).await.unwrap();
+    assert_eq!(body_json(resp).await["task"]["status"], "completed", "Parent should be auto-completed when all subtasks done");
+}
