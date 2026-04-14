@@ -66,6 +66,52 @@ A full-featured multi-user Pomodoro timer for Linux with a Rust HTTP backend, Ta
 - Create rooms with points or hours estimation
 - Real-time voting with card deck (Fibonacci for points, linear for hours)
 - 3-2-1 countdown reveal animation
+
+### Custom Statuses & Workflows
+- Define custom task statuses beyond the built-in set (e.g., `code_review`, `qa_testing`, `deployed`)
+- Each status has a category (`todo`, `in_progress`, `done`) for sprint board column mapping
+- Sprint board automatically maps custom statuses to the correct column
+- CRUD via `GET/POST /api/statuses`, `PUT/DELETE /api/statuses/{id}`
+
+### Custom Fields
+- Define custom fields on tasks: text, number, select, date, user types
+- Select fields support predefined options
+- Set/get/delete values per task
+- Custom field values included in task detail response
+- Filter tasks by custom field values via advanced search
+
+### Task Checklists
+- Lightweight sub-items on tasks (simpler than full subtasks)
+- Toggle checked state, reorder, add/remove
+- Assignees can manage checklists on tasks assigned to them
+
+### RBAC (Role-Based Access Control)
+- Three-tier role system: `root` > `admin` > `user`
+- **Admin** can manage all tasks, sprints, labels, statuses, fields, reports
+- **Admin** cannot manage users, system config, or backups (root only)
+- **User** can only manage their own tasks (plus tasks assigned to them)
+
+### Bulk Operations
+- `PUT /api/tasks/bulk-status` — change status of multiple tasks
+- `POST /api/tasks/bulk-assign` — assign a user to multiple tasks
+- `POST /api/tasks/bulk-sprint` — move multiple tasks to a sprint
+
+### Advanced Search
+- `POST /api/tasks/search/advanced` — structured query with JSON body
+- Filter by: status (eq/neq/in), project, assignee, label, priority (gt/gte/lt), due_date, title (contains), custom fields (`custom:field_name`)
+- Sort by: priority, due_date, created_at, updated_at, title
+- Pagination via limit/offset
+
+### Time Tracking Reports
+- `GET /api/reports/time-tracking` — hours per user per project per week
+- CSV export via `?format=csv`
+- Date range filtering via `?from=&to=`
+
+### Web GUI
+- The daemon serves the React frontend as static files
+- Access the full app at `http://server:9090` in any browser
+- No Tauri desktop app required — works on any device
+- Platform abstraction layer: Tauri IPC in desktop mode, fetch() in web mode
 - Quick-accept, custom value accept, re-vote
 - Auto-advance to next unestimated task after accept
 - Admin inline edit task title/description from voting screen
