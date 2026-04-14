@@ -7474,3 +7474,32 @@ async fn test_admin_can_create_custom_statuses_and_fields() {
     let resp = app.clone().oneshot(auth_req("POST", "/api/fields", &admin_tok, Some(json!({"name":"admin_field","field_type":"text"})))).await.unwrap();
     assert_eq!(resp.status(), 201);
 }
+
+// ============================================================
+// SLA tracking (Jira gap #8)
+// ============================================================
+
+#[tokio::test]
+async fn test_sla_report() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    // Create and complete a task
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"SLA1","priority":5})))).await.unwrap();
+    let tid = body_json(resp).await["id"].as_i64().unwrap();
+    app.clone().oneshot(auth_req("PUT", &format!("/api/tasks/{}", tid), &tok, Some(json!({"status":"completed"})))).await.unwrap();
+    // Get SLA report
+    let resp = app.clone().oneshot(auth_req("GET", "/api/reports/sla", &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let report = body_json(resp).await;
+    assert!(report["resolution_time_by_priority"].as_array().unwrap().len() > 0);
+    assert!(report["overdue_tasks"].is_number());
+    assert!(report["on_time_completion"]["on_time_pct"].is_number());
+}
+
+#[tokio::test]
+async fn test_sla_report_non_admin_rejected() {
+    let app = app().await;
+    let (user_tok, _) = register_user_full(&app, "slauser", "SlaUs1111").await;
+    let resp = app.clone().oneshot(auth_req("GET", "/api/reports/sla", &user_tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 403);
+}

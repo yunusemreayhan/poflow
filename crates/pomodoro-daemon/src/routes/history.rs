@@ -66,6 +66,43 @@ pub async fn time_tracking_report(State(engine): State<AppState>, claims: Claims
         .map_err(|e| internal(e.to_string()))
 }
 
+// SLA metrics: resolution time by priority
+#[utoipa::path(get, path = "/api/reports/sla", responses((status = 200)), security(("bearer" = [])))]
+pub async fn sla_report(State(engine): State<AppState>, claims: Claims) -> ApiResult<serde_json::Value> {
+    if !auth::is_admin_or_root(&claims) { return Err(err(StatusCode::FORBIDDEN, "Admin or root required")); }
+    // Resolution time: hours from created_at to updated_at for completed tasks, grouped by priority
+    let rows: Vec<(i64, i64, f64, f64, f64)> = sqlx::query_as(
+        "SELECT priority, COUNT(*), \
+         AVG((julianday(updated_at) - julianday(created_at)) * 24), \
+         MIN((julianday(updated_at) - julianday(created_at)) * 24), \
+         MAX((julianday(updated_at) - julianday(created_at)) * 24) \
+         FROM tasks WHERE status IN ('completed','done') AND deleted_at IS NULL \
+         GROUP BY priority ORDER BY priority DESC")
+        .fetch_all(&engine.pool).await.map_err(internal)?;
+    let by_priority: Vec<serde_json::Value> = rows.iter().map(|(p, count, avg, min, max)| {
+        serde_json::json!({"priority": p, "count": count, "avg_hours": (*avg * 10.0).round() / 10.0, "min_hours": (*min * 10.0).round() / 10.0, "max_hours": (*max * 10.0).round() / 10.0})
+    }).collect();
+    // Overdue tasks (due_date < today, not completed)
+    let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
+    let (overdue_count,): (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM tasks WHERE due_date IS NOT NULL AND due_date < ? AND status NOT IN ('completed','done','archived') AND deleted_at IS NULL")
+        .bind(&today).fetch_one(&engine.pool).await.map_err(internal)?;
+    // Tasks completed on time vs late
+    let (on_time,): (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM tasks WHERE due_date IS NOT NULL AND status IN ('completed','done') AND updated_at <= due_date || 'T23:59:59' AND deleted_at IS NULL")
+        .fetch_one(&engine.pool).await.map_err(internal)?;
+    let (late,): (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM tasks WHERE due_date IS NOT NULL AND status IN ('completed','done') AND updated_at > due_date || 'T23:59:59' AND deleted_at IS NULL")
+        .fetch_one(&engine.pool).await.map_err(internal)?;
+    let total_with_due = on_time + late;
+    let on_time_pct = if total_with_due > 0 { (on_time as f64 / total_with_due as f64 * 100.0).round() } else { 0.0 };
+    Ok(Json(serde_json::json!({
+        "resolution_time_by_priority": by_priority,
+        "overdue_tasks": overdue_count,
+        "on_time_completion": {"on_time": on_time, "late": late, "on_time_pct": on_time_pct},
+    })))
+}
+
 #[utoipa::path(get, path = "/api/history", responses((status = 200, body = Vec<db::SessionWithPath>)), security(("bearer" = [])))]
 pub async fn get_history(State(engine): State<AppState>, claims: Claims, Query(q): Query<HistoryQuery>) -> ApiResult<Vec<db::SessionWithPath>> {
     let from = q.from.unwrap_or_else(|| "2000-01-01T00:00:00".to_string());

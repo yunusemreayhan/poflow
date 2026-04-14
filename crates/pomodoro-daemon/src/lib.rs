@@ -94,6 +94,7 @@ pub async fn build_router(engine: Arc<engine::Engine>) -> Router {
         .route("/api/history", get(routes::get_history))
         .route("/api/reports/user-hours", get(routes::user_hours_report))
         .route("/api/reports/time-tracking", get(routes::time_tracking_report))
+        .route("/api/reports/sla", get(routes::sla_report))
         .route("/api/stats", get(routes::get_stats))
         .route("/api/analytics/estimation-accuracy", get(routes::estimation_accuracy))
         .route("/api/analytics/focus-score", get(routes::focus_score))
