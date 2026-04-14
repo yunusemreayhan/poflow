@@ -43,7 +43,7 @@ pub async fn build_router(engine: Arc<engine::Engine>) -> Router {
             axum::http::HeaderName::from_static("x-page"),
             axum::http::HeaderName::from_static("x-per-page")]);
 
-    Router::new()
+    let mut router = Router::new()
         .route("/api/health", get(routes::health))
         .route("/api/auth/register", post(routes::register))
         .route("/api/auth/login", post(routes::login))
@@ -198,7 +198,41 @@ pub async fn build_router(engine: Arc<engine::Engine>) -> Router {
         .layer(axum::middleware::from_fn(security_headers))
         .layer(axum::middleware::from_fn(request_id_logger))
         .layer(axum::middleware::from_fn(api_rate_limit))
-        .with_state(engine)
+        .with_state(engine);
+
+    // Web GUI: serve static files from gui/dist/ as fallback (SPA)
+    if let Some(gui_dir) = resolve_gui_dir() {
+        tracing::info!("Serving web GUI from {}", gui_dir.display());
+        let serve = tower_http::services::ServeDir::new(&gui_dir)
+            .fallback(tower_http::services::ServeFile::new(gui_dir.join("index.html")));
+        router = router.fallback_service(serve);
+    } else {
+        tracing::info!("No gui/dist found — web GUI disabled (API-only mode)");
+    }
+
+    router
+}
+
+/// Find the gui/dist directory relative to the executable or working directory.
+fn resolve_gui_dir() -> Option<std::path::PathBuf> {
+    // 1. Env var override
+    if let Ok(p) = std::env::var("POMODORO_GUI_DIR") {
+        let pb = std::path::PathBuf::from(p);
+        if pb.join("index.html").exists() { return Some(pb); }
+    }
+    // 2. Next to the executable (packaged .deb layout)
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            let candidate = dir.join("gui");
+            if candidate.join("index.html").exists() { return Some(candidate); }
+        }
+    }
+    // 3. Relative to working directory (development)
+    for candidate in ["gui/dist", "../gui/dist"] {
+        let pb = std::path::PathBuf::from(candidate);
+        if pb.join("index.html").exists() { return Some(pb); }
+    }
+    None
 }
 
 async fn security_headers(req: axum::extract::Request, next: axum::middleware::Next) -> axum::response::Response {

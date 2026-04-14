@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Edit3, Save, Download } from "lucide-react";
 import type { TaskDetail } from "../store/api";
-import { save as saveDialog } from "@tauri-apps/plugin-dialog";
-import { invoke } from "@tauri-apps/api/core";
+import { platformSaveFile } from "../platform";
 
 export function formatDuration(s: number) {
   const h = Math.floor(s / 3600);
@@ -117,8 +116,7 @@ export function ExportButton({ detail }: { detail: TaskDetail }) {
     }
     const filename = `${t.title.replace(/[^a-zA-Z0-9]/g, "_")}.${ext}`;
     try {
-      const path = await saveDialog({ defaultPath: filename, filters: [{ name: ext.toUpperCase(), extensions: [ext] }] });
-      if (path) await invoke("plugin:fs|write_text_file", { path, contents: content });
+      await platformSaveFile(filename, content, ext);
     } catch {
       const blob = new Blob([content], { type: ext === "json" ? "application/json" : "text/markdown" });
       const url = URL.createObjectURL(blob);

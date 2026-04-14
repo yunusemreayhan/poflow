@@ -9,9 +9,7 @@ vi.stubGlobal("localStorage", {
 });
 
 // Mock Tauri invoke
-const mockInvoke = vi.fn(async (cmd: string, args?: Record<string, unknown>) => {
-  if (cmd === "api_call") {
-    const { method, path, body } = args as { method: string; path: string; body: unknown };
+const mockApiCall = vi.fn(async (method: string, path: string, body?: unknown) => {
     if (method === "POST" && path === "/api/auth/login") {
       return { token: "test-token", refresh_token: "test-refresh", user_id: 1, username: "testuser", role: "user" };
     }
@@ -46,15 +44,18 @@ const mockInvoke = vi.fn(async (cmd: string, args?: Record<string, unknown>) => 
       return { id: 99, parent_id: null, user_id: 1, user: "testuser", title: (body as any)?.title || "T", description: null, project: null, tags: null, priority: 3, estimated: 1, actual: 0, estimated_hours: 0, remaining_points: 0, due_date: null, status: "backlog", sort_order: 0, created_at: "", updated_at: "", attachment_count: 0 };
     }
     return null;
-  }
-  if (cmd === "set_token") return;
-  if (cmd === "save_auth") return;
-  if (cmd === "load_auth") throw new Error("No auth");
-  if (cmd === "clear_auth") return;
-  return null;
 });
 
-vi.mock("@tauri-apps/api/core", () => ({ invoke: mockInvoke }));
+vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(async () => null) }));
+
+vi.mock("../platform", () => ({
+  isTauri: false,
+  platformApiCall: (...args: any[]) => mockApiCall(...args),
+  platformSetToken: vi.fn(async () => {}),
+  platformSaveAuth: vi.fn(async () => {}),
+  platformClearAuth: vi.fn(async () => {}),
+  platformSetConnection: vi.fn(async () => {}),
+}));
 
 const { useStore } = await import("../store/store");
 
@@ -64,7 +65,7 @@ beforeEach(() => {
     tasks: [], connected: false, error: null,
     toasts: [], confirmDialog: null,
   });
-  mockInvoke.mockClear();
+  mockApiCall.mockClear();
 });
 
 describe("store - auth", () => {

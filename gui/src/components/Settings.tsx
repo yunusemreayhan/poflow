@@ -2,7 +2,7 @@ import { useStore } from "../store/store";
 import { useEffect, useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Save, Shield, ShieldOff, Check, Trash2 } from "lucide-react";
-import { invoke } from "@tauri-apps/api/core";
+import { isTauri, platformIndicatorStatus, platformIndicatorToggle } from "../platform";
 import type { Config, User, AuthResponse } from "../store/api";
 import { LabelManager } from "./Labels";
 import AuditLog from "./AuditLog";
@@ -16,17 +16,18 @@ function PanelIndicatorToggle() {
   const [running, setRunning] = useState(false);
   const [loading, setLoading] = useState(false);
   const check = useCallback(() => {
-    invoke<boolean>("indicator_status").then(setRunning).catch(() => {});
+    platformIndicatorStatus().then(setRunning).catch(() => {});
   }, []);
   useEffect(() => { check(); const id = setInterval(check, 5000); return () => clearInterval(id); }, [check]);
   const toggle = async () => {
     setLoading(true);
     try {
-      const result = await invoke<boolean>("indicator_toggle", { enable: !running });
+      const result = await platformIndicatorToggle(!running);
       setRunning(result);
     } catch { /* ignore */ }
     setTimeout(() => { check(); setLoading(false); }, 1000);
   };
+  if (!isTauri) return null; // Hide panel indicator on web
   return (
     <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/5">
       <div>

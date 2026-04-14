@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { apiCall, setToken } from "./api";
-import { invoke } from "@tauri-apps/api/core";
+import { platformSaveAuth, platformClearAuth, platformSetConnection, platformSetToken, platformApiCall } from "../platform";
 import type { EngineState, Task, DayStat, Session, Config, Comment, TaskDetail, AuthResponse, TaskSprintInfo, BurnTotalEntry, TaskAssignee, Sprint } from "./api";
 import { cacheTasksOffline, getOfflineTasks, enqueueOfflineAction, processSyncQueue } from "../offlineStore";
 
@@ -162,7 +162,7 @@ export const useStore = create<Store>((set, get) => ({
   login: async (username, password) => {
     const resp = await apiCall<AuthResponse>("POST", "/api/auth/login", { username, password });
     await setToken(resp.token);
-    invoke("save_auth", { data: JSON.stringify(resp) }).catch(() => {
+    platformSaveAuth(JSON.stringify(resp)).catch(() => {
       localStorage.setItem("auth", JSON.stringify(resp)); // fallback
     });
     set({ token: resp.token, username: resp.username, role: resp.role });
@@ -177,7 +177,7 @@ export const useStore = create<Store>((set, get) => ({
   register: async (username, password) => {
     const resp = await apiCall<AuthResponse>("POST", "/api/auth/register", { username, password });
     await setToken(resp.token);
-    invoke("save_auth", { data: JSON.stringify(resp) }).catch(() => {
+    platformSaveAuth(JSON.stringify(resp)).catch(() => {
       localStorage.setItem("auth", JSON.stringify(resp));
     });
     set({ token: resp.token, username: resp.username, role: resp.role });
@@ -190,7 +190,7 @@ export const useStore = create<Store>((set, get) => ({
 
   logout: () => {
     apiCall("POST", "/api/auth/logout").catch(() => {});
-    invoke("clear_auth").catch(() => {});
+    platformClearAuth().catch(() => {});
     localStorage.removeItem("auth");
     // S2: Remove tokens for this server from savedServers
     const url = get().serverUrl;
@@ -201,7 +201,7 @@ export const useStore = create<Store>((set, get) => ({
       set({ savedServers: servers });
     }
     set({ token: null, username: null, role: null });
-    invoke("set_token", { token: "" }).catch(() => {});
+    platformSetToken("").catch(() => {});
     // PF8: Clear SW API cache on logout to prevent stale auth data leaking
     if (typeof caches !== 'undefined') caches.delete('pomo-v1').catch(() => {});
   },
@@ -212,14 +212,14 @@ export const useStore = create<Store>((set, get) => ({
     const url = localStorage.getItem("serverUrl");
     if (url) {
       set({ serverUrl: url });
-      invoke("set_connection", { baseUrl: url });
+      platformSetConnection(url);
     }
   },
 
   setServerUrl: async (url) => {
     const clean = url.replace(/\/+$/, "");
     localStorage.setItem("serverUrl", clean);
-    await invoke("set_connection", { baseUrl: clean });
+    await platformSetConnection(clean);
     set({ serverUrl: clean, token: null, username: null, role: null });
     localStorage.removeItem("auth");
   },
@@ -227,15 +227,15 @@ export const useStore = create<Store>((set, get) => ({
   switchToServer: async (server) => {
     set({ mutating: true }); // V32-20: Show loading during server switch
     localStorage.setItem("serverUrl", server.url);
-    await invoke("set_connection", { baseUrl: server.url });
+    await platformSetConnection(server.url);
     await setToken(server.token);
-    invoke("save_auth", { data: JSON.stringify({ token: server.token, refresh_token: server.refresh_token, username: server.username, role: server.role }) }).catch(() => {
+    platformSaveAuth(JSON.stringify({ token: server.token, refresh_token: server.refresh_token, username: server.username, role: server.role })).catch(() => {
       localStorage.setItem("auth", JSON.stringify({ token: server.token, refresh_token: server.refresh_token, username: server.username, role: server.role }));
     });
     set({ serverUrl: server.url, token: server.token, username: server.username, role: server.role });
     // V30-19: Validate token — if expired, try refresh or force re-login
     try {
-      await invoke("api_call", { method: "GET", path: "/api/timer", body: null });
+      await platformApiCall("GET", "/api/timer");
     } catch {
       set({ token: null, username: null, role: null });
       get().toast("Session expired — please log in again", "error");

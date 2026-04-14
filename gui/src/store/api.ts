@@ -1,17 +1,17 @@
-import { invoke } from "@tauri-apps/api/core";
+import { platformApiCall, platformSetToken } from "../platform";
 
 // --- HTTP API helper ---
 
 export async function apiCall<T = unknown>(method: string, path: string, body?: unknown): Promise<T> {
   try {
-    return await invoke<T>("api_call", { method, path, body: body ?? null });
+    return await platformApiCall<T>(method, path, body ?? null);
   } catch (e) {
     const msg = typeof e === "string" ? e : (e as Error)?.message || "";
     // Auto-refresh on 401 (expired token)
     if (msg.includes("401") || msg.includes("expired") || msg.includes("Unauthorized")) {
       const refreshed = await tryRefreshToken();
       if (refreshed) {
-        try { return await invoke<T>("api_call", { method, path, body: body ?? null }); } catch { /* retry failed — fall through to original error */ }
+        try { return await platformApiCall<T>(method, path, body ?? null); } catch { /* retry failed — fall through to original error */ }
       } else {
         // Refresh failed — force logout so user gets a clean login screen
         // instead of staying in a broken "logged in but disconnected" state
@@ -39,11 +39,9 @@ async function tryRefreshToken(): Promise<boolean> {
       const server = state.savedServers?.find(s => s.url === state.serverUrl);
       const serverIdx = state.savedServers?.findIndex(s => s.url === state.serverUrl) ?? -1;
       if (!server?.refresh_token || serverIdx < 0) return false;
-      const resp = await invoke<{ token: string; refresh_token: string }>("api_call", {
-        method: "POST", path: "/api/auth/refresh", body: { refresh_token: server.refresh_token }
-      });
+      const resp = await platformApiCall<{ token: string; refresh_token: string }>("POST", "/api/auth/refresh", { refresh_token: server.refresh_token });
       if (resp?.token) {
-        await setToken(resp.token);
+        await platformSetToken(resp.token);
         const servers = [...state.savedServers];
         servers[serverIdx] = { ...servers[serverIdx], token: resp.token, refresh_token: resp.refresh_token };
         localStorage.setItem("servers", JSON.stringify(servers));
@@ -64,7 +62,7 @@ function showErrorToast(msg: string) {
 }
 
 export async function setToken(token: string) {
-  return invoke("set_token", { token });
+  return platformSetToken(token);
 }
 
 // S1: Get a fresh token for direct fetch() calls (binary uploads/downloads).
@@ -75,7 +73,7 @@ export async function getFreshToken(): Promise<string> {
   if (!token) throw new Error("Not authenticated");
   // S1-v23: Use authenticated endpoint to verify token validity
   try {
-    await invoke("api_call", { method: "GET", path: "/api/timer", body: null });
+    await platformApiCall("GET", "/api/timer");
   } catch {
     const refreshed = await tryRefreshToken();
     if (!refreshed) throw new Error("Token expired");
