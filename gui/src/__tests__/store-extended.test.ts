@@ -50,7 +50,7 @@ vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(async () => null) }));
 
 vi.mock("../platform", () => ({
   isTauri: false,
-  platformApiCall: (...args: any[]) => mockApiCall(...args),
+  platformApiCall: (m: string, p: string, b?: unknown) => mockApiCall(m, p, b),
   platformSetToken: vi.fn(async () => {}),
   platformSaveAuth: vi.fn(async () => {}),
   platformClearAuth: vi.fn(async () => {}),

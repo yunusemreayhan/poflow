@@ -31,7 +31,7 @@ const mockApiCall = vi.fn(async (method: string, path: string, body?: unknown) =
 
 vi.mock("../platform", () => ({
   isTauri: false,
-  platformApiCall: (...args: any[]) => mockApiCall(...args),
+  platformApiCall: (m: string, p: string, b?: unknown) => mockApiCall(m, p, b),
   platformSetToken: vi.fn(async () => {}),
   platformSaveAuth: vi.fn(async () => {}),
   platformClearAuth: vi.fn(async () => {}),

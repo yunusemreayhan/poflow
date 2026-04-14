@@ -125,24 +125,24 @@ function Sidebar() {
       </div>
       </div> {/* end scrollable top */}
 
-      {/* Bottom: Teams + User — always visible */}
-      <div className="shrink-0 flex flex-col items-center gap-1 mt-2">
-      {/* Team selector */}
+      {/* Bottom: Teams + User — shrinks if needed, teams scroll */}
+      <div className="shrink flex flex-col items-center gap-1 mt-2 min-h-0">
+      {/* Team selector — scrollable when many teams */}
       {teams.length > 0 && (
-        <div className="flex flex-col items-center gap-0.5 mb-2">
+        <div className="flex flex-col items-center gap-0.5 mb-2 overflow-y-auto overflow-x-hidden scrollbar-hide min-h-0 flex-1">
           <button onClick={() => setActiveTeam(null)}
-            className={`w-11 h-7 flex items-center justify-center rounded text-[9px] font-medium transition-all ${!activeTeamId ? "bg-[var(--color-accent)] text-white" : "text-white/30 hover:text-white/50"}`}
+            className={`w-11 h-7 flex items-center justify-center rounded text-[9px] font-medium transition-all shrink-0 ${!activeTeamId ? "bg-[var(--color-accent)] text-white" : "text-white/30 hover:text-white/50"}`}
             title="All teams">All</button>
           {teams.map(t => (
             <button key={t.id} onClick={() => setActiveTeam(t.id)}
-              className={`w-11 h-7 flex items-center justify-center rounded text-[9px] font-medium truncate transition-all ${activeTeamId === t.id ? "bg-[var(--color-accent)] text-white" : "text-white/30 hover:text-white/50"}`}
+              className={`w-11 h-7 flex items-center justify-center rounded text-[9px] font-medium truncate transition-all shrink-0 ${activeTeamId === t.id ? "bg-[var(--color-accent)] text-white" : "text-white/30 hover:text-white/50"}`}
               title={t.name} aria-label={t.name}>{t.name.slice(0, 4)}</button>
           ))}
         </div>
       )}
 
       {/* User + theme + logout */}
-      <div className="flex flex-col items-center gap-1 mb-2">
+      <div className="shrink-0 flex flex-col items-center gap-1 mb-2">
         <span className="text-[10px] text-white/30 truncate max-w-[60px]">{username}</span>
         <NotificationBell />
         <button onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
