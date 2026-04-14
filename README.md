@@ -1,6 +1,6 @@
 # Pomodoro Linux
 
-A full-featured multi-user Pomodoro timer for Linux with a Rust HTTP backend, Tauri v2 GUI, hierarchical task management, sprint planning, estimation rooms, and time tracking. Packaged as a single `.deb`.
+A production-grade multi-user Pomodoro timer and project management platform for Linux. Rust HTTP backend (160+ API endpoints), Tauri v2 desktop GUI, web GUI (PWA), hierarchical task management, sprint planning, estimation rooms, Gantt charts, custom workflows, RBAC, and time tracking. Packaged as a single `.deb`.
 
 ## Features
 
@@ -112,11 +112,25 @@ A full-featured multi-user Pomodoro timer for Linux with a Rust HTTP backend, Ta
 - Access the full app at `http://server:9090` in any browser
 - No Tauri desktop app required — works on any device
 - Platform abstraction layer: Tauri IPC in desktop mode, fetch() in web mode
-- Quick-accept, custom value accept, re-vote
-- Auto-advance to next unestimated task after accept
-- Admin inline edit task title/description from voting screen
-- Room roles: admin/voter with promote/demote/kick
-- Vote history with per-user breakdown
+
+### Gantt Chart
+- SVG timeline showing tasks with due dates as horizontal bars
+- Dependency arrows between linked tasks
+- Zoom in/out (4 levels), navigate by weeks
+- Today line, weekend shading, overdue highlighting
+- Status-colored bars
+
+### Roadmap View
+- Epic-level overview with progress bars
+- Task count, completion percentage, story points
+- Status breakdown segments per epic
+
+### Automation Rules
+- User-defined trigger→action rules executed automatically
+- Triggers: `task.status_changed`, `task.all_subtasks_done`
+- Conditions: filter by from/to status
+- Actions: `set_status`, `set_priority`
+- Auto-complete parent when all subtasks done
 
 ### Multi-User
 - JWT authentication (bcrypt + 7-day tokens)
