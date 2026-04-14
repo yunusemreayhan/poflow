@@ -38,7 +38,7 @@ export function BoardView({ board, reload, wipLimit: wipLimitProp }: { board: Sp
 
   const WIP_LIMIT = wipLimitProp ?? 5;
   const Column = useCallback(({ title, tasks, color, status }: { title: string; tasks: Task[]; color: string; status: string }) => (
-    <div className="flex-1 min-w-0 rounded-lg border-2 border-transparent transition-colors" role="list" aria-label={`${title} tasks`}
+    <div className="flex-1 min-w-[200px] md:min-w-0 rounded-lg border-2 border-transparent transition-colors shrink-0 md:shrink" role="list" aria-label={`${title} tasks`}
       onDragOver={e => { e.preventDefault(); e.currentTarget.style.borderColor = "var(--color-accent)"; e.currentTarget.style.background = "rgba(124,58,237,0.05)"; }}
       onDragLeave={e => { e.currentTarget.style.borderColor = "transparent"; e.currentTarget.style.background = ""; }}
       onDrop={e => { e.currentTarget.style.borderColor = "transparent"; e.currentTarget.style.background = ""; const id = Number(e.dataTransfer.getData("text/plain")); if (id) changeStatus(id, status); }}>
@@ -99,7 +99,7 @@ export function BoardView({ board, reload, wipLimit: wipLimitProp }: { board: Sp
         </div>
         <span>{pct}% done</span>
       </div>
-      <div className="flex gap-3">
+      <div className="flex gap-3 overflow-x-auto min-w-0 pb-2">
       <Column title="Todo" tasks={board.todo} color="text-white/60" status="backlog" />
       <Column title="In Progress" tasks={board.in_progress} color="text-yellow-400" status="in_progress" />
       {board.blocked.length > 0 && <Column title="Blocked" tasks={board.blocked} color="text-red-400" status="blocked" />}

@@ -109,7 +109,7 @@ export default function Timer() {
   }), []);
 
   return (
-    <div className="flex flex-col items-center justify-center gap-6 h-full px-8">
+    <div className="flex flex-col items-center justify-center gap-4 md:gap-6 h-full px-4 md:px-8">
       {/* Phase label */}
       <div aria-live="polite" aria-atomic="true">
       <AnimatePresence mode="wait">

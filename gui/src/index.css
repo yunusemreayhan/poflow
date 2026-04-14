@@ -147,3 +147,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 select, select option { color-scheme: dark; background-color: #1a1a2e; color: #e0e0e0; }
 [data-theme="light"] select, [data-theme="light"] select option { color-scheme: light; background-color: #f0f0f5; color: #1a1a2e; }
+
+/* Safe area for mobile bottom nav (notch/home indicator) */
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }

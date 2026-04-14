@@ -68,7 +68,7 @@ export default function CalendarView() {
   const selectedTasks = selected ? tasksByDate.get(selected) || [] : [];
 
   return (
-    <div className="flex flex-col gap-5 p-8 h-full overflow-y-auto">
+    <div className="flex flex-col gap-3 md:gap-5 p-3 md:p-8 h-full overflow-y-auto">
       <div className="glass p-4 flex items-center gap-3">
         <button onClick={() => setOffset(o => o - 1)} className="p-1 text-white/50 hover:text-white" aria-label="Previous month"><ChevronLeft size={18} /></button>
         <h2 className="text-lg font-semibold text-white flex-1 text-center">{monthName}</h2>

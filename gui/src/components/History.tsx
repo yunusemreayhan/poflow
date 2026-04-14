@@ -105,7 +105,7 @@ export default function History() {
   }, [heatmapData]);
 
   return (
-    <div className="flex flex-col gap-6 p-8 h-full overflow-y-auto">
+    <div className="flex flex-col gap-3 md:gap-6 p-3 md:p-8 h-full overflow-y-auto">
       {/* User filter */}
       <div className="flex items-center gap-3">
         <Users size={16} className="text-white/40" />

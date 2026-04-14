@@ -183,7 +183,7 @@ export default function Settings() {
   };
 
   return (
-    <div className="flex flex-col gap-5 p-8 h-full overflow-y-auto">
+    <div className="flex flex-col gap-3 md:gap-5 p-3 md:p-8 h-full overflow-y-auto">
       <div className="glass p-5">
         <h3 className="text-sm font-semibold text-white/60 mb-3">{t.timerDurations}</h3>
         <Field label="Work (minutes)">

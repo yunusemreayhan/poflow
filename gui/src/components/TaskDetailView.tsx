@@ -475,7 +475,7 @@ export default function TaskDetailView({ taskId, onBack, onNavigate }: { taskId:
   }
 
   return (
-    <div className="flex flex-col gap-4 p-8 h-full overflow-y-auto">
+    <div className="flex flex-col gap-3 md:gap-4 p-3 md:p-8 h-full overflow-y-auto">
       {/* Breadcrumbs */}
       {breadcrumbs.length > 0 && onNavigate && (
         <nav aria-label="Breadcrumb" className="flex items-center gap-1 text-xs text-white/30 overflow-x-auto">

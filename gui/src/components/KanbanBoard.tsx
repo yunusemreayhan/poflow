@@ -76,7 +76,7 @@ export default function KanbanBoard() {
   }, [dragId, tasks, updateTask]);
 
   return (
-    <div className="p-8 h-full flex flex-col gap-5 overflow-hidden">
+    <div className="p-3 md:p-8 h-full flex flex-col gap-3 md:gap-5 overflow-hidden">
       <div className="glass p-4 flex items-center gap-3">
         <h2 className="text-lg font-semibold text-white flex-1">Kanban Board</h2>
         <Select value={groupBy} onChange={v => setGroupBy(v as typeof groupBy)}

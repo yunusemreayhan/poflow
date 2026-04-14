@@ -79,7 +79,7 @@ export default function Sprints() {
   if (selected) return <SprintView id={selected} onBack={() => { setSelected(null); load(); }} />;
 
   return (
-    <div className="flex flex-col gap-5 p-8 h-full overflow-y-auto">
+    <div className="flex flex-col gap-3 md:gap-5 p-3 md:p-8 h-full overflow-y-auto">
       <div className="glass p-4 flex items-center gap-3">
         <h2 className="text-lg font-semibold text-white flex-1">Sprints</h2>
         <Select value={filter} onChange={setFilter} className="w-32 text-xs"

@@ -44,7 +44,7 @@ function RoomList({ onSelect }: { onSelect: (id: number) => void }) {
   const closed = rooms.filter(r => r.status === "closed");
 
   return (
-    <div className="flex flex-col gap-5 p-8 h-full overflow-y-auto">
+    <div className="flex flex-col gap-3 md:gap-5 p-3 md:p-8 h-full overflow-y-auto">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-white">Estimation Rooms</h2>
         <motion.button whileTap={{ scale: 0.95 }} onClick={() => setShowCreate(!showCreate)}

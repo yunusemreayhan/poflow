@@ -40,7 +40,7 @@ export default function AuthScreen() {
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="glass p-8 w-full max-w-sm"
+        className="glass p-6 md:p-8 w-full max-w-sm mx-4"
       >
         <div className="text-center mb-6">
           <motion.div

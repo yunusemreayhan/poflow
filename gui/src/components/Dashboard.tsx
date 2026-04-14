@@ -27,7 +27,7 @@ export default function Dashboard() {
   const completedToday = useMemo(() => tasks.filter(t => t.status === "completed" && t.updated_at.startsWith(today)).length, [tasks, today]);
 
   return (
-    <div className="flex flex-col gap-5 p-8 h-full overflow-y-auto">
+    <div className="flex flex-col gap-3 md:gap-5 p-3 md:p-8 h-full overflow-y-auto">
       <div className="glass p-4 flex justify-between items-center">
         <dl className="grid grid-cols-2 md:grid-cols-4 gap-4 flex-1">
         <Stat label="Focus today" value={todayStats ? `${Math.round(todayStats.total_focus_s / 60)}m` : "0m"} />

@@ -113,7 +113,7 @@ export default function TaskList({ selectMode, onSelect, selectedTaskId, votedTa
   }
 
   return (
-    <div className={selectMode ? "flex flex-col gap-2 max-h-[50vh] overflow-hidden" : "flex flex-col gap-5 p-8 h-full overflow-hidden"}>
+    <div className={selectMode ? "flex flex-col gap-2 max-h-[50vh] overflow-hidden" : "flex flex-col gap-3 md:gap-5 p-3 md:p-8 h-full overflow-hidden"}>
       {/* Add root project/task — only in full mode */}
       {!selectMode && (
       <div className="glass p-4 flex gap-3 items-center">
@@ -150,7 +150,7 @@ export default function TaskList({ selectMode, onSelect, selectedTaskId, votedTa
       )}
 
       {/* Search + Filter */}
-      <div className="flex gap-2 items-center">
+      <div className="flex gap-2 items-center flex-wrap">
         <div className="relative flex-1">
           <input id="task-search" value={search} onChange={e => setSearch(e.target.value)}
             placeholder={selectMode ? "Search..." : "Search tasks... (press /)"}
