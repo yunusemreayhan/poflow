@@ -158,3 +158,5 @@ mod custom_statuses;
 pub use custom_statuses::*;
 mod custom_fields;
 pub use custom_fields::*;
+mod checklists;
+pub use checklists::*;

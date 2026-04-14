@@ -7335,3 +7335,72 @@ async fn test_advanced_search_with_sort() {
         assert!(arr[0]["priority"].as_i64().unwrap() >= arr[1]["priority"].as_i64().unwrap());
     }
 }
+
+// ============================================================
+// Task checklists (Priority 3, F27)
+// ============================================================
+
+#[tokio::test]
+async fn test_checklist_crud() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"CL Task"})))).await.unwrap();
+    let tid = body_json(resp).await["id"].as_i64().unwrap();
+    // Add items
+    let resp = app.clone().oneshot(auth_req("POST", &format!("/api/tasks/{}/checklist", tid), &tok, Some(json!({"title":"Step 1"})))).await.unwrap();
+    assert_eq!(resp.status(), 201);
+    let item = body_json(resp).await;
+    assert_eq!(item["title"], "Step 1");
+    assert_eq!(item["checked"], false);
+    let cid = item["id"].as_i64().unwrap();
+    app.clone().oneshot(auth_req("POST", &format!("/api/tasks/{}/checklist", tid), &tok, Some(json!({"title":"Step 2"})))).await.unwrap();
+    // List
+    let resp = app.clone().oneshot(auth_req("GET", &format!("/api/tasks/{}/checklist", tid), &tok, None)).await.unwrap();
+    let items = body_json(resp).await;
+    assert_eq!(items.as_array().unwrap().len(), 2);
+    // Toggle checked
+    let resp = app.clone().oneshot(auth_req("PUT", &format!("/api/checklist/{}", cid), &tok, Some(json!({"checked":true})))).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    assert_eq!(body_json(resp).await["checked"], true);
+    // Update title
+    let resp = app.clone().oneshot(auth_req("PUT", &format!("/api/checklist/{}", cid), &tok, Some(json!({"title":"Step 1 (done)"})))).await.unwrap();
+    assert_eq!(body_json(resp).await["title"], "Step 1 (done)");
+    // Delete
+    let resp = app.clone().oneshot(auth_req("DELETE", &format!("/api/checklist/{}", cid), &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 204);
+    let resp = app.clone().oneshot(auth_req("GET", &format!("/api/tasks/{}/checklist", tid), &tok, None)).await.unwrap();
+    assert_eq!(body_json(resp).await.as_array().unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn test_checklist_assignee_can_edit() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let (user_tok, _) = register_user_full(&app, "cluser", "ClUser111").await;
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"CL2"})))).await.unwrap();
+    let tid = body_json(resp).await["id"].as_i64().unwrap();
+    // Assign user
+    app.clone().oneshot(auth_req("POST", &format!("/api/tasks/{}/assignees", tid), &tok, Some(json!({"username":"cluser"})))).await.unwrap();
+    // Assignee can add checklist items
+    let resp = app.clone().oneshot(auth_req("POST", &format!("/api/tasks/{}/checklist", tid), &user_tok, Some(json!({"title":"My step"})))).await.unwrap();
+    assert_eq!(resp.status(), 201);
+    let cid = body_json(resp).await["id"].as_i64().unwrap();
+    // Assignee can toggle
+    let resp = app.clone().oneshot(auth_req("PUT", &format!("/api/checklist/{}", cid), &user_tok, Some(json!({"checked":true})))).await.unwrap();
+    assert_eq!(resp.status(), 200);
+}
+
+#[tokio::test]
+async fn test_checklist_cascade_on_task_delete() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"CL3"})))).await.unwrap();
+    let tid = body_json(resp).await["id"].as_i64().unwrap();
+    app.clone().oneshot(auth_req("POST", &format!("/api/tasks/{}/checklist", tid), &tok, Some(json!({"title":"Will be deleted"})))).await.unwrap();
+    // Delete task (soft delete)
+    app.clone().oneshot(auth_req("DELETE", &format!("/api/tasks/{}", tid), &tok, None)).await.unwrap();
+    // Restore and check checklist still exists (soft delete doesn't cascade)
+    app.clone().oneshot(auth_req("POST", &format!("/api/tasks/{}/restore", tid), &tok, None)).await.unwrap();
+    let resp = app.clone().oneshot(auth_req("GET", &format!("/api/tasks/{}/checklist", tid), &tok, None)).await.unwrap();
+    assert_eq!(body_json(resp).await.as_array().unwrap().len(), 1);
+}

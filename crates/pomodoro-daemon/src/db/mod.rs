@@ -545,6 +545,19 @@ async fn migrate(pool: &Pool) -> Result<()> {
         sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (19, ?)").bind(&now_str()).execute(pool).await.ok();
     }
 
+    // Migration 20: Task checklists (lightweight sub-items)
+    if !applied_set.contains(&20) {
+        sqlx::query("CREATE TABLE IF NOT EXISTS checklist_items (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            task_id     INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+            title       TEXT NOT NULL,
+            checked     INTEGER NOT NULL DEFAULT 0,
+            sort_order  INTEGER NOT NULL DEFAULT 0,
+            created_at  TEXT NOT NULL
+        )").execute(pool).await.ok();
+        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (20, ?)").bind(&now_str()).execute(pool).await.ok();
+    }
+
     sqlx::query("CREATE TABLE IF NOT EXISTS task_attachments (
         id          INTEGER PRIMARY KEY AUTOINCREMENT,
         task_id     INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
@@ -621,3 +634,5 @@ mod custom_statuses;
 pub use custom_statuses::*;
 mod custom_fields;
 pub use custom_fields::*;
+mod checklists;
+pub use checklists::*;
