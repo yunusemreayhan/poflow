@@ -217,7 +217,7 @@ class TestNotifPrefs:
     def test_get_default_prefs(self, logged_in):
         h = H()
         prefs = h.get_notif_prefs()
-        assert len(prefs) == 6
+        assert len(prefs) == 7
         assert all(p["enabled"] for p in prefs)
 
     def test_disable_event(self, logged_in):

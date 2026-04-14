@@ -21,7 +21,7 @@ def api(method, path, body=None, token=None):
     if token:
         hdrs["Authorization"] = f"Bearer {token}"
     resp = urllib.request.urlopen(
-        urllib.request.Request(f"{url}{path}", data=data, headers=hdrs, method=method), timeout=5)
+        urllib.request.Request(f"{url}{path}", data=data, headers=hdrs, method=method), timeout=15)
     raw = resp.read().decode()
     return json.loads(raw) if raw else {}
 

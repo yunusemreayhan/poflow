@@ -43,13 +43,26 @@ pub async fn login(headers: axum::http::HeaderMap, State(engine): State<AppState
     Ok(Json(AuthResponse { token, refresh_token, user_id: user.id, username: user.username, role: user.role }))
 }
 
-#[utoipa::path(post, path = "/api/auth/logout", responses((status = 204)), security(("bearer" = [])))]
-pub async fn logout(headers: axum::http::HeaderMap) -> Result<StatusCode, ApiError> {
+#[derive(Deserialize, Default, utoipa::ToSchema)]
+pub struct LogoutRequest {
+    pub refresh_token: Option<String>,
+}
+
+#[utoipa::path(post, path = "/api/auth/logout", request_body(content = Option<LogoutRequest>, content_type = "application/json"), responses((status = 204)), security(("bearer" = [])))]
+pub async fn logout(headers: axum::http::HeaderMap, body: axum::body::Bytes) -> Result<StatusCode, ApiError> {
     let token = headers.get("authorization")
         .and_then(|v| v.to_str().ok())
         .and_then(|h| h.strip_prefix("Bearer "))
         .ok_or_else(|| err(StatusCode::UNAUTHORIZED, "Missing token"))?;
     auth::revoke_token(token).await;
+    // Also revoke refresh token if provided in body
+    if let Ok(req) = serde_json::from_slice::<LogoutRequest>(&body) {
+        if let Some(rt) = req.refresh_token {
+            if !rt.is_empty() {
+                auth::revoke_token(&rt).await;
+            }
+        }
+    }
     Ok(StatusCode::NO_CONTENT)
 }
 

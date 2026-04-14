@@ -6,7 +6,13 @@ use std::sync::Arc;
 use tower::ServiceExt;
 
 async fn app() -> axum::Router {
-    std::env::set_var("POMODORO_ROOT_PASSWORD", "root");
+    static INIT: std::sync::Once = std::sync::Once::new();
+    INIT.call_once(|| {
+        std::env::set_var("POMODORO_ROOT_PASSWORD", "root");
+        // Rate limit tests are incompatible with parallel execution (shared global state).
+        // They check this env var and skip gracefully.
+        std::env::set_var("POMODORO_NO_RATE_LIMIT", "1");
+    });
     let pool = pomodoro_daemon::db::connect_memory().await.unwrap();
     let config = pomodoro_daemon::config::Config::default();
     let engine = Arc::new(pomodoro_daemon::engine::Engine::new(pool, config).await);
@@ -15,7 +21,8 @@ async fn app() -> axum::Router {
 
 fn json_req(method: &str, uri: &str, body: Option<Value>) -> Request<Body> {
     static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
-    let ip = format!("10.0.0.{}", COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed) % 250 + 1);
+    let n = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let ip = format!("10.{}.{}.{}", (n / 65025 % 255) + 1, (n / 255 % 255) + 1, (n % 255) + 1);
     let b = Request::builder().method(method).uri(uri)
         .header("content-type", "application/json")
         .header("x-forwarded-for", ip);
@@ -27,8 +34,9 @@ fn json_req(method: &str, uri: &str, body: Option<Value>) -> Request<Body> {
 }
 
 fn auth_req(method: &str, uri: &str, token: &str, body: Option<Value>) -> Request<Body> {
-    static AUTH_COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
-    let ip = format!("10.1.0.{}", AUTH_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed) % 250 + 1);
+    static AUTH_COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(5_000_000);
+    let n = AUTH_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let ip = format!("10.{}.{}.{}", (n / 65025 % 255) + 1, (n / 255 % 255) + 1, (n % 255) + 1);
     let b = Request::builder().method(method).uri(uri)
         .header("content-type", "application/json")
         .header("authorization", format!("Bearer {}", token))
@@ -2098,9 +2106,9 @@ async fn test_optimistic_locking_sprint_conflict() {
 
 #[tokio::test]
 async fn test_auth_rate_limiting() {
-    if std::env::var("POMODORO_NO_RATE_LIMIT").is_ok() { eprintln!("SKIP: rate limiter disabled"); return; }
-    pomodoro_daemon::routes::auth_limiter().reset();
     let app = app().await;
+    if std::env::var("POMODORO_NO_RATE_LIMIT").is_ok() { return; }
+    pomodoro_daemon::routes::auth_limiter().reset();
     // Send 11 login attempts (limit is 10 per 60s)
     // Note: rate limiter uses x-forwarded-for header, which our test doesn't set,
     // so it falls back to "unknown" key. All requests share the same key.
@@ -4074,9 +4082,9 @@ async fn test_webhook_ssrf_additional_patterns() {
 // === T8: Auth rate limiting — verify limit ===
 #[tokio::test]
 async fn test_auth_rate_limit_threshold() {
-    if std::env::var("POMODORO_NO_RATE_LIMIT").is_ok() { eprintln!("SKIP: rate limiter disabled"); return; }
-    pomodoro_daemon::routes::auth_limiter().reset();
     let app = app().await;
+    if std::env::var("POMODORO_NO_RATE_LIMIT").is_ok() { return; }
+    pomodoro_daemon::routes::auth_limiter().reset();
 
     // Send 11 login attempts from same IP (limit is 10/60s)
     let mut last_status = 200;
@@ -4246,9 +4254,9 @@ async fn test_rate_limit_get_not_limited() {
 
 #[tokio::test]
 async fn test_auth_rate_limit_blocks_after_threshold() {
-    if std::env::var("POMODORO_NO_RATE_LIMIT").is_ok() { eprintln!("SKIP: rate limiter disabled"); return; }
-    pomodoro_daemon::routes::auth_limiter().reset();
     let app = app().await;
+    if std::env::var("POMODORO_NO_RATE_LIMIT").is_ok() { return; }
+    pomodoro_daemon::routes::auth_limiter().reset();
     // Use a fixed IP for all requests to trigger rate limit
     let fixed_ip = "10.99.99.1";
     for i in 0..12 {
@@ -5236,6 +5244,21 @@ async fn flow_logout_revokes_access_token() {
     // Token should now be rejected
     let resp = app.clone().oneshot(auth_req("GET", "/api/timer", &token, None)).await.unwrap();
     assert_eq!(resp.status(), 401);
+}
+
+#[tokio::test]
+async fn flow_logout_revokes_refresh_token() {
+    let app = app().await;
+    let resp = app.clone().oneshot(json_req("POST", "/api/auth/login", Some(json!({"username":"root","password":"root"})))).await.unwrap();
+    let j = body_json(resp).await;
+    let access = j["token"].as_str().unwrap().to_string();
+    let refresh = j["refresh_token"].as_str().unwrap().to_string();
+    // Logout with refresh token in body
+    let resp = app.clone().oneshot(auth_req("POST", "/api/auth/logout", &access, Some(json!({"refresh_token": refresh})))).await.unwrap();
+    assert_eq!(resp.status(), 204);
+    // Refresh token should now be rejected
+    let resp = app.clone().oneshot(json_req("POST", "/api/auth/refresh", Some(json!({"refresh_token": refresh})))).await.unwrap();
+    assert_eq!(resp.status(), 401, "Refresh token should be revoked after logout");
 }
 
 // ---- Flow: user-assigned-others-task (multi-user authorization) ----

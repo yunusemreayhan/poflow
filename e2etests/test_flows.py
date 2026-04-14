@@ -187,30 +187,37 @@ class TestTimerSession:
 
     def test_short_break_mode(self, logged_in):
         click_tab(logged_in, "Timer")
+        try:
+            api_call("POST", "/api/timer/stop", token=get_root_token())
+        except Exception:
+            pass
+        time.sleep(0.5)
         logged_in.execute_js("document.querySelectorAll('button').forEach(b => { if (b.textContent.includes('Short Break')) b.click(); })")
-        body = wait_body_contains(logged_in, "01:00", "00:")
-        assert "01:00" in body or "00:" in body
+        body = wait_body_contains(logged_in, "SHORT BREAK", "Short Break", timeout=8)
+        assert "SHORT BREAK" in body or "Short Break" in body
 
     def test_long_break_mode(self, logged_in):
         try:
-            logged_in.click_text("Stop")
-        except (WebDriverError, AssertionError):
+            api_call("POST", "/api/timer/stop", token=get_root_token())
+        except Exception:
             pass
+        time.sleep(0.5)
         logged_in.execute_js("document.querySelectorAll('button').forEach(b => { if (b.textContent.includes('Long Break')) b.click(); })")
-        body = wait_body_contains(logged_in, "01:00", "00:")
-        assert "01:00" in body or "00:" in body
+        body = wait_body_contains(logged_in, "LONG BREAK", "Long Break", timeout=8)
+        assert "LONG BREAK" in body or "Long Break" in body
 
     def test_back_to_focus(self, logged_in):
         try:
-            logged_in.click_text("Stop")
-        except (WebDriverError, AssertionError):
+            api_call("POST", "/api/timer/stop", token=get_root_token())
+        except Exception:
             pass
+        time.sleep(0.5)
         logged_in.execute_js("document.querySelectorAll('button').forEach(b => { if (b.textContent.trim() === 'Start' || b.textContent.includes('Start')) b.click(); })")
-        body = wait_body_contains(logged_in, "01:00", "00:")
-        assert "01:00" in body or "00:" in body
+        body = wait_body_contains(logged_in, "FOCUS", "Focus", "WORK", "00:", timeout=8)
+        assert any(t in body for t in ("FOCUS", "Focus", "WORK", "00:"))
         try:
-            logged_in.click_text("Stop")
-        except (WebDriverError, AssertionError):
+            api_call("POST", "/api/timer/stop", token=get_root_token())
+        except Exception:
             pass
 
 

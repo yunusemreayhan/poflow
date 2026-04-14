@@ -50,6 +50,7 @@ class TestHistoryStats:
         api("POST", "/api/tasks", {"title": "D3", "project": "DashProj"}, t)
         click_tab(logged_in, "Timer")
         click_tab(logged_in, "Tasks")
+        import time; time.sleep(1)
         body = logged_in.text(logged_in.find("body"))
         assert "DashProj" in body
 
