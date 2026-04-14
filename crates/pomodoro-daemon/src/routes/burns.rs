@@ -20,6 +20,13 @@ pub async fn log_burn(State(engine): State<AppState>, claims: Claims, Path(id): 
     if exists.is_none() {
         return Err(err(StatusCode::BAD_REQUEST, "Task does not belong to this sprint"));
     }
+    // Authorization: must be sprint owner, task owner, assigned to task, or root
+    if claims.role != "root" && sprint.created_by_id != claims.user_id && task.user_id != claims.user_id {
+        let assignees = db::list_assignees(&engine.pool, req.task_id).await.map_err(internal)?;
+        if !assignees.contains(&claims.username) {
+            return Err(err(StatusCode::FORBIDDEN, "Not assigned to this task"));
+        }
+    }
     let b = db::log_burn(&engine.pool, Some(id), req.task_id, None, claims.user_id, pts, hrs, "manual", req.note.as_deref())
         .await.map_err(internal)?;
     engine.notify(ChangeEvent::Sprints);

@@ -831,6 +831,9 @@ async fn test_burn_multi_user_summary() {
     app.clone().oneshot(auth_req("POST", &format!("/api/sprints/{}/tasks", sid), &tok, Some(json!({"task_ids":[tid]})))).await.unwrap();
     app.clone().oneshot(auth_req("POST", &format!("/api/sprints/{}/start", sid), &tok, None)).await.unwrap();
 
+    // Assign Bob to the task so he can log burns
+    app.clone().oneshot(auth_req("POST", &format!("/api/tasks/{}/assignees", tid), &tok, Some(json!({"username":"bob"})))).await.unwrap();
+
     // Root burns 3 pts, Bob burns 5 pts
     app.clone().oneshot(auth_req("POST", &format!("/api/sprints/{}/burn", sid), &tok, Some(json!({"task_id":tid,"points":3.0})))).await.unwrap();
     app.clone().oneshot(auth_req("POST", &format!("/api/sprints/{}/burn", sid), &tok2, Some(json!({"task_id":tid,"points":5.0})))).await.unwrap();
@@ -841,6 +844,25 @@ async fn test_burn_multi_user_summary() {
     assert_eq!(arr.len(), 2); // two users
     let total: f64 = arr.iter().map(|e| e["points"].as_f64().unwrap()).sum();
     assert_eq!(total, 8.0);
+}
+
+#[tokio::test]
+async fn test_burn_log_requires_authorization() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let (user_tok, _) = register_user_full(&app, "burnnoauth", "BurnNo111").await;
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"BurnTask"})))).await.unwrap();
+    let tid = body_json(resp).await["id"].as_i64().unwrap();
+    let resp = app.clone().oneshot(auth_req("POST", "/api/sprints", &tok, Some(json!({"name":"BurnSprint"})))).await.unwrap();
+    let sid = body_json(resp).await["id"].as_i64().unwrap();
+    app.clone().oneshot(auth_req("POST", &format!("/api/sprints/{}/tasks", sid), &tok, Some(json!({"task_ids":[tid]})))).await.unwrap();
+    app.clone().oneshot(auth_req("POST", &format!("/api/sprints/{}/start", sid), &tok, None)).await.unwrap();
+    // Unrelated user cannot log burns
+    let resp = app.clone().oneshot(auth_req("POST", &format!("/api/sprints/{}/burn", sid), &user_tok, Some(json!({"task_id":tid,"points":5.0})))).await.unwrap();
+    assert_eq!(resp.status(), 403, "Unrelated user should not be able to log burns");
+    // Sprint owner can
+    let resp = app.clone().oneshot(auth_req("POST", &format!("/api/sprints/{}/burn", sid), &tok, Some(json!({"task_id":tid,"points":3.0})))).await.unwrap();
+    assert_eq!(resp.status(), 201);
 }
 
 #[tokio::test]
