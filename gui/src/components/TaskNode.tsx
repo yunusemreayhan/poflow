@@ -111,10 +111,17 @@ export default function TaskNode({ node, depth, onView, selectMode, onSelect, se
             const siblings = useStore.getState().tasks.filter(s => s.parent_id === newParent && s.id !== dragId).sort((a, b) => a.sort_order - b.sort_order);
             const idx = siblings.findIndex(s => s.id === t.id);
             const insertAt = dropZone === "above" ? idx : idx + 1;
-            const before = insertAt > 0 ? siblings[insertAt - 1].sort_order : 0;
-            const after = insertAt < siblings.length ? siblings[insertAt].sort_order : before + 2;
-            const newOrder = Math.floor((before + after) / 2);
-            await updateTask(dragId, { parent_id: newParent, sort_order: newOrder === before ? after + 1 : newOrder });
+            // Move to new parent first if needed
+            const dragTask = useStore.getState().tasks.find(tk => tk.id === dragId);
+            if (dragTask && dragTask.parent_id !== newParent) {
+              await updateTask(dragId, { parent_id: newParent });
+            }
+            // Build new order: insert dragId at the right position, renumber all siblings
+            const ordered = [...siblings];
+            ordered.splice(insertAt, 0, { id: dragId } as typeof ordered[0]);
+            const orders: [number, number][] = ordered.map((s, i) => [s.id, i * 1000]);
+            await apiCall("POST", "/api/tasks/reorder", { orders });
+            useStore.getState().loadTasks();
           }
         }}
         onTouchStart={(e) => {

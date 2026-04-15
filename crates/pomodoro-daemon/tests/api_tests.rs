@@ -8022,3 +8022,28 @@ async fn test_save_task_as_template_captures_labels() {
     let data: serde_json::Value = serde_json::from_str(tmpl["data"].as_str().unwrap()).unwrap();
     assert!(data["labels"].as_array().unwrap().iter().any(|l| l == "tmpl_save_label"));
 }
+
+// ============================================================
+// Drag-drop reorder persistence
+// ============================================================
+
+#[tokio::test]
+async fn test_reorder_persists_sort_order() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"Alpha"})))).await.unwrap();
+    let a = body_json(resp).await["id"].as_i64().unwrap();
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"Beta"})))).await.unwrap();
+    let b = body_json(resp).await["id"].as_i64().unwrap();
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"Gamma"})))).await.unwrap();
+    let c = body_json(resp).await["id"].as_i64().unwrap();
+    // Reorder: Gamma first, Alpha second, Beta third
+    app.clone().oneshot(auth_req("POST", "/api/tasks/reorder", &tok, Some(json!({"orders":[[c, 0],[a, 1000],[b, 2000]]})))).await.unwrap();
+    // Fetch and verify order
+    let resp = app.clone().oneshot(auth_req("GET", "/api/tasks", &tok, None)).await.unwrap();
+    let tasks = body_json(resp).await;
+    let titles: Vec<&str> = tasks.as_array().unwrap().iter()
+        .filter(|t| ["Alpha","Beta","Gamma"].contains(&t["title"].as_str().unwrap_or("")))
+        .map(|t| t["title"].as_str().unwrap()).collect();
+    assert_eq!(titles, vec!["Gamma", "Alpha", "Beta"], "Reorder should persist");
+}
