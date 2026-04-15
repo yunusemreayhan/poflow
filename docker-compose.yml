@@ -1,0 +1,21 @@
+services:
+  pomodoro:
+    build: .
+    ports:
+      - "9090:9090"
+    volumes:
+      - pomodoro-data:/data
+    environment:
+      - POMODORO_DATA_DIR=/data
+      - POMODORO_GUI_DIR=/usr/share/pomodoro/gui
+      - RUST_LOG=pomodoro_daemon=info
+      # Bind to all interfaces inside container
+      - POMODORO_BIND_ADDRESS=0.0.0.0
+      # Optional: set root password (otherwise auto-generated)
+      # - POMODORO_ROOT_PASSWORD=changeme
+      # Optional: disable public registration
+      # - POMODORO_ALLOW_REGISTRATION=false
+    restart: unless-stopped
+
+volumes:
+  pomodoro-data:

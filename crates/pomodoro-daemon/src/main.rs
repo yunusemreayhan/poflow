@@ -370,7 +370,9 @@ async fn main() -> Result<()> {
     }
     let app = app.layer(tower_http::trace::TraceLayer::new_for_http());
 
-    let addr = format!("{}:{}", config.bind_address, config.bind_port);
+    let bind_addr = std::env::var("POMODORO_BIND_ADDRESS").unwrap_or(config.bind_address.clone());
+    let bind_port = std::env::var("POMODORO_BIND_PORT").ok().and_then(|p| p.parse().ok()).unwrap_or(config.bind_port);
+    let addr = format!("{}:{}", bind_addr, bind_port);
     tracing::info!("HTTP server listening on {}", addr);
     if swagger_enabled { tracing::info!("Swagger UI: http://{}/swagger-ui/", addr); }
 

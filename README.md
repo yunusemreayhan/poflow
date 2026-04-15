@@ -511,18 +511,33 @@ All user references use `user_id INTEGER REFERENCES users(id)` — usernames are
 
 ## Installation
 
+### Docker (recommended)
+
 ```bash
-# Build
-cd gui && cargo tauri build --bundles deb
+# Quick start
+docker compose up -d
 
-# Install
-sudo dpkg -i target/release/bundle/deb/Pomodoro_0.1.0_amd64.deb
+# Or build and run manually
+docker build -t pomodoro .
+docker run -d -p 9090:9090 -v pomodoro-data:/data pomodoro
 
-# The daemon auto-starts via systemd user service
-systemctl --user status pomodoro.service
+# Open http://localhost:9090
+```
 
-# Access Swagger UI
-open http://localhost:9090/swagger-ui/
+### From source
+
+```bash
+./install.sh
+# Then: systemctl --user enable --now pomodoro
+# Open http://localhost:9090
+```
+
+### .deb package
+
+```bash
+cd gui && npm ci && npm run build && cd ..
+cargo deb -p pomodoro-daemon
+sudo dpkg -i target/debian/pomodoro-daemon_*.deb
 ```
 
 ## Testing

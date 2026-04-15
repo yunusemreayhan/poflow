@@ -1,0 +1,9 @@
+target/
+gui/node_modules/
+gui/dist/
+e2etests/.venv/
+e2etests/__pycache__/
+.git/
+*.db
+*.db-wal
+*.db-shm
