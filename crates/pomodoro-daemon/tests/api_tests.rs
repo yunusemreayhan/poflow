@@ -7670,3 +7670,96 @@ async fn test_global_search_comments() {
     let results = body_json(resp).await;
     assert!(!results["comments"].as_array().unwrap().is_empty(), "Should find the comment");
 }
+
+// ============================================================
+// Edge case tests for newer features
+// ============================================================
+
+#[tokio::test]
+async fn test_automation_disabled_rule_does_not_fire() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    // Create automation then disable it
+    let resp = app.clone().oneshot(auth_req("POST", "/api/automations", &tok, Some(json!({
+        "name": "Disabled rule", "trigger_event": "task.status_changed",
+        "condition_json": "{\"to_status\":\"completed\"}", "action_json": "{\"set_priority\":1}"
+    })))).await.unwrap();
+    let rid = body_json(resp).await["id"].as_i64().unwrap();
+    app.clone().oneshot(auth_req("DELETE", &format!("/api/automations/{}", rid), &tok, None)).await.unwrap();
+    // Create task and complete it
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"NoAuto","priority":5})))).await.unwrap();
+    let tid = body_json(resp).await["id"].as_i64().unwrap();
+    app.clone().oneshot(auth_req("PUT", &format!("/api/tasks/{}", tid), &tok, Some(json!({"status":"completed"})))).await.unwrap();
+    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+    let resp = app.clone().oneshot(auth_req("GET", &format!("/api/tasks/{}", tid), &tok, None)).await.unwrap();
+    assert_eq!(body_json(resp).await["task"]["priority"], 5, "Deleted rule should not fire");
+}
+
+#[tokio::test]
+async fn test_custom_status_duplicate_rejected() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    app.clone().oneshot(auth_req("POST", "/api/statuses", &tok, Some(json!({"name":"dup_status","category":"todo"})))).await.unwrap();
+    let resp = app.clone().oneshot(auth_req("POST", "/api/statuses", &tok, Some(json!({"name":"dup_status","category":"todo"})))).await.unwrap();
+    assert_eq!(resp.status(), 409);
+}
+
+#[tokio::test]
+async fn test_custom_field_select_requires_options() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("POST", "/api/fields", &tok, Some(json!({"name":"NoOpts","field_type":"select"})))).await.unwrap();
+    assert_eq!(resp.status(), 400, "Select field without options should be rejected");
+}
+
+#[tokio::test]
+async fn test_checklist_empty_title_rejected() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"CL"})))).await.unwrap();
+    let tid = body_json(resp).await["id"].as_i64().unwrap();
+    let resp = app.clone().oneshot(auth_req("POST", &format!("/api/tasks/{}/checklist", tid), &tok, Some(json!({"title":""})))).await.unwrap();
+    assert_eq!(resp.status(), 400);
+}
+
+#[tokio::test]
+async fn test_bulk_assign_nonexistent_user_rejected() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"BA"})))).await.unwrap();
+    let tid = body_json(resp).await["id"].as_i64().unwrap();
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks/bulk-assign", &tok, Some(json!({"task_ids":[tid],"username":"nonexistent_user_xyz"})))).await.unwrap();
+    assert_eq!(resp.status(), 404);
+}
+
+#[tokio::test]
+async fn test_advanced_search_title_contains() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"UniqueNeedle12345"})))).await.unwrap();
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks/search/advanced", &tok, Some(json!({
+        "filters": [{"field": "title", "op": "contains", "value": "Needle123"}]
+    })))).await.unwrap();
+    let tasks = body_json(resp).await;
+    assert!(tasks.as_array().unwrap().iter().any(|t| t["title"].as_str().unwrap().contains("Needle")));
+}
+
+#[tokio::test]
+async fn test_project_export_empty_project() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("GET", "/api/export/project?project=NonExistentProject", &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let export = body_json(resp).await;
+    assert_eq!(export["tasks"].as_array().unwrap().len(), 0);
+}
+
+#[tokio::test]
+async fn test_global_search_empty_query() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("GET", "/api/search?q=", &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let r = body_json(resp).await;
+    assert!(r["tasks"].as_array().unwrap().is_empty());
+}

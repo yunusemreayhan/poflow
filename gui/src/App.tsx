@@ -19,6 +19,7 @@ import KanbanBoard from "./components/KanbanBoard";
 import GanttChart from "./components/GanttChart";
 import RoadmapView from "./components/RoadmapView";
 import CommandPalette from "./components/CommandPalette";
+import WelcomeGuide from "./components/WelcomeGuide";
 
 const TABS = [
   { id: "timer", icon: TimerIcon, labelKey: "timer" },
@@ -184,6 +185,7 @@ export default function App() {
   const { activeTab, poll, loadTasks, connected, token, toasts, dismissToast, confirmDialog, dismissConfirm, loading, focusMode } = useStore();
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [offline, setOffline] = useState(!navigator.onLine);
+  const [showWelcome, setShowWelcome] = useState(() => !localStorage.getItem("pomo_welcomed"));
   const t = useT();
 
   // F16: Track online/offline state
@@ -255,6 +257,7 @@ export default function App() {
     <MotionConfig reducedMotion="user">
     <div className="flex h-screen bg-[var(--color-bg)]">
       <CommandPalette />
+      {showWelcome && token && <WelcomeGuide onDismiss={() => { setShowWelcome(false); localStorage.setItem("pomo_welcomed", "1"); }} />}
       <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:top-2 focus:left-2 focus:px-4 focus:py-2 focus:bg-[var(--color-accent)] focus:text-white focus:rounded-lg focus:text-sm">
         {t.skipToContent}
       </a>
