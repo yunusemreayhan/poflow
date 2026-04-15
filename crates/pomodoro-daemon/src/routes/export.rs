@@ -361,3 +361,112 @@ pub async fn export_project(State(engine): State<AppState>, claims: Claims, Quer
         .header("content-disposition", format!("attachment; filename=\"{}\"", filename))
         .body(axum::body::Body::from(body)).map_err(|e| internal(e.to_string()))
 }
+
+// Import from comprehensive project export format
+#[derive(Deserialize)]
+pub struct ProjectImportRequest {
+    pub tasks: Vec<serde_json::Value>,
+    #[serde(default)] pub comments: Vec<serde_json::Value>,
+    #[serde(default)] pub labels: Vec<serde_json::Value>,
+    #[serde(default)] pub checklists: Vec<serde_json::Value>,
+    #[serde(default)] pub custom_fields: Vec<serde_json::Value>,
+}
+
+pub async fn import_project(State(engine): State<AppState>, claims: Claims, Json(req): Json<ProjectImportRequest>) -> ApiResult<serde_json::Value> {
+    if req.tasks.len() > 2000 { return Err(err(StatusCode::BAD_REQUEST, "Too many tasks (max 2000)")); }
+    let mut created_tasks = 0i64;
+    let mut created_comments = 0i64;
+    let mut created_checklists = 0i64;
+    // Map old task IDs to new ones
+    let mut id_map: std::collections::HashMap<i64, i64> = std::collections::HashMap::new();
+
+    // Import tasks
+    for t in &req.tasks {
+        let title = t["title"].as_str().unwrap_or("").trim();
+        if title.is_empty() { continue; }
+        let task = db::create_task(&engine.pool, claims.user_id,
+            None, // parent_id resolved later
+            title,
+            t["description"].as_str(),
+            t["project"].as_str(),
+            t["tags"].as_str(),
+            t["priority"].as_i64().unwrap_or(3),
+            t["estimated"].as_i64().unwrap_or(0),
+            t["estimated_hours"].as_f64().unwrap_or(0.0),
+            t["remaining_points"].as_f64().unwrap_or(0.0),
+            t["due_date"].as_str(),
+        ).await.map_err(internal)?;
+        if let Some(old_id) = t["id"].as_i64() { id_map.insert(old_id, task.id); }
+        // Set status if not backlog
+        if let Some(status) = t["status"].as_str() {
+            if status != "backlog" {
+                db::update_task(&engine.pool, task.id, None, None, None, None, None, None, None, None, None, Some(status), None, None, None, None, None).await.ok();
+            }
+        }
+        created_tasks += 1;
+    }
+
+    // Resolve parent_id relationships
+    for t in &req.tasks {
+        if let (Some(old_id), Some(old_parent)) = (t["id"].as_i64(), t["parent_id"].as_i64()) {
+            if let (Some(&new_id), Some(&new_parent)) = (id_map.get(&old_id), id_map.get(&old_parent)) {
+                db::update_task(&engine.pool, new_id, None, None, None, None, None, None, None, None, None, None, None, Some(Some(new_parent)), None, None, None).await.ok();
+            }
+        }
+    }
+
+    // Import comments
+    for c in &req.comments {
+        if let (Some(old_tid), Some(content)) = (c["task_id"].as_i64(), c["content"].as_str()) {
+            if let Some(&new_tid) = id_map.get(&old_tid) {
+                db::add_comment(&engine.pool, claims.user_id, new_tid, None, content, None).await.ok();
+                created_comments += 1;
+            }
+        }
+    }
+
+    // Import labels
+    for l in &req.labels {
+        if let (Some(old_tid), Some(label_name)) = (l["task_id"].as_i64(), l["label"].as_str()) {
+            if let Some(&new_tid) = id_map.get(&old_tid) {
+                // Find or skip label (must exist)
+                let lid: Option<(i64,)> = sqlx::query_as("SELECT id FROM labels WHERE name = ?")
+                    .bind(label_name).fetch_optional(&engine.pool).await.unwrap_or(None);
+                if let Some((lid,)) = lid {
+                    db::add_task_label(&engine.pool, new_tid, lid).await.ok();
+                }
+            }
+        }
+    }
+
+    // Import checklists
+    for cl in &req.checklists {
+        if let (Some(old_tid), Some(title)) = (cl["task_id"].as_i64(), cl["title"].as_str()) {
+            if let Some(&new_tid) = id_map.get(&old_tid) {
+                db::add_checklist_item(&engine.pool, new_tid, title, cl["sort_order"].as_i64().unwrap_or(0)).await.ok();
+                created_checklists += 1;
+            }
+        }
+    }
+
+    // Import custom field values
+    for cf in &req.custom_fields {
+        if let (Some(old_tid), Some(field_name), Some(value)) = (cf["task_id"].as_i64(), cf["field_name"].as_str(), cf["value"].as_str()) {
+            if let Some(&new_tid) = id_map.get(&old_tid) {
+                let fid: Option<(i64,)> = sqlx::query_as("SELECT id FROM custom_fields WHERE name = ?")
+                    .bind(field_name).fetch_optional(&engine.pool).await.unwrap_or(None);
+                if let Some((fid,)) = fid {
+                    db::set_task_field_value(&engine.pool, new_tid, fid, Some(value)).await.ok();
+                }
+            }
+        }
+    }
+
+    engine.notify(ChangeEvent::Tasks);
+    Ok(Json(serde_json::json!({
+        "created_tasks": created_tasks,
+        "created_comments": created_comments,
+        "created_checklists": created_checklists,
+        "id_map": id_map,
+    })))
+}

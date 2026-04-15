@@ -174,6 +174,7 @@ pub async fn build_router(engine: Arc<engine::Engine>) -> Router {
         .route("/api/export/burns/{sprint_id}", get(routes::export_burns))
         .route("/api/export/ical", get(routes::export_ical))
         .route("/api/export/project", get(routes::export_project))
+        .route("/api/import/project", post(routes::import_project))
         .route("/api/import/tasks", post(routes::import_tasks_csv))
         .route("/api/import/tasks/json", post(routes::import_tasks_json))
         .route("/api/audit", get(routes::list_audit))

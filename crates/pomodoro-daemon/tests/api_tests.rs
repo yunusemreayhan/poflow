@@ -7603,3 +7603,24 @@ async fn test_project_export_includes_all_data() {
     assert!(!export["labels"].as_array().unwrap().is_empty());
     assert!(!export["checklists"].as_array().unwrap().is_empty());
 }
+
+#[tokio::test]
+async fn test_project_import_roundtrip() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    // Create source data
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"ImportMe","project":"RoundTrip","priority":4})))).await.unwrap();
+    let tid = body_json(resp).await["id"].as_i64().unwrap();
+    app.clone().oneshot(auth_req("POST", &format!("/api/tasks/{}/comments", tid), &tok, Some(json!({"content":"Round trip comment"})))).await.unwrap();
+    app.clone().oneshot(auth_req("POST", &format!("/api/tasks/{}/checklist", tid), &tok, Some(json!({"title":"Check 1"})))).await.unwrap();
+    // Export
+    let resp = app.clone().oneshot(auth_req("GET", "/api/export/project?project=RoundTrip", &tok, None)).await.unwrap();
+    let export = body_json(resp).await;
+    // Import into same DB (creates duplicates — that's fine for testing)
+    let resp = app.clone().oneshot(auth_req("POST", "/api/import/project", &tok, Some(export.clone()))).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let result = body_json(resp).await;
+    assert_eq!(result["created_tasks"], 1);
+    assert_eq!(result["created_comments"], 1);
+    assert_eq!(result["created_checklists"], 1);
+}
