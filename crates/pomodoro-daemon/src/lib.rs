@@ -193,6 +193,7 @@ pub async fn build_router(engine: Arc<engine::Engine>) -> Router {
         .route("/api/templates", get(routes::list_templates).post(routes::create_template))
         .route("/api/templates/{id}", put(routes::update_template).delete(routes::delete_template))
         .route("/api/templates/{id}/instantiate", post(routes::instantiate_template))
+        .route("/api/tasks/{id}/save-as-template", post(routes::save_task_as_template))
         // Custom statuses (Jira-like workflows)
         .route("/api/statuses", get(routes::list_custom_statuses).post(routes::create_custom_status))
         .route("/api/statuses/{id}", put(routes::update_custom_status).delete(routes::delete_custom_status))
