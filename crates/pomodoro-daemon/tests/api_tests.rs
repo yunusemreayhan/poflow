@@ -7576,3 +7576,30 @@ async fn test_automation_all_subtasks_done() {
     let resp = app.clone().oneshot(auth_req("GET", &format!("/api/tasks/{}", pid), &tok, None)).await.unwrap();
     assert_eq!(body_json(resp).await["task"]["status"], "completed", "Parent should be auto-completed when all subtasks done");
 }
+
+// ============================================================
+// Comprehensive project export
+// ============================================================
+
+#[tokio::test]
+async fn test_project_export_includes_all_data() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    // Create task with comment, label, checklist, custom field
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"ExportTask","project":"ExportProj"})))).await.unwrap();
+    let tid = body_json(resp).await["id"].as_i64().unwrap();
+    app.clone().oneshot(auth_req("POST", &format!("/api/tasks/{}/comments", tid), &tok, Some(json!({"content":"Test comment"})))).await.unwrap();
+    let resp = app.clone().oneshot(auth_req("POST", "/api/labels", &tok, Some(json!({"name":"export_label","color":"#ff0000"})))).await.unwrap();
+    let lid = body_json(resp).await["id"].as_i64().unwrap();
+    app.clone().oneshot(auth_req("PUT", &format!("/api/tasks/{}/labels/{}", tid, lid), &tok, None)).await.unwrap();
+    app.clone().oneshot(auth_req("POST", &format!("/api/tasks/{}/checklist", tid), &tok, Some(json!({"title":"Check item"})))).await.unwrap();
+    // Export
+    let resp = app.clone().oneshot(auth_req("GET", "/api/export/project?project=ExportProj", &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let export = body_json(resp).await;
+    assert_eq!(export["version"], 1);
+    assert!(!export["tasks"].as_array().unwrap().is_empty());
+    assert!(!export["comments"].as_array().unwrap().is_empty());
+    assert!(!export["labels"].as_array().unwrap().is_empty());
+    assert!(!export["checklists"].as_array().unwrap().is_empty());
+}

@@ -288,3 +288,76 @@ pub async fn export_ical(State(engine): State<AppState>, claims: Claims) -> Resu
 fn ical_escape(s: &str) -> String {
     s.replace('\\', "\\\\").replace(';', "\\;").replace(',', "\\,").replace(':', "\\:").replace('\n', "\\n").replace('\r', "")
 }
+
+// Comprehensive project export — tasks with comments, custom fields, dependencies, labels
+#[derive(Deserialize)]
+pub struct ProjectExportQuery { pub project: Option<String> }
+
+#[utoipa::path(get, path = "/api/export/project", responses((status = 200)), security(("bearer" = [])))]
+pub async fn export_project(State(engine): State<AppState>, claims: Claims, Query(q): Query<ProjectExportQuery>) -> Result<axum::response::Response, ApiError> {
+    let user_filter = if claims.role == "root" || claims.role == "admin" { None } else { Some(claims.user_id) };
+    let filter = db::TaskFilter { status: None, project: q.project.as_deref(), search: None, assignee: None, due_before: None, due_after: None, priority: None, team_id: None, user_id: user_filter, label: None };
+    let tasks = db::list_tasks_paged(&engine.pool, filter, 10000, 0).await.map_err(internal)?;
+    let task_ids: Vec<i64> = tasks.iter().map(|t| t.id).collect();
+
+    // Batch fetch comments
+    let mut comments: Vec<serde_json::Value> = Vec::new();
+    for tid in &task_ids {
+        let cs: Vec<(i64, String, String, String)> = sqlx::query_as(
+            "SELECT c.task_id, u.username, c.content, c.created_at FROM comments c JOIN users u ON c.user_id = u.id WHERE c.task_id = ? ORDER BY c.created_at")
+            .bind(tid).fetch_all(&engine.pool).await.unwrap_or_default();
+        for (task_id, user, content, at) in cs {
+            comments.push(serde_json::json!({"task_id": task_id, "user": user, "content": content, "created_at": at}));
+        }
+    }
+
+    // Dependencies
+    let deps = db::get_all_dependencies(&engine.pool).await.unwrap_or_default();
+    let relevant_deps: Vec<_> = deps.iter().filter(|d| task_ids.contains(&d.task_id) || task_ids.contains(&d.depends_on)).collect();
+
+    // Labels per task
+    let mut task_labels: Vec<serde_json::Value> = Vec::new();
+    for tid in &task_ids {
+        let labels: Vec<(String, String)> = sqlx::query_as(
+            "SELECT l.name, l.color FROM task_labels tl JOIN labels l ON l.id = tl.label_id WHERE tl.task_id = ?")
+            .bind(tid).fetch_all(&engine.pool).await.unwrap_or_default();
+        for (name, color) in labels {
+            task_labels.push(serde_json::json!({"task_id": tid, "label": name, "color": color}));
+        }
+    }
+
+    // Custom field values
+    let cf_rows = db::get_task_field_values_batch(&engine.pool, &task_ids).await.unwrap_or_default();
+    let custom_fields: Vec<serde_json::Value> = cf_rows.iter().map(|(tid, fv)| {
+        serde_json::json!({"task_id": tid, "field_name": fv.field_name, "field_type": fv.field_type, "value": fv.value})
+    }).collect();
+
+    // Checklists
+    let mut checklists: Vec<serde_json::Value> = Vec::new();
+    for tid in &task_ids {
+        let items = db::list_checklist(&engine.pool, *tid).await.unwrap_or_default();
+        for item in items {
+            checklists.push(serde_json::json!({"task_id": tid, "title": item.title, "checked": item.checked, "sort_order": item.sort_order}));
+        }
+    }
+
+    let export = serde_json::json!({
+        "version": 1,
+        "exported_at": db::now_str(),
+        "project": q.project,
+        "tasks": tasks,
+        "comments": comments,
+        "dependencies": relevant_deps,
+        "labels": task_labels,
+        "custom_fields": custom_fields,
+        "checklists": checklists,
+    });
+
+    let body = serde_json::to_vec_pretty(&export).map_err(|e| internal(e.to_string()))?;
+    let filename = format!("pomodoro-export-{}.json", q.project.as_deref().unwrap_or("all"));
+    axum::response::Response::builder()
+        .status(StatusCode::OK)
+        .header("content-type", "application/json")
+        .header("content-disposition", format!("attachment; filename=\"{}\"", filename))
+        .body(axum::body::Body::from(body)).map_err(|e| internal(e.to_string()))
+}
