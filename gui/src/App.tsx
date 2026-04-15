@@ -18,6 +18,7 @@ import CalendarView from "./components/CalendarView";
 import KanbanBoard from "./components/KanbanBoard";
 import GanttChart from "./components/GanttChart";
 import RoadmapView from "./components/RoadmapView";
+import CommandPalette from "./components/CommandPalette";
 
 const TABS = [
   { id: "timer", icon: TimerIcon, labelKey: "timer" },
@@ -253,6 +254,7 @@ export default function App() {
   return (
     <MotionConfig reducedMotion="user">
     <div className="flex h-screen bg-[var(--color-bg)]">
+      <CommandPalette />
       <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:top-2 focus:left-2 focus:px-4 focus:py-2 focus:bg-[var(--color-accent)] focus:text-white focus:rounded-lg focus:text-sm">
         {t.skipToContent}
       </a>
@@ -399,6 +401,7 @@ export default function App() {
                   ["Space", "Pause/Resume timer"],
                   ["Escape", "Stop timer"],
                   ["/", t.focusSearch],
+                  ["⌘K", "Command palette (global search)"],
                   ["?", t.toggleShortcuts],
                   ["Double-click", t.renameTask],
                   ["Enter", t.saveEdit],
