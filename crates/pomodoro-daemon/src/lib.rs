@@ -2,6 +2,7 @@ pub mod auth;
 pub mod automation;
 pub mod config;
 pub mod db;
+pub mod email;
 pub mod engine;
 pub mod notify;
 pub mod routes;

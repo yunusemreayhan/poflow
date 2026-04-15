@@ -25,8 +25,15 @@ pub async fn update_profile(State(engine): State<AppState>, claims: Claims, Json
         let hash = tokio::task::spawn_blocking(move || bcrypt::hash(&pw, 12))
             .await.map_err(internal)?.map_err(internal)?;
         db::update_user_password(&engine.pool, claims.user_id, &hash).await.map_err(internal)?;
-        // S1: Invalidate user cache so existing tokens are re-validated against password_changed_at
         auth::invalidate_user_cache(&engine.user_auth_cache, claims.user_id).await;
+    }
+    if let Some(ref email) = req.email {
+        let email_trimmed = email.trim();
+        if !email_trimmed.is_empty() && !email_trimmed.contains('@') {
+            return Err(err(StatusCode::BAD_REQUEST, "Invalid email address"));
+        }
+        let val = if email_trimmed.is_empty() { None } else { Some(email_trimmed) };
+        sqlx::query("UPDATE users SET email = ? WHERE id = ?").bind(val).bind(claims.user_id).execute(&engine.pool).await.map_err(internal)?;
     }
     let user = db::get_user(&engine.pool, claims.user_id).await.map_err(internal)?;
     let token = auth::create_token(user.id, &user.username, &user.role).map_err(internal)?;

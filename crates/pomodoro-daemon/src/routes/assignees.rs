@@ -16,6 +16,12 @@ pub async fn add_assignee(State(engine): State<AppState>, claims: Claims, Path(i
     db::add_assignee(&engine.pool, id, uid).await.map_err(internal)?;
     // BL21: Notify assigned user
     db::create_notification(&engine.pool, uid, "task_assigned", &format!("You were assigned to: {}", task.title), Some("task"), Some(id)).await.ok();
+    // Email notification (if user has email configured)
+    if let Ok(user) = db::get_user(&engine.pool, uid).await {
+        if let Some(ref email) = user.email {
+            crate::email::notify_assigned(email, &task.title, &claims.username);
+        }
+    }
     engine.notify(ChangeEvent::Tasks);
     Ok(StatusCode::OK)
 }

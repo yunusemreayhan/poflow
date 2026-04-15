@@ -8047,3 +8047,29 @@ async fn test_reorder_persists_sort_order() {
         .map(|t| t["title"].as_str().unwrap()).collect();
     assert_eq!(titles, vec!["Gamma", "Alpha", "Beta"], "Reorder should persist");
 }
+
+// ============================================================
+// Email notifications (SMTP integration)
+// ============================================================
+
+#[tokio::test]
+async fn test_profile_email_update() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    // Set email
+    let resp = app.clone().oneshot(auth_req("PUT", "/api/profile", &tok, Some(json!({"email":"test@example.com"})))).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    // Verify via admin user list
+    let resp = app.clone().oneshot(auth_req("GET", "/api/admin/users", &tok, None)).await.unwrap();
+    let users = body_json(resp).await;
+    let root = users.as_array().unwrap().iter().find(|u| u["username"] == "root").unwrap();
+    assert_eq!(root["email"], "test@example.com");
+}
+
+#[tokio::test]
+async fn test_profile_invalid_email_rejected() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("PUT", "/api/profile", &tok, Some(json!({"email":"not-an-email"})))).await.unwrap();
+    assert_eq!(resp.status(), 400);
+}

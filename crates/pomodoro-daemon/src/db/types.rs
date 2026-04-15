@@ -36,7 +36,7 @@ pub struct TaskAssignee { pub task_id: i64, pub user_id: i64, pub username: Stri
 #[derive(Debug, Clone, FromRow, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 pub struct User {
     pub id: i64, pub username: String, #[serde(skip_serializing)] pub password_hash: String,
-    pub role: String, pub created_at: String,
+    pub role: String, pub created_at: String, pub email: Option<String>,
 }
 
 #[derive(Debug, Clone, FromRow, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]

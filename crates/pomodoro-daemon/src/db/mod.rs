@@ -570,6 +570,12 @@ async fn migrate(pool: &Pool) -> Result<()> {
         sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (20, ?)").bind(now_str()).execute(pool).await.ok();
     }
 
+    // Migration 21: Add email column to users (for SMTP notifications)
+    if !applied_set.contains(&21) {
+        if let Err(e) = sqlx::query("ALTER TABLE users ADD COLUMN email TEXT").execute(pool).await { log_migration_err("ALTER TABLE users ADD COLUMN email", e); }
+        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (21, ?)").bind(now_str()).execute(pool).await.ok();
+    }
+
     sqlx::query("CREATE TABLE IF NOT EXISTS task_attachments (
         id          INTEGER PRIMARY KEY AUTOINCREMENT,
         task_id     INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
