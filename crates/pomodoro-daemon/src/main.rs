@@ -93,6 +93,17 @@ use utoipa_swagger_ui::SwaggerUi;
         routes::get_notif_prefs, routes::update_notif_prefs, routes::get_task_sessions,
         // V38-1: Watcher endpoints
         routes::watch_task, routes::unwatch_task, routes::get_task_watchers, routes::get_watched_tasks,
+        // Custom statuses, custom fields, checklists
+        routes::list_custom_statuses, routes::create_custom_status, routes::update_custom_status, routes::delete_custom_status,
+        routes::list_custom_fields, routes::create_custom_field, routes::update_custom_field, routes::delete_custom_field,
+        routes::get_task_fields, routes::set_task_field_value, routes::delete_task_field_value,
+        routes::list_checklist, routes::add_checklist_item, routes::update_checklist_item, routes::delete_checklist_item,
+        // Bulk ops, advanced search, reports
+        routes::bulk_assign, routes::bulk_sprint_move,
+        routes::advanced_search, routes::global_search,
+        routes::time_tracking_report, routes::sla_report, routes::standup_report,
+        // Project export/import, templates
+        routes::export_project, routes::save_task_as_template,
     ),
     components(schemas(
         db::Task, db::Session, db::Comment, db::User, db::TaskDetail, db::SessionWithPath, db::DayStat, db::TaskAssignee,
@@ -120,6 +131,12 @@ use utoipa_swagger_ui::SwaggerUi;
         routes::RefreshRequest, routes::ChangePasswordRequest,
         routes::RestoreRequest, routes::ReorderRequest,
         routes::CreateTemplateRequest, routes::RoomRoleRequest,
+        // New feature schemas
+        db::CustomStatus, db::CustomField, db::ChecklistItem, db::TaskFieldValue,
+        routes::CreateCustomStatusRequest, routes::CreateFieldRequest, routes::SetFieldValueRequest,
+        routes::AddChecklistItemRequest, routes::UpdateChecklistItemRequest,
+        routes::BulkAssignRequest, routes::BulkSprintMoveRequest,
+        routes::AdvancedSearchRequest, routes::SearchFilter,
     )),
     modifiers(&SecurityAddon),
     info(title = "Pomodoro API", version = "2.1.0", description = "Multi-user Pomodoro timer with hierarchical task management")
