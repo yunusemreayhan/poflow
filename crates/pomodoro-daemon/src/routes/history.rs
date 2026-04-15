@@ -470,3 +470,67 @@ pub async fn weekly_digest(State(engine): State<AppState>, claims: Claims) -> Ap
         "upcoming_due": upcoming.into_iter().map(|(t, d)| serde_json::json!({"title": t, "due_date": d})).collect::<Vec<_>>(),
     })))
 }
+
+// Daily standup report — auto-generated from task data
+#[utoipa::path(get, path = "/api/reports/standup", responses((status = 200)), security(("bearer" = [])))]
+pub async fn standup_report(State(engine): State<AppState>, claims: Claims) -> ApiResult<serde_json::Value> {
+    let today = chrono::Utc::now().naive_utc().date();
+    let yesterday = (today - chrono::Duration::days(1)).format("%Y-%m-%d").to_string();
+    let today_str = today.format("%Y-%m-%d").to_string();
+
+    // What I did yesterday: tasks completed/updated yesterday
+    let done_yesterday: Vec<(i64, String, String)> = sqlx::query_as(
+        "SELECT id, title, status FROM tasks WHERE user_id = ? AND status IN ('completed','done') AND updated_at >= ? AND updated_at < ? AND deleted_at IS NULL ORDER BY updated_at DESC")
+        .bind(claims.user_id).bind(&yesterday).bind(&today_str)
+        .fetch_all(&engine.pool).await.map_err(internal)?;
+
+    // Sessions yesterday
+    let (focus_hours,): (f64,) = sqlx::query_as(
+        "SELECT COALESCE(SUM(duration_s),0)/3600.0 FROM sessions WHERE user_id = ? AND status = 'completed' AND started_at >= ? AND started_at < ?")
+        .bind(claims.user_id).bind(&yesterday).bind(&today_str)
+        .fetch_one(&engine.pool).await.map_err(internal)?;
+
+    // What I'm doing today: in-progress + active tasks
+    let doing_today: Vec<(i64, String, i64, Option<String>)> = sqlx::query_as(
+        "SELECT id, title, priority, due_date FROM tasks WHERE user_id = ? AND status IN ('in_progress','active') AND deleted_at IS NULL ORDER BY priority DESC, due_date ASC NULLS LAST")
+        .bind(claims.user_id).fetch_all(&engine.pool).await.map_err(internal)?;
+
+    // Blockers: blocked tasks
+    let blockers: Vec<(i64, String)> = sqlx::query_as(
+        "SELECT id, title FROM tasks WHERE user_id = ? AND status = 'blocked' AND deleted_at IS NULL")
+        .bind(claims.user_id).fetch_all(&engine.pool).await.map_err(internal)?;
+
+    // Overdue tasks
+    let overdue: Vec<(i64, String, String)> = sqlx::query_as(
+        "SELECT id, title, due_date FROM tasks WHERE user_id = ? AND due_date < ? AND status NOT IN ('completed','done','archived') AND deleted_at IS NULL ORDER BY due_date")
+        .bind(claims.user_id).bind(&today_str).fetch_all(&engine.pool).await.map_err(internal)?;
+
+    // Generate markdown
+    let mut md = format!("# Daily Standup — {}\n\n", today_str);
+    md.push_str("## ✅ Yesterday\n");
+    if done_yesterday.is_empty() && focus_hours < 0.01 { md.push_str("- (no completed tasks)\n"); }
+    else {
+        for (id, title, _) in &done_yesterday { md.push_str(&format!("- [#{}] {}\n", id, title)); }
+        if focus_hours > 0.01 { md.push_str(&format!("- ⏱ {:.1}h focused\n", focus_hours)); }
+    }
+    md.push_str("\n## 🔄 Today\n");
+    if doing_today.is_empty() { md.push_str("- (no active tasks)\n"); }
+    else { for (id, title, pri, due) in &doing_today { md.push_str(&format!("- [#{}] {} (P{}{})\n", id, title, pri, due.as_ref().map(|d| format!(", due {}", d)).unwrap_or_default())); } }
+    if !blockers.is_empty() {
+        md.push_str("\n## 🚫 Blockers\n");
+        for (id, title) in &blockers { md.push_str(&format!("- [#{}] {}\n", id, title)); }
+    }
+    if !overdue.is_empty() {
+        md.push_str("\n## ⚠️ Overdue\n");
+        for (id, title, due) in &overdue { md.push_str(&format!("- [#{}] {} (was due {})\n", id, title, due)); }
+    }
+
+    Ok(Json(serde_json::json!({
+        "date": today_str,
+        "yesterday": { "completed": done_yesterday.iter().map(|(id, title, _)| serde_json::json!({"id": id, "title": title})).collect::<Vec<_>>(), "focus_hours": (focus_hours * 100.0).round() / 100.0 },
+        "today": doing_today.iter().map(|(id, title, pri, due)| serde_json::json!({"id": id, "title": title, "priority": pri, "due_date": due})).collect::<Vec<_>>(),
+        "blockers": blockers.iter().map(|(id, title)| serde_json::json!({"id": id, "title": title})).collect::<Vec<_>>(),
+        "overdue": overdue.iter().map(|(id, title, due)| serde_json::json!({"id": id, "title": title, "due_date": due})).collect::<Vec<_>>(),
+        "markdown": md,
+    })))
+}

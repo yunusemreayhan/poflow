@@ -77,6 +77,42 @@ pub async fn search_tasks(State(engine): State<AppState>, claims: Claims, Query(
     Ok(Json(results.into_iter().map(|(id, title, snippet)| serde_json::json!({"id": id, "title": title, "snippet": snippet})).collect()))
 }
 
+// Global search across tasks, comments, and sprints
+#[derive(Deserialize)]
+pub struct GlobalSearchQuery { pub q: String, pub limit: Option<i64> }
+
+#[utoipa::path(get, path = "/api/search", responses((status = 200)), security(("bearer" = [])))]
+pub async fn global_search(State(engine): State<AppState>, claims: Claims, Query(q): Query<GlobalSearchQuery>) -> ApiResult<serde_json::Value> {
+    let query = q.q.trim();
+    if query.is_empty() { return Ok(Json(serde_json::json!({"tasks":[],"comments":[],"sprints":[]}))); }
+    let limit = q.limit.unwrap_or(10).min(50);
+    let like = format!("%{}%", query);
+
+    // Tasks
+    let user_filter = if auth::is_admin_or_root(&claims) { None } else { Some(claims.user_id) };
+    let task_results = db::search_tasks_fts(&engine.pool, query, limit, user_filter).await.unwrap_or_default();
+    let tasks: Vec<serde_json::Value> = task_results.into_iter().map(|(id, title, snippet)| serde_json::json!({"type":"task","id":id,"title":title,"snippet":snippet})).collect();
+
+    // Comments
+    let comments: Vec<(i64, i64, String, String, String)> = sqlx::query_as(
+        "SELECT c.id, c.task_id, c.content, c.created_at, u.username FROM comments c JOIN users u ON c.user_id = u.id WHERE c.content LIKE ? ORDER BY c.created_at DESC LIMIT ?")
+        .bind(&like).bind(limit).fetch_all(&engine.pool).await.unwrap_or_default();
+    let comments: Vec<serde_json::Value> = comments.into_iter().map(|(id, tid, content, at, user)| {
+        let snippet = if content.len() > 100 { format!("{}...", &content[..100]) } else { content };
+        serde_json::json!({"type":"comment","id":id,"task_id":tid,"snippet":snippet,"created_at":at,"user":user})
+    }).collect();
+
+    // Sprints
+    let sprints: Vec<(i64, String, String, Option<String>)> = sqlx::query_as(
+        "SELECT id, name, status, project FROM sprints WHERE name LIKE ? OR project LIKE ? ORDER BY created_at DESC LIMIT ?")
+        .bind(&like).bind(&like).bind(limit).fetch_all(&engine.pool).await.unwrap_or_default();
+    let sprints: Vec<serde_json::Value> = sprints.into_iter().map(|(id, name, status, project)| {
+        serde_json::json!({"type":"sprint","id":id,"name":name,"status":status,"project":project})
+    }).collect();
+
+    Ok(Json(serde_json::json!({"tasks":tasks,"comments":comments,"sprints":sprints})))
+}
+
 // Advanced structured search (JQL-like)
 #[derive(Deserialize, utoipa::ToSchema)]
 pub struct AdvancedSearchRequest {

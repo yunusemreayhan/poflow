@@ -7624,3 +7624,49 @@ async fn test_project_import_roundtrip() {
     assert_eq!(result["created_comments"], 1);
     assert_eq!(result["created_checklists"], 1);
 }
+
+// ============================================================
+// Standup report + Global search
+// ============================================================
+
+#[tokio::test]
+async fn test_standup_report() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    // Create and complete a task
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"Standup task"})))).await.unwrap();
+    let tid = body_json(resp).await["id"].as_i64().unwrap();
+    app.clone().oneshot(auth_req("PUT", &format!("/api/tasks/{}", tid), &tok, Some(json!({"status":"in_progress"})))).await.unwrap();
+    // Get standup
+    let resp = app.clone().oneshot(auth_req("GET", "/api/reports/standup", &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let report = body_json(resp).await;
+    assert!(report["date"].is_string());
+    assert!(report["today"].is_array());
+    assert!(report["markdown"].as_str().unwrap().contains("Daily Standup"));
+    // in_progress task should appear in "today"
+    assert!(report["today"].as_array().unwrap().iter().any(|t| t["title"] == "Standup task"));
+}
+
+#[tokio::test]
+async fn test_global_search() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"UniqueSearchTarget42"})))).await.unwrap();
+    let resp = app.clone().oneshot(auth_req("GET", "/api/search?q=UniqueSearchTarget42", &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let results = body_json(resp).await;
+    assert!(!results["tasks"].as_array().unwrap().is_empty(), "Should find the task");
+}
+
+#[tokio::test]
+async fn test_global_search_comments() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"CommentSearch"})))).await.unwrap();
+    let tid = body_json(resp).await["id"].as_i64().unwrap();
+    app.clone().oneshot(auth_req("POST", &format!("/api/tasks/{}/comments", tid), &tok, Some(json!({"content":"UniqueCommentXyz99"})))).await.unwrap();
+    let resp = app.clone().oneshot(auth_req("GET", "/api/search?q=UniqueCommentXyz99", &tok, None)).await.unwrap();
+    let results = body_json(resp).await;
+    assert!(!results["comments"].as_array().unwrap().is_empty(), "Should find the comment");
+}
