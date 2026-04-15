@@ -4,6 +4,14 @@ import { platformSaveAuth, platformClearAuth, platformSetConnection, platformSet
 import type { EngineState, Task, DayStat, Session, Config, Comment, TaskDetail, AuthResponse, TaskSprintInfo, BurnTotalEntry, TaskAssignee, Sprint } from "./api";
 import { cacheTasksOffline, getOfflineTasks, enqueueOfflineAction, processSyncQueue } from "../offlineStore";
 
+// Dedup guard: prevents double-submit from rapid clicks on mutation actions
+const _inflight = new Set<string>();
+function dedup(key: string, fn: () => Promise<void>): Promise<void> {
+  if (_inflight.has(key)) return Promise.resolve();
+  _inflight.add(key);
+  return fn().finally(() => _inflight.delete(key));
+}
+
 // Task load timestamp tracked in store
 
 export interface SavedServer {
@@ -159,7 +167,7 @@ export const useStore = create<Store>((set, get) => ({
 
   setTab: (tab) => set({ activeTab: tab }),
 
-  login: async (username, password) => {
+  login: async (username, password) => dedup("auth:login", async () => {
     const resp = await apiCall<AuthResponse>("POST", "/api/auth/login", { username, password });
     await setToken(resp.token);
     platformSaveAuth(JSON.stringify(resp)).catch(() => {
@@ -172,7 +180,7 @@ export const useStore = create<Store>((set, get) => ({
     servers.unshift({ url, username: resp.username, token: resp.token, refresh_token: resp.refresh_token, role: resp.role });
     saveServers(servers);
     set({ savedServers: servers });
-  },
+  }),
 
   register: async (username, password) => {
     const resp = await apiCall<AuthResponse>("POST", "/api/auth/register", { username, password });
@@ -259,12 +267,12 @@ export const useStore = create<Store>((set, get) => ({
     }
   },
 
-  start: async (taskId) => {
+  start: async (taskId) => dedup("timer:start", async () => {
     const body: Record<string, unknown> = {};
     if (taskId) body.task_id = taskId;
     const engine = await apiCall<EngineState>("POST", "/api/timer/start", body);
     set({ engine });
-  },
+  }),
 
   pause: async () => {
     const engine = await apiCall<EngineState>("POST", "/api/timer/pause");
@@ -353,7 +361,7 @@ export const useStore = create<Store>((set, get) => ({
     set(s => ({ loading: { ...s.loading, tasks: false } }));
   },
 
-  createTask: async (title, parentId, project, priority = 3, estimated = 1) => {
+  createTask: async (title, parentId, project, priority = 3, estimated = 1) => dedup("task:create", async () => {
     set({ mutating: true });
     try {
       const task = await apiCall<Task>("POST", "/api/tasks", { title, parent_id: parentId, project, priority, estimated });
@@ -367,7 +375,7 @@ export const useStore = create<Store>((set, get) => ({
         get().toast("Offline — task queued for sync", "info");
       }
     } finally { set({ mutating: false }); }
-  },
+  }),
 
   updateTask: async (id, fields) => {
     set({ mutating: true });

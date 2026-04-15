@@ -35,14 +35,14 @@ export function useRoomWebSocket(roomId: number, onState: (s: RoomState) => void
         ws.onclose = () => {
           clearInterval(hb);
           if (unmountedRef.current) return;
-          const delay = Math.min(1000 * Math.pow(2, attempts), 15000);
+          const delay = Math.min(1000 * Math.pow(2, attempts), 30000);
           attempts++;
           reconnectTimer.current = setTimeout(tryConnect, delay);
         };
         ws.onerror = () => ws?.close();
       } catch {
         if (!unmountedRef.current) {
-          const delay = Math.min(1000 * Math.pow(2, attempts), 15000);
+          const delay = Math.min(1000 * Math.pow(2, attempts), 30000);
           attempts++;
           reconnectTimer.current = setTimeout(tryConnect, delay);
         }
