@@ -65,6 +65,26 @@ enum Cmd {
     JoinRoom { room_id: i64 },
     /// Vote in a room
     Vote { room_id: i64, value: f64 },
+    /// Mark a task as completed
+    Done { task_id: i64 },
+    /// Update task status
+    SetStatus { task_id: i64, status: String },
+    /// Delete a task
+    Delete { task_id: i64 },
+    /// Search tasks
+    Search { query: String },
+    /// Show daily standup report
+    Standup,
+    /// Assign a user to a task
+    Assign { task_id: i64, username: String },
+    /// Add a comment to a task
+    Comment { task_id: i64, text: String },
+    /// Show task detail
+    Show { task_id: i64 },
+    /// List checklist items for a task
+    Checklist { task_id: i64 },
+    /// Add checklist item
+    Check { task_id: i64, title: String },
 }
 
 async fn api(client: &reqwest::Client, base: &str, token: Option<&str>, method: &str, path: &str, body: Option<Value>) -> Result<Value> {
@@ -186,6 +206,64 @@ async fn main() -> Result<()> {
         Cmd::Vote { room_id, value } => {
             api(&client, base, token, "POST", &format!("/api/rooms/{}/vote", room_id), Some(json!({"value": value}))).await?;
             println!("Voted {} in room {}", value, room_id);
+        }
+        Cmd::Done { task_id } => {
+            api(&client, base, token, "PUT", &format!("/api/tasks/{}", task_id), Some(json!({"status":"completed"}))).await?;
+            println!("Task #{} marked as completed", task_id);
+        }
+        Cmd::SetStatus { task_id, status } => {
+            api(&client, base, token, "PUT", &format!("/api/tasks/{}", task_id), Some(json!({"status": status}))).await?;
+            println!("Task #{} → {}", task_id, status);
+        }
+        Cmd::Delete { task_id } => {
+            api(&client, base, token, "DELETE", &format!("/api/tasks/{}", task_id), None).await?;
+            println!("Task #{} deleted", task_id);
+        }
+        Cmd::Search { query } => {
+            let results = api(&client, base, token, "GET", &format!("/api/search?q={}", query.replace(' ', "%20").replace('#', "%23").replace('&', "%26")), None).await?;
+            if let Some(tasks) = results["tasks"].as_array() {
+                for t in tasks { println!("[task] #{} {}", t["id"], t["title"].as_str().unwrap_or("?")); }
+            }
+            if let Some(comments) = results["comments"].as_array() {
+                for c in comments { println!("[comment] task#{} {}", c["task_id"], c["snippet"].as_str().unwrap_or("?")); }
+            }
+            if let Some(sprints) = results["sprints"].as_array() {
+                for s in sprints { println!("[sprint] #{} {}", s["id"], s["name"].as_str().unwrap_or("?")); }
+            }
+        }
+        Cmd::Standup => {
+            let report = api(&client, base, token, "GET", "/api/reports/standup", None).await?;
+            print!("{}", report["markdown"].as_str().unwrap_or("No data"));
+        }
+        Cmd::Assign { task_id, username } => {
+            api(&client, base, token, "POST", &format!("/api/tasks/{}/assignees", task_id), Some(json!({"username": username}))).await?;
+            println!("Assigned {} to task #{}", username, task_id);
+        }
+        Cmd::Comment { task_id, text } => {
+            api(&client, base, token, "POST", &format!("/api/tasks/{}/comments", task_id), Some(json!({"content": text}))).await?;
+            println!("Comment added to task #{}", task_id);
+        }
+        Cmd::Show { task_id } => {
+            let detail = api(&client, base, token, "GET", &format!("/api/tasks/{}", task_id), None).await?;
+            let t = &detail["task"];
+            println!("#{} [{}] {} (P{})", t["id"], t["status"].as_str().unwrap_or("?"), t["title"].as_str().unwrap_or("?"), t["priority"]);
+            if let Some(d) = t["description"].as_str() { if !d.is_empty() { println!("  {}", d); } }
+            if let Some(p) = t["project"].as_str() { println!("  Project: {}", p); }
+            if let Some(d) = t["due_date"].as_str() { println!("  Due: {}", d); }
+            if let Some(comments) = detail["comments"].as_array() {
+                for c in comments { println!("  💬 {} ({}): {}", c["user"].as_str().unwrap_or("?"), &c["created_at"].as_str().unwrap_or("?")[..10], c["content"].as_str().unwrap_or("")); }
+            }
+        }
+        Cmd::Checklist { task_id } => {
+            let items = api(&client, base, token, "GET", &format!("/api/tasks/{}/checklist", task_id), None).await?;
+            if let Some(arr) = items.as_array() {
+                if arr.is_empty() { println!("No checklist items"); }
+                for item in arr { println!("[{}] {}", if item["checked"].as_bool().unwrap_or(false) { "x" } else { " " }, item["title"].as_str().unwrap_or("?")); }
+            }
+        }
+        Cmd::Check { task_id, title } => {
+            api(&client, base, token, "POST", &format!("/api/tasks/{}/checklist", task_id), Some(json!({"title": title}))).await?;
+            println!("Checklist item added to task #{}", task_id);
         }
     }
     Ok(())
