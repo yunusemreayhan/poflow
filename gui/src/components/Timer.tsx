@@ -14,6 +14,15 @@ const PHASE_COLORS: Record<string, string> = {
   Idle: "#6C7A89",
 };
 
+function playSound(file: string) {
+  try { new Audio(`/${file}`).play().catch(() => {}); } catch { /* ignore */ }
+}
+
+function sendNotification(title: string, body: string) {
+  if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
+  try { new Notification(title, { body, icon: "/favicon.svg" }); } catch { /* ignore */ }
+}
+
 const PHASE_KEYS: Record<string, keyof ReturnType<typeof useT>> = {
   Work: "work",
   ShortBreak: "shortBreak",
@@ -63,15 +72,28 @@ export default function Timer() {
       const breakType = phase === "ShortBreak" ? "short" : "long";
       const autoStarted = status === "Running";
       toast(autoStarted ? `🍅 Session complete! Auto-starting ${breakType} break...` : "🍅 Session complete!", "success");
+      if (config?.sound_enabled) playSound("work-end.ogg");
+      if (config?.notification_enabled) sendNotification("Pomodoro", `Session complete! Time for a ${breakType} break.`);
       if (prevSessionRef.current) setNotePrompt({ sessionId: prevSessionRef.current });
       // BL15: Celebrate when daily goal is reached
       const dc = engine?.daily_completed ?? 0;
       const dg = engine?.daily_goal ?? 0;
       if (dg > 0 && dc >= dg && dc - 1 < dg) toast("🎉 Daily goal reached!", "success");
     }
+    if ((prevPhaseRef.current === "ShortBreak" || prevPhaseRef.current === "LongBreak") && phase === "Work") {
+      if (config?.sound_enabled) playSound("break-end.ogg");
+      if (config?.notification_enabled) sendNotification("Pomodoro", "Break over! Time to focus.");
+    }
     prevPhaseRef.current = phase;
     prevSessionRef.current = engine?.current_session_id ?? null;
   }, [phase, engine?.current_session_id]);
+
+  // Request notification permission when enabled
+  useEffect(() => {
+    if (config?.notification_enabled && typeof Notification !== "undefined" && Notification.permission === "default") {
+      Notification.requestPermission().catch(() => {});
+    }
+  }, [config?.notification_enabled]);
 
   // Keyboard shortcuts: Space = start/pause/resume, Escape = stop
   useEffect(() => {
