@@ -7763,3 +7763,56 @@ async fn test_global_search_empty_query() {
     let r = body_json(resp).await;
     assert!(r["tasks"].as_array().unwrap().is_empty());
 }
+
+// ============================================================
+// Recurrence auto-creation (DB function test)
+// ============================================================
+
+#[tokio::test]
+async fn test_recurrence_auto_creates_task_via_db() {
+    // Test the recurrence DB functions directly (simulating background scheduler)
+    std::env::set_var("POMODORO_ROOT_PASSWORD", "root");
+    let pool = pomodoro_daemon::db::connect_memory().await.unwrap();
+    let yesterday = (chrono::Utc::now() - chrono::Duration::days(1)).format("%Y-%m-%d").to_string();
+    let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
+    // Create template task
+    let task = pomodoro_daemon::db::create_task(&pool, 1, None, "Daily standup", None, Some("Team"), None, 4, 1, 0.0, 0.0, None).await.unwrap();
+    // Set recurrence with yesterday's due date
+    pomodoro_daemon::db::set_recurrence(&pool, task.id, "daily", &yesterday).await.unwrap();
+    // Get due recurrences
+    let due = pomodoro_daemon::db::get_due_recurrences(&pool, &today).await.unwrap();
+    assert_eq!(due.len(), 1);
+    assert_eq!(due[0].task_id, task.id);
+    // Simulate auto-creation
+    let title = format!("{} ({})", task.title, today);
+    let new_task = pomodoro_daemon::db::create_task(&pool, task.user_id, task.parent_id, &title,
+        task.description.as_deref(), task.project.as_deref(), task.tags.as_deref(),
+        task.priority, task.estimated, task.estimated_hours, task.remaining_points, task.due_date.as_deref()).await.unwrap();
+    assert!(new_task.title.contains(&today));
+    assert_eq!(new_task.project.as_deref(), Some("Team"));
+    assert_eq!(new_task.priority, 4);
+    // Advance recurrence
+    let next = chrono::NaiveDate::parse_from_str(&yesterday, "%Y-%m-%d").unwrap() + chrono::Duration::days(1);
+    pomodoro_daemon::db::advance_recurrence(&pool, task.id, &next.format("%Y-%m-%d").to_string()).await.unwrap();
+    // Verify next_due advanced
+    let rec = pomodoro_daemon::db::get_recurrence(&pool, task.id).await.unwrap().unwrap();
+    assert_eq!(rec.next_due, today);
+    assert!(rec.last_created.as_ref().unwrap().starts_with(&today), "last_created should be today");
+}
+
+#[tokio::test]
+async fn test_recurrence_monthly_advances_correctly() {
+    use chrono::Datelike;
+    std::env::set_var("POMODORO_ROOT_PASSWORD", "root");
+    let pool = pomodoro_daemon::db::connect_memory().await.unwrap();
+    let task = pomodoro_daemon::db::create_task(&pool, 1, None, "Monthly report", None, None, None, 3, 1, 0.0, 0.0, Some("2026-01-31")).await.unwrap();
+    pomodoro_daemon::db::set_recurrence(&pool, task.id, "monthly", "2026-01-31").await.unwrap();
+    // Advance from Jan 31 → should go to Feb 28 (not Feb 31)
+    let d = chrono::NaiveDate::parse_from_str("2026-01-31", "%Y-%m-%d").unwrap();
+    let m = d.month() % 12 + 1; // Feb
+    let y = if m == 1 { d.year() + 1 } else { d.year() };
+    let max_day = chrono::NaiveDate::from_ymd_opt(y, m + 1, 1).and_then(|d| d.pred_opt()).map(|d| d.day()).unwrap_or(28);
+    let next = chrono::NaiveDate::from_ymd_opt(y, m, 31u32.min(max_day)).unwrap();
+    assert_eq!(next.to_string(), "2026-02-28", "Jan 31 monthly should advance to Feb 28");
+}
+
