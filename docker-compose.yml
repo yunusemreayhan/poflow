@@ -15,6 +15,11 @@ services:
       # - POMODORO_ROOT_PASSWORD=changeme
       # Optional: disable public registration
       # - POMODORO_ALLOW_REGISTRATION=false
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9090/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
     restart: unless-stopped
 
 volumes:

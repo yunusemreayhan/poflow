@@ -15,7 +15,7 @@ RUN npm run build
 
 ## Runtime
 FROM debian:bookworm-slim
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates libsqlite3-0 && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates libsqlite3-0 wget && rm -rf /var/lib/apt/lists/*
 COPY --from=backend /build/target/release/pomodoro-daemon /usr/bin/pomodoro-daemon
 COPY --from=frontend /build/gui/dist /usr/share/pomodoro/gui
 
@@ -25,4 +25,5 @@ ENV POMODORO_GUI_DIR=/usr/share/pomodoro/gui \
 
 EXPOSE 9090
 VOLUME /data
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD wget -qO- http://localhost:9090/api/health || exit 1
 CMD ["pomodoro-daemon"]

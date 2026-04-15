@@ -277,10 +277,14 @@ async fn request_id_logger(req: axum::extract::Request, next: axum::middleware::
     let rid = format!("{:012x}", COUNTER.fetch_add(1, Ordering::Relaxed));
     let method = req.method().to_string();
     let path = req.uri().path().to_string();
+    let start = std::time::Instant::now();
     let mut resp = next.run(req).await;
+    let elapsed_ms = start.elapsed().as_millis();
     let status = resp.status().as_u16();
     if status >= 400 {
-        tracing::warn!(request_id = %rid, method = %method, path = %path, status = status, "request error");
+        tracing::warn!(request_id = %rid, method = %method, path = %path, status = status, elapsed_ms = elapsed_ms, "request error");
+    } else if elapsed_ms > 500 {
+        tracing::warn!(request_id = %rid, method = %method, path = %path, status = status, elapsed_ms = elapsed_ms, "slow request");
     }
     resp.headers_mut().insert("x-request-id", rid.parse().unwrap());
     resp
