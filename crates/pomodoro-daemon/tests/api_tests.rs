@@ -8115,3 +8115,57 @@ async fn test_activity_feed_type_filter() {
     let items = body_json(resp).await;
     assert!(items.as_array().unwrap().iter().all(|i| i["type"] == "audit"));
 }
+
+// ============================================================
+// Data retention: archive / unarchive
+// ============================================================
+
+#[tokio::test]
+async fn test_archive_and_unarchive_task() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    // Create and complete a task
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"ArchiveMe"})))).await.unwrap();
+    let tid = body_json(resp).await["id"].as_i64().unwrap();
+    app.clone().oneshot(auth_req("PUT", &format!("/api/tasks/{}", tid), &tok, Some(json!({"status":"archived"})))).await.unwrap();
+    // Should appear in archived list
+    let resp = app.clone().oneshot(auth_req("GET", "/api/tasks/archived", &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let archived = body_json(resp).await;
+    assert!(archived.as_array().unwrap().iter().any(|t| t["id"] == tid));
+    // Normal task list still includes it (with status=archived) — filter by status to exclude
+    let resp = app.clone().oneshot(auth_req("GET", "/api/tasks?status=backlog", &tok, None)).await.unwrap();
+    let tasks = body_json(resp).await;
+    assert!(!tasks.as_array().unwrap().iter().any(|t| t["id"] == tid), "Archived task should not appear when filtering by backlog");
+    // Unarchive
+    let resp = app.clone().oneshot(auth_req("POST", &format!("/api/tasks/{}/unarchive", tid), &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 204);
+    // Should be back as completed
+    let resp = app.clone().oneshot(auth_req("GET", &format!("/api/tasks/{}", tid), &tok, None)).await.unwrap();
+    assert_eq!(body_json(resp).await["task"]["status"], "completed");
+}
+
+#[tokio::test]
+async fn test_unarchive_non_archived_rejected() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"NotArchived"})))).await.unwrap();
+    let tid = body_json(resp).await["id"].as_i64().unwrap();
+    let resp = app.clone().oneshot(auth_req("POST", &format!("/api/tasks/{}/unarchive", tid), &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 400, "Should reject unarchive on non-archived task");
+}
+
+#[tokio::test]
+async fn test_archived_list_user_scoped() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let (user_tok, _) = register_user_full(&app, "archuser", "ArchUs111").await;
+    // Root archives a task
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"RootArchived"})))).await.unwrap();
+    let tid = body_json(resp).await["id"].as_i64().unwrap();
+    app.clone().oneshot(auth_req("PUT", &format!("/api/tasks/{}", tid), &tok, Some(json!({"status":"archived"})))).await.unwrap();
+    // User should NOT see root's archived tasks
+    let resp = app.clone().oneshot(auth_req("GET", "/api/tasks/archived", &user_tok, None)).await.unwrap();
+    let archived = body_json(resp).await;
+    assert!(!archived.as_array().unwrap().iter().any(|t| t["id"] == tid));
+}

@@ -258,6 +258,26 @@ pub async fn list_deleted_tasks(State(engine): State<AppState>, claims: Claims) 
     db::list_deleted_tasks(&engine.pool, user_filter).await.map(Json).map_err(internal)
 }
 
+#[utoipa::path(get, path = "/api/tasks/archived", responses((status = 200, body = Vec<db::Task>)), security(("bearer" = [])))]
+pub async fn list_archived_tasks(State(engine): State<AppState>, claims: Claims) -> ApiResult<Vec<db::Task>> {
+    let mut q = format!("{} WHERE t.status = 'archived' AND t.deleted_at IS NULL", db::TASK_SELECT);
+    if !auth::is_admin_or_root(&claims) { q.push_str(" AND t.user_id = ?"); }
+    q.push_str(" ORDER BY t.updated_at DESC LIMIT 500");
+    let mut query = sqlx::query_as::<_, db::Task>(&q);
+    if !auth::is_admin_or_root(&claims) { query = query.bind(claims.user_id); }
+    query.fetch_all(&engine.pool).await.map(Json).map_err(internal)
+}
+
+#[utoipa::path(post, path = "/api/tasks/{id}/unarchive", responses((status = 204)), security(("bearer" = [])))]
+pub async fn unarchive_task(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>) -> Result<StatusCode, ApiError> {
+    let task = db::get_task(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Task not found"))?;
+    if !is_owner_or_root(task.user_id, &claims) { return Err(err(StatusCode::FORBIDDEN, "Not owner")); }
+    if task.status != "archived" { return Err(err(StatusCode::BAD_REQUEST, "Task is not archived")); }
+    db::update_task(&engine.pool, id, None, None, None, None, None, None, None, None, None, Some("completed"), None, None, None, None, None).await.map_err(internal)?;
+    engine.notify(ChangeEvent::Tasks);
+    Ok(StatusCode::NO_CONTENT)
+}
+
 #[derive(Deserialize)]
 pub struct TaskQuery {
     pub status: Option<String>, pub project: Option<String>,
