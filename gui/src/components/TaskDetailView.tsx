@@ -10,6 +10,57 @@ import { TaskRecurrence } from "./Recurrence";
 import { TaskActivityFeed, TaskAttachments, TaskTimeChart } from "./TaskDetailParts";
 import { apiCall } from "../store/api";
 import { computeRollup } from "../rollup";
+
+// Inline checklist component for task detail
+function TaskChecklist({ taskId, canEdit }: { taskId: number; canEdit: boolean }) {
+  const [items, setItems] = useState<{ id: number; title: string; checked: boolean; sort_order: number }[]>([]);
+  const [newTitle, setNewTitle] = useState("");
+  useEffect(() => { apiCall<typeof items>("GET", `/api/tasks/${taskId}/checklist`).then(setItems).catch(() => {}); }, [taskId]);
+  const toggle = async (id: number, checked: boolean) => {
+    await apiCall("PUT", `/api/checklist/${id}`, { checked: !checked });
+    setItems(prev => prev.map(i => i.id === id ? { ...i, checked: !checked } : i));
+  };
+  const add = async () => {
+    if (!newTitle.trim()) return;
+    const item = await apiCall<typeof items[0]>("POST", `/api/tasks/${taskId}/checklist`, { title: newTitle.trim() });
+    setItems(prev => [...prev, item]);
+    setNewTitle("");
+  };
+  const remove = async (id: number) => {
+    await apiCall("DELETE", `/api/checklist/${id}`);
+    setItems(prev => prev.filter(i => i.id !== id));
+  };
+  if (items.length === 0 && !canEdit) return null;
+  const done = items.filter(i => i.checked).length;
+  return (
+    <div className="mb-3">
+      {items.length > 0 && (
+        <>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-[10px] text-white/30">Checklist</span>
+            <span className="text-[10px] text-white/20">{done}/{items.length}</span>
+            {items.length > 0 && <div className="flex-1 h-1 bg-white/5 rounded-full overflow-hidden"><div className="h-full bg-green-500 rounded-full transition-all" style={{ width: `${(done / items.length) * 100}%` }} /></div>}
+          </div>
+          <div className="space-y-0.5">
+            {items.map(item => (
+              <div key={item.id} className="flex items-center gap-2 text-xs group">
+                <button onClick={() => toggle(item.id, item.checked)} className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${item.checked ? "bg-green-500/20 border-green-500/50 text-green-400" : "border-white/20 text-transparent hover:border-white/40"}`}>✓</button>
+                <span className={item.checked ? "line-through text-white/30" : "text-white/60"}>{item.title}</span>
+                {canEdit && <button onClick={() => remove(item.id)} className="opacity-0 group-hover:opacity-100 text-white/20 hover:text-red-400 ml-auto"><Trash2 size={10} /></button>}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+      {canEdit && (
+        <div className="flex gap-1 mt-1">
+          <input value={newTitle} onChange={e => setNewTitle(e.target.value)} onKeyDown={e => e.key === "Enter" && add()}
+            placeholder="+ Add checklist item" className="flex-1 bg-transparent text-xs text-white/50 placeholder-white/20 outline-none" />
+        </div>
+      )}
+    </div>
+  );
+}
 import CommentSection from "./CommentSection";
 import { formatDuration, EditField, ProgressBar, ExportButton, EstimateVsActual } from "./TaskDetailHelpers";
 
@@ -292,6 +343,24 @@ function DetailNode({ detail, depth, onRefresh, hoursMap }: { detail: TaskDetail
 
         {/* Attachments */}
         <TaskAttachments taskId={t.id} />
+
+        {/* Custom fields */}
+        {(detail.custom_fields?.length ?? 0) > 0 && (
+          <div className="mb-3">
+            <div className="text-[10px] text-white/30 mb-1">Custom Fields</div>
+            <div className="space-y-1">
+              {(detail.custom_fields ?? []).map(cf => (
+                <div key={cf.field_id} className="flex items-center gap-2 text-xs">
+                  <span className="text-white/40 min-w-[80px]">{cf.field_name}:</span>
+                  <span className="text-white/70">{cf.value ?? "—"}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Checklists */}
+        <TaskChecklist taskId={t.id} canEdit={t.user_id === useStore.getState().engine?.current_user_id || useStore.getState().role === "root" || useStore.getState().role === "admin"} />
 
         {/* Assignees */}
         <div className="flex items-center gap-2 flex-wrap mb-3">

@@ -70,6 +70,7 @@ export interface TaskDetail {
   comments: Comment[];
   sessions: Session[];
   children: TaskDetail[];
+  custom_fields?: { field_id: number; field_name: string; field_type: string; value: string | null }[];
 }
 
 export interface DayStat {
