@@ -1,14 +1,23 @@
 [Unit]
 Description=Pomodoro Timer Daemon
 Documentation=https://github.com/yunusemreayhan/pomodoroLinux
-After=graphical-session.target
+After=network.target graphical-session.target
 
 [Service]
 Type=simple
 ExecStart=/usr/bin/pomodoro-daemon
 Restart=on-failure
-RestartSec=3
+RestartSec=5
 Environment=RUST_LOG=pomodoro_daemon=info
+Environment=POMODORO_GUI_DIR=/usr/share/pomodoro/gui
+Environment=POMODORO_DATA_DIR=%h/.local/share/pomodoro
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=%h/.local/share/pomodoro %h/.config/pomodoro
+PrivateTmp=true
 
 [Install]
 WantedBy=default.target

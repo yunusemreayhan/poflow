@@ -1,0 +1,18 @@
+# Pomodoro daemon configuration
+# See https://github.com/yunusemreayhan/pomodoroLinux for documentation
+
+# Server bind address and port
+# bind_address = "0.0.0.0"  # Listen on all interfaces (for LAN access)
+# bind_port = 9090
+
+# Timer defaults (minutes)
+# work_duration_min = 25
+# short_break_min = 5
+# long_break_min = 15
+# long_break_interval = 4
+
+# Security
+# allow_registration = true  # Set to false to disable public registration
+
+# CORS origins (comma-separated, for web GUI on different port)
+# cors_origins = ["http://localhost:3000"]

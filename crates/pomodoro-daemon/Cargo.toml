@@ -46,3 +46,20 @@ getrandom = "0.4.2"
 tower = { version = "0.5", features = ["util"] }
 http-body-util = "0.1"
 hyper = "1"
+
+[package.metadata.deb]
+maintainer = "Yunus Emre Ayhan <yunus.ayhan@ericsson.com>"
+copyright = "2026, Yunus Emre Ayhan"
+license-file = ["../../LICENSE", "0"]
+extended-description = "Production-grade Pomodoro timer and project management platform. 164+ API endpoints, Tauri desktop GUI, web GUI (PWA), hierarchical tasks, sprint planning, Gantt charts, custom workflows, RBAC, and time tracking."
+section = "utils"
+priority = "optional"
+depends = "$auto"
+assets = [
+    ["target/release/pomodoro-daemon", "usr/bin/", "755"],
+    ["../../assets/pomodoro.service", "usr/lib/systemd/user/pomodoro.service", "644"],
+    ["../../assets/pomodoro.desktop", "usr/share/applications/pomodoro.desktop", "644"],
+    ["../../gui/dist/*", "usr/share/pomodoro/gui/", "644"],
+    ["../../gui/dist/assets/*", "usr/share/pomodoro/gui/assets/", "644"],
+]
+conf-files = ["/etc/pomodoro/config.toml"]

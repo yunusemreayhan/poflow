@@ -7816,3 +7816,110 @@ async fn test_recurrence_monthly_advances_correctly() {
     assert_eq!(next.to_string(), "2026-02-28", "Jan 31 monthly should advance to Feb 28");
 }
 
+
+// ============================================================
+// Full workflow integration test
+// ============================================================
+
+#[tokio::test]
+async fn test_full_project_workflow() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+
+    // 1. Create a project with tasks
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"Backend","project":"MyApp","priority":4})))).await.unwrap();
+    let t1 = body_json(resp).await["id"].as_i64().unwrap();
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"Frontend","project":"MyApp","priority":3})))).await.unwrap();
+    let t2 = body_json(resp).await["id"].as_i64().unwrap();
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"Deploy","project":"MyApp","priority":5,"parent_id":t1})))).await.unwrap();
+    let t3 = body_json(resp).await["id"].as_i64().unwrap();
+
+    // 2. Add labels
+    let resp = app.clone().oneshot(auth_req("POST", "/api/labels", &tok, Some(json!({"name":"wf_critical","color":"#ef4444"})))).await.unwrap();
+    let lid = body_json(resp).await["id"].as_i64().unwrap();
+    app.clone().oneshot(auth_req("PUT", &format!("/api/tasks/{}/labels/{}", t1, lid), &tok, None)).await.unwrap();
+
+    // 3. Add dependency: Deploy depends on Backend
+    app.clone().oneshot(auth_req("POST", &format!("/api/tasks/{}/dependencies", t3), &tok, Some(json!({"depends_on":t1})))).await.unwrap();
+
+    // 4. Add checklist to Backend
+    app.clone().oneshot(auth_req("POST", &format!("/api/tasks/{}/checklist", t1), &tok, Some(json!({"title":"Write API"})))).await.unwrap();
+    app.clone().oneshot(auth_req("POST", &format!("/api/tasks/{}/checklist", t1), &tok, Some(json!({"title":"Write tests"})))).await.unwrap();
+
+    // 5. Create sprint and add tasks
+    let resp = app.clone().oneshot(auth_req("POST", "/api/sprints", &tok, Some(json!({"name":"Sprint 1","project":"MyApp","start_date":"2026-04-14","end_date":"2026-04-28"})))).await.unwrap();
+    let sid = body_json(resp).await["id"].as_i64().unwrap();
+    app.clone().oneshot(auth_req("POST", &format!("/api/sprints/{}/tasks", sid), &tok, Some(json!({"task_ids":[t1,t2,t3]})))).await.unwrap();
+    app.clone().oneshot(auth_req("POST", &format!("/api/sprints/{}/start", sid), &tok, None)).await.unwrap();
+
+    // 6. Work on tasks — change statuses
+    app.clone().oneshot(auth_req("PUT", &format!("/api/tasks/{}", t1), &tok, Some(json!({"status":"in_progress"})))).await.unwrap();
+    app.clone().oneshot(auth_req("PUT", &format!("/api/tasks/{}", t1), &tok, Some(json!({"status":"completed"})))).await.unwrap();
+    app.clone().oneshot(auth_req("PUT", &format!("/api/tasks/{}", t2), &tok, Some(json!({"status":"completed"})))).await.unwrap();
+
+    // 7. Check sprint board
+    let resp = app.clone().oneshot(auth_req("GET", &format!("/api/sprints/{}/board", sid), &tok, None)).await.unwrap();
+    let board = body_json(resp).await;
+    assert_eq!(board["done"].as_array().unwrap().len(), 2, "2 tasks should be done");
+
+    // 8. Log time
+    app.clone().oneshot(auth_req("POST", &format!("/api/sprints/{}/burn", sid), &tok, Some(json!({"task_id":t1,"hours":4.0})))).await.unwrap();
+
+    // 9. Export project
+    let resp = app.clone().oneshot(auth_req("GET", "/api/export/project?project=MyApp", &tok, None)).await.unwrap();
+    let export = body_json(resp).await;
+    assert_eq!(export["tasks"].as_array().unwrap().len(), 3);
+    assert!(!export["labels"].as_array().unwrap().is_empty());
+    assert!(!export["checklists"].as_array().unwrap().is_empty());
+
+    // 10. Get standup
+    let resp = app.clone().oneshot(auth_req("GET", "/api/reports/standup", &tok, None)).await.unwrap();
+    let standup = body_json(resp).await;
+    assert!(standup["markdown"].as_str().unwrap().contains("Daily Standup"));
+
+    // 11. Advanced search
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks/search/advanced", &tok, Some(json!({
+        "filters": [{"field":"project","op":"eq","value":"MyApp"},{"field":"status","op":"eq","value":"completed"}],
+        "sort_by": "priority", "sort_dir": "desc"
+    })))).await.unwrap();
+    let results = body_json(resp).await;
+    assert_eq!(results.as_array().unwrap().len(), 2, "2 completed tasks in MyApp");
+}
+
+#[tokio::test]
+async fn test_multi_user_collaboration() {
+    let app = app().await;
+    let root_tok = login_root(&app).await;
+    let (user_tok, user_id) = register_user_full(&app, "collab_dev", "CollDev11").await;
+    let (_, admin_id) = register_user_full(&app, "collab_admin", "CollAdm11").await;
+
+    // Promote to admin
+    app.clone().oneshot(auth_req("PUT", &format!("/api/admin/users/{}/role", admin_id), &root_tok, Some(json!({"role":"admin"})))).await.unwrap();
+    let resp = app.clone().oneshot(json_req("POST", "/api/auth/login", Some(json!({"username":"collab_admin","password":"CollAdm11"})))).await.unwrap();
+    let admin_tok = body_json(resp).await["token"].as_str().unwrap().to_string();
+
+    // Root creates task, assigns to dev
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &root_tok, Some(json!({"title":"Collab task"})))).await.unwrap();
+    let tid = body_json(resp).await["id"].as_i64().unwrap();
+    app.clone().oneshot(auth_req("POST", &format!("/api/tasks/{}/assignees", tid), &root_tok, Some(json!({"username":"collab_dev"})))).await.unwrap();
+
+    // Dev can update the task (assignee permission)
+    let resp = app.clone().oneshot(auth_req("PUT", &format!("/api/tasks/{}", tid), &user_tok, Some(json!({"status":"in_progress"})))).await.unwrap();
+    assert_eq!(resp.status(), 200);
+
+    // Dev can add comment
+    let resp = app.clone().oneshot(auth_req("POST", &format!("/api/tasks/{}/comments", tid), &user_tok, Some(json!({"content":"Working on it"})))).await.unwrap();
+    assert_eq!(resp.status(), 201);
+
+    // Admin can also update (admin privilege)
+    let resp = app.clone().oneshot(auth_req("PUT", &format!("/api/tasks/{}", tid), &admin_tok, Some(json!({"priority":5})))).await.unwrap();
+    assert_eq!(resp.status(), 200);
+
+    // Dev can self-unassign
+    let resp = app.clone().oneshot(auth_req("DELETE", &format!("/api/tasks/{}/assignees/collab_dev", tid), &user_tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 204);
+
+    // Admin cannot manage users (root only)
+    let resp = app.clone().oneshot(auth_req("GET", "/api/admin/users", &admin_tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 403);
+}
