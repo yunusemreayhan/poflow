@@ -34,8 +34,9 @@ pub async fn build_router(engine: Arc<engine::Engine>) -> Router {
     ];
     all_origins.extend(extra);
 
+    let allow_all_cors = std::env::var("POMODORO_CORS_ALLOW_ALL").is_ok();
     let cors = CorsLayer::new()
-        .allow_origin(AllowOrigin::list(all_origins))
+        .allow_origin(if allow_all_cors { AllowOrigin::any() } else { AllowOrigin::list(all_origins) })
         .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE, Method::OPTIONS])
         .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION, header::IF_NONE_MATCH,
             axum::http::HeaderName::from_static("x-requested-with")])

@@ -32,10 +32,13 @@ pub async fn connect() -> Result<Pool> {
     let opts = SqliteConnectOptions::from_str(&format!("sqlite:{}?mode=rwc", path.display()))?
         .create_if_missing(true)
         .journal_mode(sqlx::sqlite::SqliteJournalMode::Wal)
-        .busy_timeout(std::time::Duration::from_secs(5))
-        .pragma("foreign_keys", "ON");
+        .busy_timeout(std::time::Duration::from_secs(10))
+        .pragma("foreign_keys", "ON")
+        .pragma("synchronous", "NORMAL")  // faster writes, still safe with WAL
+        .pragma("cache_size", "-8000")    // 8MB page cache
+        .pragma("temp_store", "MEMORY");  // temp tables in memory
     let pool = SqlitePoolOptions::new()
-        .max_connections(4) // WAL allows concurrent reads
+        .max_connections(8) // WAL allows concurrent reads
         .min_connections(1)
         .connect_with(opts).await?;
     migrate(&pool).await?;
@@ -297,6 +300,15 @@ async fn migrate(pool: &Pool) -> Result<()> {
     sqlx::query("CREATE INDEX IF NOT EXISTS idx_notifications_user_read ON notifications(user_id, read)").execute(pool).await.ok();
     sqlx::query("CREATE INDEX IF NOT EXISTS idx_task_watchers_user ON task_watchers(user_id)").execute(pool).await.ok();
     sqlx::query("CREATE INDEX IF NOT EXISTS idx_burn_log_sprint ON burn_log(sprint_id, cancelled)").execute(pool).await.ok();
+    // Performance indexes for common query patterns
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_tasks_deleted_at ON tasks(deleted_at)").execute(pool).await.ok();
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_tasks_due_date ON tasks(due_date) WHERE due_date IS NOT NULL").execute(pool).await.ok();
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_sessions_task_id ON sessions(task_id)").execute(pool).await.ok();
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_task_assignees_task ON task_assignees(task_id)").execute(pool).await.ok();
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_task_labels_task ON task_labels(task_id)").execute(pool).await.ok();
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_task_custom_values_task ON task_custom_values(task_id)").execute(pool).await.ok();
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_checklist_items_task ON checklist_items(task_id)").execute(pool).await.ok();
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_tasks_sort ON tasks(sort_order, id) WHERE deleted_at IS NULL").execute(pool).await.ok();
 
     sqlx::query("CREATE TABLE IF NOT EXISTS labels (
         id          INTEGER PRIMARY KEY AUTOINCREMENT,

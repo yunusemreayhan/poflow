@@ -4,7 +4,15 @@ use std::collections::HashMap;
 #[utoipa::path(get, path = "/api/health", responses((status = 200)))]
 pub async fn health(State(engine): State<AppState>) -> Json<serde_json::Value> {
     let db_ok = sqlx::query("SELECT 1").execute(&engine.pool).await.is_ok();
-    Json(serde_json::json!({ "status": if db_ok { "ok" } else { "degraded" }, "db": db_ok }))
+    let (user_count,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM users").fetch_one(&engine.pool).await.unwrap_or((0,));
+    let (task_count,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM tasks WHERE deleted_at IS NULL").fetch_one(&engine.pool).await.unwrap_or((0,));
+    Json(serde_json::json!({
+        "status": if db_ok { "ok" } else { "degraded" },
+        "db": db_ok,
+        "version": env!("CARGO_PKG_VERSION"),
+        "users": user_count,
+        "tasks": task_count,
+    }))
 }
 
 #[utoipa::path(get, path = "/api/tasks/{id}/votes", responses((status = 200, body = Vec<db::RoomVote>)), security(("bearer" = [])))]
