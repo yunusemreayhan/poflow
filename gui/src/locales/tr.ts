@@ -7,6 +7,7 @@ const tr: Locale = {
   timer: "Zamanlayıcı",
   tasks: "Görevler",
   history: "Geçmiş",
+  activity: "Aktivite",
   sprints: "Sprintler",
   rooms: "Odalar",
   kanban: "Kanban",

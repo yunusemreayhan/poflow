@@ -360,39 +360,61 @@ pub async fn priority_suggestions(State(engine): State<AppState>, claims: Claims
 pub struct FeedQuery { pub since: Option<String>, pub types: Option<String>, pub limit: Option<i64> }
 
 #[utoipa::path(get, path = "/api/feed", responses((status = 200)), security(("bearer" = [])))]
+#[allow(clippy::type_complexity)]
 pub async fn activity_feed(State(engine): State<AppState>, _claims: Claims, Query(q): Query<FeedQuery>) -> ApiResult<Vec<serde_json::Value>> {
     let since = q.since.as_deref().unwrap_or("2000-01-01T00:00:00");
-    // PF7: Basic datetime format validation
     if q.since.is_some() && chrono::NaiveDateTime::parse_from_str(since, "%Y-%m-%dT%H:%M:%S").is_err()
         && chrono::NaiveDateTime::parse_from_str(since, "%Y-%m-%dT%H:%M:%S%.f").is_err() {
         return Err(err(StatusCode::BAD_REQUEST, "Invalid 'since' format. Use ISO 8601 (YYYY-MM-DDTHH:MM:SS)"));
     }
     let limit = q.limit.unwrap_or(50).min(200);
     let types: Option<Vec<&str>> = q.types.as_deref().map(|t| t.split(',').map(|s| s.trim()).collect());
+    let show = |t: &str| types.as_ref().is_none_or(|ts| ts.iter().any(|x| *x == t || *x == "all"));
 
     let mut items: Vec<serde_json::Value> = Vec::new();
 
-    // Audit log entries
-    if types.as_ref().is_none_or(|t| t.iter().any(|x| *x == "audit" || *x == "all")) {
-        let rows: Vec<(String, String, Option<String>, String, String)> = sqlx::query_as(
-            "SELECT a.action, a.entity_type, a.detail, a.created_at, u.username FROM audit_log a JOIN users u ON a.user_id = u.id WHERE a.created_at > ? ORDER BY a.created_at DESC LIMIT ?")
+    // Audit log entries (task create/update/delete, role changes, etc.)
+    if show("audit") {
+        let rows: Vec<(String, String, Option<i64>, Option<String>, String, String)> = sqlx::query_as(
+            "SELECT a.action, a.entity_type, a.entity_id, a.detail, a.created_at, u.username FROM audit_log a JOIN users u ON a.user_id = u.id WHERE a.created_at > ? ORDER BY a.created_at DESC LIMIT ?")
             .bind(since).bind(limit).fetch_all(&engine.pool).await.map_err(internal)?;
-        for (action, entity, detail, at, user) in rows {
-            items.push(serde_json::json!({"type": "audit", "action": action, "entity_type": entity, "detail": detail, "created_at": at, "user": user}));
+        for (action, entity, entity_id, detail, at, user) in rows {
+            items.push(serde_json::json!({"type": "audit", "action": action, "entity_type": entity, "entity_id": entity_id, "detail": detail, "created_at": at, "user": user}));
         }
     }
 
-    // Recent comments
-    if types.as_ref().is_none_or(|t| t.iter().any(|x| *x == "comment" || *x == "all")) {
+    // Comments
+    if show("comment") {
         let rows: Vec<(i64, i64, String, String, String)> = sqlx::query_as(
             "SELECT c.id, c.task_id, c.content, c.created_at, u.username FROM comments c JOIN users u ON c.user_id = u.id WHERE c.created_at > ? ORDER BY c.created_at DESC LIMIT ?")
             .bind(since).bind(limit).fetch_all(&engine.pool).await.map_err(internal)?;
         for (id, task_id, content, at, user) in rows {
-            items.push(serde_json::json!({"type": "comment", "id": id, "task_id": task_id, "content": content.chars().take(200).collect::<String>(), "created_at": at, "user": user}));
+            // Look up task title
+            let title: Option<(String,)> = sqlx::query_as("SELECT title FROM tasks WHERE id = ?").bind(task_id).fetch_optional(&engine.pool).await.unwrap_or(None);
+            items.push(serde_json::json!({"type": "comment", "id": id, "task_id": task_id, "task_title": title.map(|t| t.0), "content": content.chars().take(200).collect::<String>(), "created_at": at, "user": user}));
         }
     }
 
-    // Sort by created_at descending, truncate
+    // Sprint events
+    if show("sprint") {
+        let rows: Vec<(i64, String, String, String, String)> = sqlx::query_as(
+            "SELECT s.id, s.name, s.status, s.updated_at, u.username FROM sprints s JOIN users u ON s.created_by_id = u.id WHERE s.updated_at > ? ORDER BY s.updated_at DESC LIMIT ?")
+            .bind(since).bind(limit).fetch_all(&engine.pool).await.map_err(internal)?;
+        for (id, name, status, at, user) in rows {
+            items.push(serde_json::json!({"type": "sprint", "sprint_id": id, "name": name, "status": status, "created_at": at, "user": user}));
+        }
+    }
+
+    // Burn log entries (time logged)
+    if show("burn") {
+        let rows: Vec<(i64, f64, f64, String, String, String)> = sqlx::query_as(
+            "SELECT b.task_id, b.points, b.hours, b.created_at, u.username, t.title FROM burn_log b JOIN users u ON b.user_id = u.id JOIN tasks t ON b.task_id = t.id WHERE b.cancelled = 0 AND b.created_at > ? ORDER BY b.created_at DESC LIMIT ?")
+            .bind(since).bind(limit).fetch_all(&engine.pool).await.map_err(internal)?;
+        for (task_id, points, hours, at, user, title) in rows {
+            items.push(serde_json::json!({"type": "burn", "task_id": task_id, "task_title": title, "points": points, "hours": hours, "created_at": at, "user": user}));
+        }
+    }
+
     items.sort_by(|a, b| b["created_at"].as_str().unwrap_or("").cmp(a["created_at"].as_str().unwrap_or("")));
     items.truncate(limit as usize);
     Ok(Json(items))

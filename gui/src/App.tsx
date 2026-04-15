@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence, MotionConfig } from "framer-motion";
-import { Timer as TimerIcon, ListTodo, BarChart3, Settings as SettingsIcon, Wifi, WifiOff, Code2, LogOut, Users, Zap, Sun, Moon, RefreshCw, LayoutDashboard, Bell, CalendarDays, Columns3, GanttChart as GanttIcon, Map } from "lucide-react";
+import { Timer as TimerIcon, ListTodo, BarChart3, Settings as SettingsIcon, Wifi, WifiOff, Code2, LogOut, Users, Zap, Sun, Moon, RefreshCw, LayoutDashboard, Bell, CalendarDays, Columns3, GanttChart as GanttIcon, Map, Activity } from "lucide-react";
 import { useStore } from "./store/store";
 import { useT } from "./i18n";
 import { apiCall } from "./store/api";
@@ -20,6 +20,7 @@ import GanttChart from "./components/GanttChart";
 import RoadmapView from "./components/RoadmapView";
 import CommandPalette from "./components/CommandPalette";
 import WelcomeGuide from "./components/WelcomeGuide";
+import ActivityTimeline from "./components/ActivityTimeline";
 
 const TABS = [
   { id: "timer", icon: TimerIcon, labelKey: "timer" },
@@ -32,6 +33,7 @@ const TABS = [
   { id: "sprints", icon: Zap, labelKey: "sprints" },
   { id: "rooms", icon: Users, labelKey: "rooms" },
   { id: "history", icon: BarChart3, labelKey: "history" },
+  { id: "activity", icon: Activity, labelKey: "activity" },
   { id: "api", icon: Code2, labelKey: "api" },
   { id: "settings", icon: SettingsIcon, labelKey: "settings" },
 ] as const;
@@ -296,6 +298,7 @@ export default function App() {
             {!focusMode && activeTab === "sprints" && <Sprints />}
             {!focusMode && activeTab === "rooms" && <Rooms />}
             {!focusMode && activeTab === "history" && <History />}
+            {!focusMode && activeTab === "activity" && <ActivityTimeline />}
             {!focusMode && activeTab === "api" && <ApiReference />}
             {!focusMode && activeTab === "settings" && <Settings />}
           </motion.div>

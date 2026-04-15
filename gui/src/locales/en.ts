@@ -7,6 +7,7 @@ const en: Locale = {
   timer: "Timer",
   tasks: "Tasks",
   history: "History",
+  activity: "Activity",
   sprints: "Sprints",
   rooms: "Rooms",
   kanban: "Kanban",

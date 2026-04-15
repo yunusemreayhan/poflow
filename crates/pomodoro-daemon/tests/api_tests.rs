@@ -8073,3 +8073,45 @@ async fn test_profile_invalid_email_rejected() {
     let resp = app.clone().oneshot(auth_req("PUT", "/api/profile", &tok, Some(json!({"email":"not-an-email"})))).await.unwrap();
     assert_eq!(resp.status(), 400);
 }
+
+// ============================================================
+// Activity feed / timeline
+// ============================================================
+
+#[tokio::test]
+async fn test_activity_feed_includes_all_types() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    // Create task (generates audit entry)
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"FeedTask"})))).await.unwrap();
+    let tid = body_json(resp).await["id"].as_i64().unwrap();
+    // Add comment
+    app.clone().oneshot(auth_req("POST", &format!("/api/tasks/{}/comments", tid), &tok, Some(json!({"content":"Feed comment"})))).await.unwrap();
+    // Create sprint
+    let resp = app.clone().oneshot(auth_req("POST", "/api/sprints", &tok, Some(json!({"name":"FeedSprint"})))).await.unwrap();
+    let sid = body_json(resp).await["id"].as_i64().unwrap();
+    // Add task to sprint, start, log burn
+    app.clone().oneshot(auth_req("POST", &format!("/api/sprints/{}/tasks", sid), &tok, Some(json!({"task_ids":[tid]})))).await.unwrap();
+    app.clone().oneshot(auth_req("POST", &format!("/api/sprints/{}/start", sid), &tok, None)).await.unwrap();
+    app.clone().oneshot(auth_req("POST", &format!("/api/sprints/{}/burn", sid), &tok, Some(json!({"task_id":tid,"hours":2.0})))).await.unwrap();
+    // Get feed
+    let resp = app.clone().oneshot(auth_req("GET", "/api/feed?limit=50", &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let items = body_json(resp).await;
+    let types: Vec<&str> = items.as_array().unwrap().iter().map(|i| i["type"].as_str().unwrap_or("")).collect();
+    assert!(types.contains(&"audit"), "Feed should contain audit entries");
+    assert!(types.contains(&"comment"), "Feed should contain comments");
+    assert!(types.contains(&"sprint"), "Feed should contain sprint events");
+    assert!(types.contains(&"burn"), "Feed should contain burn entries");
+}
+
+#[tokio::test]
+async fn test_activity_feed_type_filter() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"FilterTask"})))).await.unwrap();
+    // Filter to only audit
+    let resp = app.clone().oneshot(auth_req("GET", "/api/feed?types=audit&limit=10", &tok, None)).await.unwrap();
+    let items = body_json(resp).await;
+    assert!(items.as_array().unwrap().iter().all(|i| i["type"] == "audit"));
+}

@@ -8,6 +8,7 @@ export interface Locale {
   timer: string;
   tasks: string;
   history: string;
+  activity: string;
   sprints: string;
   rooms: string;
   kanban: string;
