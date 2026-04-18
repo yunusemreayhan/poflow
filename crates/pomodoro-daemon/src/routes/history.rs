@@ -107,7 +107,7 @@ pub async fn sla_report(State(engine): State<AppState>, claims: Claims) -> ApiRe
 pub async fn get_history(State(engine): State<AppState>, claims: Claims, Query(q): Query<HistoryQuery>) -> ApiResult<Vec<db::SessionWithPath>> {
     let from = q.from.unwrap_or_else(|| "2000-01-01T00:00:00".to_string());
     let to = q.to.unwrap_or_else(|| "2099-12-31T23:59:59".to_string());
-    let parse_dt = |s: &str| chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S%.f").or_else(|_| chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S")).or_else(|_| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").map(|d| d.and_hms_opt(0,0,0).unwrap()));
+    let parse_dt = |s: &str| chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S%.f").or_else(|_| chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S")).or_else(|_| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").map(|d| d.and_hms_opt(0,0,0).expect("midnight is always valid")));
     if parse_dt(&from).is_err() { return Err(err(StatusCode::BAD_REQUEST, "Invalid 'from' format (expected ISO 8601)")); }
     if parse_dt(&to).is_err() { return Err(err(StatusCode::BAD_REQUEST, "Invalid 'to' format (expected ISO 8601)")); }
     let user_id = if claims.role == "root" { q.user_id } else { Some(claims.user_id) };

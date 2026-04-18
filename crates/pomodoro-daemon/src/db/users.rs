@@ -12,14 +12,14 @@ pub(crate) async fn seed_root_user(pool: &Pool) -> Result<()> {
             // V30-8: Write generated password to a restricted file instead of logging
             let pw_path = super::data_dir().join(".root_password");
             if let Err(e) = std::fs::write(&pw_path, &pw) {
-                eprintln!("⚠ Failed to write root password file: {}", e);
-                eprintln!("⚠ Generated root password: {} — set POMODORO_ROOT_PASSWORD to override", pw);
+                tracing::warn!("Failed to write root password file: {}", e);
+                tracing::warn!("Generated root password: {} — set POMODORO_ROOT_PASSWORD to override", pw);
             } else {
                 #[cfg(unix)] {
                     use std::os::unix::fs::PermissionsExt;
                     std::fs::set_permissions(&pw_path, std::fs::Permissions::from_mode(0o600)).ok();
                 }
-                eprintln!("⚠ Root password written to {} — set POMODORO_ROOT_PASSWORD to override", pw_path.display());
+                tracing::warn!("Root password written to {} — set POMODORO_ROOT_PASSWORD to override", pw_path.display());
             }
             pw
         });

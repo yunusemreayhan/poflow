@@ -54,7 +54,7 @@ pub fn send(to_email: &str, subject: &str, body: &str) {
         use lettre::transport::smtp::authentication::Credentials;
 
         let email = match Message::builder()
-            .from(from.parse().unwrap_or_else(|_| "pomodoro@localhost".parse().unwrap()))
+            .from(match from.parse() { Ok(a) => a, Err(_) => match "pomodoro@localhost".parse() { Ok(a) => a, Err(_) => return } })
             .to(match to.parse() { Ok(a) => a, Err(_) => return })
             .subject(subj)
             .body(text) {
