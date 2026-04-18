@@ -43,19 +43,6 @@ body {
 
 #root { height: 100vh; }
 
-@keyframes pulse-glow {
-  0%, 100% { filter: drop-shadow(0 0 8px currentColor); }
-  50% { filter: drop-shadow(0 0 20px currentColor); }
-}
-
-@keyframes breathe {
-  0%, 100% { transform: scale(1); opacity: 0.6; }
-  50% { transform: scale(1.05); opacity: 1; }
-}
-
-.animate-pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
-.animate-breathe { animation: breathe 4s ease-in-out infinite; }
-
 .glass {
   background: rgba(26, 26, 46, 0.7);
   backdrop-filter: blur(16px);
@@ -73,7 +60,13 @@ body {
   border-color: rgba(0, 0, 0, 0.12);
 }
 
-/* Light theme: fix hardcoded white text opacity classes */
+/*
+ * Light theme overrides for Tailwind white-opacity utility classes.
+ * Components use text-white/XX for dark theme (649 usages across 35 files).
+ * These overrides remap white-based classes to dark equivalents in light mode.
+ * !important is required because Tailwind v4 @layer utilities outranks base CSS.
+ * This is the standard pattern for Tailwind dual-theme support.
+ */
 [data-theme="light"] .text-white { color: var(--color-text) !important; }
 [data-theme="light"] .text-white\/15 { color: rgba(26, 26, 46, 0.25) !important; }
 [data-theme="light"] .text-white\/20 { color: rgba(26, 26, 46, 0.35) !important; }
