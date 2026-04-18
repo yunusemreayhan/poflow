@@ -49,7 +49,7 @@ pub async fn upload_attachment(
     // Generate unique storage key (portable, collision-resistant)
     let random_hex = {
         let mut buf = [0u8; 8];
-        getrandom::fill(&mut buf).unwrap_or_default();
+        getrandom::fill(&mut buf).map_err(|e| internal(format!("getrandom failed: {e}")))?;
         buf.iter().map(|b| format!("{:02x}", b)).collect::<String>()
     };
     let key = format!("{}_{}", random_hex, &safe_name);

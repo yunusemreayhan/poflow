@@ -13,7 +13,7 @@ pub struct Webhook {
 }
 
 // S5: Encrypt/decrypt webhook secrets at rest using AES-256-GCM
-fn derive_key() -> [u8; 32] {
+fn derive_key() -> Result<[u8; 32]> {
     use hmac::{Hmac, Mac, KeyInit};
     use sha2::Sha256;
     let secret_bytes: Vec<u8> = std::env::var("POMODORO_JWT_SECRET")
@@ -33,18 +33,19 @@ fn derive_key() -> [u8; 32] {
                     secret
                 })
         });
-    let mut mac = Hmac::<Sha256>::new_from_slice(&secret_bytes).unwrap();
+    let mut mac = Hmac::<Sha256>::new_from_slice(&secret_bytes)
+        .map_err(|e| anyhow::anyhow!("HMAC init: {e}"))?;
     mac.update(b"webhook-secret-encryption");
     let result = mac.finalize().into_bytes();
     let mut key = [0u8; 32];
     key.copy_from_slice(&result);
-    key
+    Ok(key)
 }
 
 fn encrypt_secret(plaintext: &str) -> Result<String> {
     use aes_gcm::{Aes256Gcm, KeyInit, aead::Aead};
     use aes_gcm::Nonce;
-    let key = derive_key();
+    let key = derive_key()?;
     let cipher = Aes256Gcm::new_from_slice(&key).map_err(|e| anyhow::anyhow!("AES init: {e}"))?;
     let mut nonce_bytes = [0u8; 12];
     getrandom::fill(&mut nonce_bytes).map_err(|e| anyhow::anyhow!("getrandom: {e}"))?;
@@ -94,7 +95,7 @@ fn decrypt_secret_aes(nonce_hex: &str, ct_hex: &str) -> Option<String> {
     let ciphertext: Vec<u8> = (0..ct_hex.len()).step_by(2)
         .map(|i| u8::from_str_radix(&ct_hex[i..i+2], 16).ok())
         .collect::<Option<Vec<u8>>>()?;
-    let key = derive_key();
+    let key = derive_key().ok()?;
     let cipher = Aes256Gcm::new_from_slice(&key).ok()?;
     let nonce = Nonce::from_slice(&nonce_bytes);
     let plaintext = cipher.decrypt(nonce, ciphertext.as_ref()).ok()?;
@@ -115,7 +116,7 @@ fn decrypt_secret_xor(ciphertext_hex: &str) -> Option<String> {
             std::fs::read(&path).ok().filter(|d| d.len() >= 32)
                 .unwrap_or_else(|| { use sha2::{Sha256 as S, Digest}; S::digest(crate::db::data_dir().to_string_lossy().as_bytes()).to_vec() })
         });
-    let mut mac = Hmac::<Sha256>::new_from_slice(&secret_bytes).unwrap();
+    let mut mac = Hmac::<Sha256>::new_from_slice(&secret_bytes).ok()?;
     mac.update(b"webhook-secret-encryption");
     let key = mac.finalize().into_bytes().to_vec();
     let decrypted: Vec<u8> = encrypted.iter().enumerate().map(|(i, b)| b ^ key[i % key.len()]).collect();

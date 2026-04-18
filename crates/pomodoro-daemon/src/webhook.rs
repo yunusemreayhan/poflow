@@ -77,9 +77,10 @@ pub fn dispatch(pool: Pool, event: &str, payload: serde_json::Value) {
                 if !secret.is_empty() {
                     use hmac::{Hmac, Mac, KeyInit};
                     use sha2::Sha256;
-                    let mut mac = <Hmac<Sha256>>::new_from_slice(secret.as_bytes()).unwrap();
-                    mac.update(body_str.as_bytes());
-                    Some(format!("sha256={}", mac.finalize().into_bytes().iter().map(|b| format!("{:02x}", b)).collect::<String>()))
+                    if let Ok(mut mac) = <Hmac<Sha256>>::new_from_slice(secret.as_bytes()) {
+                        mac.update(body_str.as_bytes());
+                        Some(format!("sha256={}", mac.finalize().into_bytes().iter().map(|b| format!("{:02x}", b)).collect::<String>()))
+                    } else { None }
                 } else { None }
             } else { None };
             let mut attempts = 0;
