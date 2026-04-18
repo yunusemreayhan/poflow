@@ -5,11 +5,15 @@ set -e
 echo "Building pomodoro-daemon..."
 cargo build --release -p pomodoro-daemon
 
+echo "Building pomodoro-cli..."
+cargo build --release -p pomodoro-cli
+
 echo "Building web GUI..."
 cd gui && npm ci && npm run build && cd ..
 
-echo "Installing binary..."
+echo "Installing binaries..."
 sudo install -Dm755 target/release/pomodoro-daemon /usr/bin/pomodoro-daemon
+sudo install -Dm755 target/release/pomo /usr/bin/pomo
 
 echo "Installing web GUI..."
 sudo mkdir -p /usr/share/pomodoro/gui

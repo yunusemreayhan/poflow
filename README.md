@@ -1,6 +1,6 @@
 # Pomodoro Linux
 
-A production-grade multi-user Pomodoro timer and project management platform for Linux. Rust HTTP backend (160+ API endpoints), Tauri v2 desktop GUI, web GUI (PWA), hierarchical task management, sprint planning, estimation rooms, Gantt charts, custom workflows, RBAC, and time tracking. Packaged as a single `.deb`.
+A production-grade multi-user Pomodoro timer and project management platform for Linux. Rust HTTP backend (207 API endpoints), Tauri v2 desktop GUI, web GUI (PWA), hierarchical task management, sprint planning, estimation rooms, Gantt charts, custom workflows, RBAC, and time tracking. Packaged as a single `.deb`.
 
 ## Features
 
@@ -545,18 +545,25 @@ sudo dpkg -i target/debian/pomodoro-daemon_*.deb
 ### ⚠️ Run tests before pushing
 
 ```bash
+# Run all 3 quality gates at once
+./check.sh
+
+# Or individually:
 # 1. Unit/integration tests (fast, no GUI needed)
 cargo test -p pomodoro-daemon
 
-# 2. E2E GUI tests (requires built binaries + display)
+# 2. Frontend unit tests
+cd gui && npm test
+
+# 3. E2E GUI tests (requires built binaries + display)
 ./e2etests/run_e2e.sh
 ```
 
-Both must pass before pushing to main.
+All three gates must pass before pushing to main.
 
 ### Unit & Integration Tests
 
-333 integration tests run automatically (`cargo test -p pomodoro-daemon`):
+416 integration tests run automatically (`cargo test -p pomodoro-daemon`):
 
 ```bash
 cargo test -p pomodoro-daemon
@@ -564,9 +571,19 @@ cargo test -p pomodoro-daemon
 
 Tests use in-memory SQLite — no disk I/O, fully isolated, no port conflicts.
 
+### Frontend Unit Tests
+
+154 frontend tests across 11 test files (`cd gui && npm test`):
+
+```bash
+cd gui && npm test
+```
+
+Tests cover store logic, i18n, utils, tree operations, rollup, and error boundary.
+
 ### E2E GUI Tests
 
-1011 end-to-end tests across 44 files drive the real Tauri GUI via WebDriver against an isolated daemon. 100% API endpoint coverage (179/179 endpoints tested).
+887 end-to-end tests across 46 files drive the real Tauri GUI via WebDriver against an isolated daemon. 100% API endpoint coverage (207/207 endpoints tested).
 
 ```bash
 # Run all E2E tests
@@ -581,7 +598,7 @@ Tests use in-memory SQLite — no disk I/O, fully isolated, no port conflicts.
 
 **Coverage areas:**
 - GUI flows: login, registration, timer, task detail, sprint board, settings, theme, sidebar, keyboard shortcuts
-- API exhaustive: every endpoint (179/179), every status transition, every config field, pagination, search
+- API exhaustive: every endpoint (207/207), every status transition, every config field, pagination, search
 - Security: JWT tampering, IDOR, privilege escalation, rate limiting, SQL injection, path traversal
 - Edge cases: unicode/emoji, 10K-char strings, HTML injection, boundary values, input validation
 - Data integrity: lifecycle counts, sprint column invariants, dependency chains, import/export round-trips
