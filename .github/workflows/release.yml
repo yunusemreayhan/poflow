@@ -32,6 +32,15 @@ jobs:
       - name: Install frontend deps
         run: cd gui && npm ci
 
+      - name: Frontend tests
+        run: cd gui && npm test
+
+      - name: Backend tests
+        run: cargo test -p pomodoro-daemon
+
+      - name: Clippy
+        run: cargo clippy -p pomodoro-daemon -- -D warnings
+
       - name: Build daemon & CLI
         run: cargo build --release -p pomodoro-daemon -p pomodoro-cli
 
