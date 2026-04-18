@@ -401,7 +401,15 @@ impl Engine {
                     // Re-acquire lock briefly to set session ID
                     let mut states = self.states.lock().await;
                     if let Some(state) = states.get_mut(&c.user_id) {
-                        state.current_session_id = Some(session.id);
+                        // B3: Only set session ID if state hasn't been modified by another request
+                        // (e.g., user stopped/started a new timer while we were doing DB I/O)
+                        if state.current_session_id.is_none() && state.status == TimerStatus::Running {
+                            state.current_session_id = Some(session.id);
+                        } else {
+                            // State was modified — end the orphaned session
+                            db::end_session(&self.pool, session.id, "superseded").await
+                                .map_err(|e| tracing::warn!("Failed to end orphaned session {}: {}", session.id, e)).ok();
+                        }
                     }
                 }
             }

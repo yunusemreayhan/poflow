@@ -370,8 +370,7 @@ export const useStore = create<Store>((set, get) => ({
     } catch {
       // F16: Queue offline
       if (!navigator.onLine) {
-        const base = get().serverUrl || "";
-        await enqueueOfflineAction("POST", `${base}/api/tasks`, { title, parent_id: parentId, project, priority, estimated });
+        await enqueueOfflineAction("POST", "/api/tasks", { title, parent_id: parentId, project, priority, estimated });
         get().toast("Offline — task queued for sync", "info");
       }
     } finally { set({ mutating: false }); }
@@ -391,8 +390,7 @@ export const useStore = create<Store>((set, get) => ({
       }
       // F16: Queue offline
       if (!navigator.onLine) {
-        const base = get().serverUrl || "";
-        await enqueueOfflineAction("PUT", `${base}/api/tasks/${id}`, fields);
+        await enqueueOfflineAction("PUT", `/api/tasks/${id}`, fields);
         set(s => ({ tasks: s.tasks.map(t => t.id === id ? { ...t, ...fields as Partial<Task> } : t) }));
         get().toast("Offline — update queued for sync", "info");
         return;

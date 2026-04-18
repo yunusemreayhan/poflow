@@ -88,9 +88,8 @@ export async function processSyncQueue(_token: string): Promise<{ synced: number
   let synced = 0, failed = 0;
   for (const entry of queue) {
     try {
-      // Extract path from stored full URL
-      let path: string;
-      try { path = new URL(entry.url).pathname; } catch { path = entry.url; }
+      // B4: url may be a relative path (new) or full URL (legacy entries). Always resolve to path.
+      const path = entry.url.startsWith('/') ? entry.url : (() => { try { return new URL(entry.url).pathname; } catch { return entry.url; } })();
       await api(entry.method, path, entry.body);
       if (entry.queueId) await clearSyncEntry(entry.queueId);
       synced++;

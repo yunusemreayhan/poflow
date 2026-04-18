@@ -80,7 +80,7 @@ pub async fn create_backup(State(engine): State<AppState>, claims: Claims) -> Re
     // SAFETY: VACUUM INTO requires a literal path (no parameter binding in SQLite).
     // Path is server-generated from timestamp + fixed prefix. Validated above to contain
     // only [a-zA-Z0-9/_-. ] — no quotes, semicolons, or null bytes can reach here.
-    assert!(!path_str.contains('\''), "BUG: single quote in backup path");
+    if path_str.contains('\'') { return Err(err(StatusCode::BAD_REQUEST, "Invalid characters in backup path")); }
     sqlx::query(&format!("VACUUM INTO '{}'", path_str))
         .execute(&engine.pool).await.map_err(|e| internal(format!("Backup failed: {}", e)))?;
     // S1: Restrict backup file permissions
@@ -149,15 +149,17 @@ pub async fn restore_backup(State(engine): State<AppState>, claims: Claims, Json
         return Err(err(StatusCode::BAD_REQUEST, "Invalid characters in backup path"));
     }
     // SAFETY: Same as create_backup — VACUUM INTO requires literal path, validated above.
-    assert!(!safety_str.contains('\''), "BUG: single quote in safety backup path");
+    if safety_str.contains('\'') { return Err(err(StatusCode::BAD_REQUEST, "Invalid characters in backup path")); }
     sqlx::query(&format!("VACUUM INTO '{}'", safety_str)).execute(&engine.pool).await.map_err(|e| internal(format!("Safety backup failed: {}", e)))?;
     // B8: Checkpoint WAL before overwriting to ensure consistency
     sqlx::query("PRAGMA wal_checkpoint(TRUNCATE)").execute(&engine.pool).await.map_err(|e| internal(format!("WAL checkpoint failed: {}", e)))?;
     // Restore: copy backup over current DB
     let db_path = db::db_path();
+    // B2: Verify backup is readable before closing pool (closing pool is irreversible)
+    let backup_bytes = std::fs::read(&backup_path).map_err(|e| internal(format!("Cannot read backup file: {}", e)))?;
     // Close all pool connections before overwriting to prevent corruption
     engine.pool.close().await;
-    std::fs::copy(&backup_path, &db_path).map_err(|e| internal(format!("Restore failed: {}", e)))?;
+    std::fs::write(&db_path, &backup_bytes).map_err(|e| internal(format!("Restore failed: {}", e)))?;
     // S4: Schedule graceful shutdown so the server restarts with the restored DB
     // (pool is closed, all subsequent requests would fail anyway)
     tokio::spawn(async {
