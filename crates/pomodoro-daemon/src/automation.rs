@@ -70,10 +70,10 @@ async fn execute_action(pool: &Pool, task_id: i64, action_json: &str, _rule_id: 
     let action: Value = match serde_json::from_str(action_json) { Ok(v) => v, Err(_) => return };
 
     if let Some(status) = action.get("set_status").and_then(|v| v.as_str()) {
-        db::update_task(pool, task_id, None, None, None, None, None, None, None, None, None, Some(status), None, None, None, None, None).await.ok();
+        db::update_task(pool, task_id, db::UpdateTaskOpts { status: Some(status), ..Default::default() }).await.ok();
     }
     if let Some(priority) = action.get("set_priority").and_then(|v| v.as_i64()) {
-        db::update_task(pool, task_id, None, None, None, None, Some(priority), None, None, None, None, None, None, None, None, None, None).await.ok();
+        db::update_task(pool, task_id, db::UpdateTaskOpts { priority: Some(priority), ..Default::default() }).await.ok();
     }
     tracing::debug!("Automation rule executed on task {}", task_id);
 }

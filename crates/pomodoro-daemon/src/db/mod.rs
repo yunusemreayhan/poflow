@@ -578,16 +578,20 @@ async fn migrate(pool: &Pool) -> Result<()> {
         sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (21, ?)").bind(now_str()).execute(pool).await.ok();
     }
 
-    sqlx::query("CREATE TABLE IF NOT EXISTS task_attachments (
-        id          INTEGER PRIMARY KEY AUTOINCREMENT,
-        task_id     INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
-        user_id     INTEGER NOT NULL REFERENCES users(id),
-        filename    TEXT NOT NULL,
-        mime_type   TEXT NOT NULL DEFAULT 'application/octet-stream',
-        size_bytes  INTEGER NOT NULL,
-        storage_key TEXT NOT NULL,
-        created_at  TEXT NOT NULL
-    )").execute(pool).await?;
+    // Migration 22: task_attachments (previously unversioned)
+    if !applied_set.contains(&22) {
+        sqlx::query("CREATE TABLE IF NOT EXISTS task_attachments (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            task_id     INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+            user_id     INTEGER NOT NULL REFERENCES users(id),
+            filename    TEXT NOT NULL,
+            mime_type   TEXT NOT NULL DEFAULT 'application/octet-stream',
+            size_bytes  INTEGER NOT NULL,
+            storage_key TEXT NOT NULL,
+            created_at  TEXT NOT NULL
+        )").execute(pool).await?;
+        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (22, ?)").bind(now_str()).execute(pool).await.ok();
+    }
 
     // B12: Detect FTS5 availability for existing DBs
     if applied_set.contains(&8) {
@@ -595,17 +599,20 @@ async fn migrate(pool: &Pool) -> Result<()> {
         tasks::set_fts5_available(fts_exists);
     }
 
-    // BL21-23: In-app notifications
-    sqlx::query("CREATE TABLE IF NOT EXISTS notifications (
-        id          INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        kind        TEXT NOT NULL,
-        message     TEXT NOT NULL,
-        entity_type TEXT,
-        entity_id   INTEGER,
-        read        INTEGER NOT NULL DEFAULT 0,
-        created_at  TEXT NOT NULL
-    )").execute(pool).await?;
+    // Migration 23: notifications (previously unversioned)
+    if !applied_set.contains(&23) {
+        sqlx::query("CREATE TABLE IF NOT EXISTS notifications (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            kind        TEXT NOT NULL,
+            message     TEXT NOT NULL,
+            entity_type TEXT,
+            entity_id   INTEGER,
+            read        INTEGER NOT NULL DEFAULT 0,
+            created_at  TEXT NOT NULL
+        )").execute(pool).await?;
+        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (23, ?)").bind(now_str()).execute(pool).await.ok();
+    }
 
     Ok(())
 }

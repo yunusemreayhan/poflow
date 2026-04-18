@@ -3,15 +3,25 @@ use super::*;
 
 const BURN_SELECT: &str = "SELECT b.id, b.sprint_id, b.task_id, b.session_id, b.user_id, u.username, b.points, b.hours, b.source, b.note, b.cancelled, b.cancelled_by_id, cu.username as cancelled_by, b.created_at FROM burn_log b JOIN users u ON b.user_id = u.id LEFT JOIN users cu ON b.cancelled_by_id = cu.id";
 
-#[allow(clippy::too_many_arguments)]
-pub async fn log_burn(pool: &Pool, sprint_id: Option<i64>, task_id: i64, session_id: Option<i64>, user_id: i64, points: f64, hours: f64, source: &str, note: Option<&str>) -> Result<BurnEntry> {
+pub struct LogBurnOpts<'a> {
+    pub sprint_id: Option<i64>,
+    pub task_id: i64,
+    pub session_id: Option<i64>,
+    pub user_id: i64,
+    pub points: f64,
+    pub hours: f64,
+    pub source: &'a str,
+    pub note: Option<&'a str>,
+}
+
+pub async fn log_burn(pool: &Pool, opts: LogBurnOpts<'_>) -> Result<BurnEntry> {
     let now = now_str();
     let id = sqlx::query("INSERT INTO burn_log (sprint_id, task_id, session_id, user_id, points, hours, source, note, created_at) VALUES (?,?,?,?,?,?,?,?,?)")
-        .bind(sprint_id).bind(task_id).bind(session_id).bind(user_id).bind(points).bind(hours).bind(source).bind(note).bind(&now)
+        .bind(opts.sprint_id).bind(opts.task_id).bind(opts.session_id).bind(opts.user_id).bind(opts.points).bind(opts.hours).bind(opts.source).bind(opts.note).bind(&now)
         .execute(pool).await?.last_insert_rowid();
     // Auto-assign user to task
     sqlx::query("INSERT OR IGNORE INTO task_assignees (task_id, user_id) VALUES (?, ?)")
-        .bind(task_id).bind(user_id).execute(pool).await?;
+        .bind(opts.task_id).bind(opts.user_id).execute(pool).await?;
     Ok(sqlx::query_as::<_, BurnEntry>(&format!("{} WHERE b.id = ?", BURN_SELECT)).bind(id).fetch_one(pool).await?)
 }
 

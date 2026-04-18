@@ -15,7 +15,7 @@ async fn auto_unblock_dependents(engine: &AppState, task_id: i64) {
              WHERE td.task_id = ? AND t.deleted_at IS NULL AND t.status NOT IN ('completed','done')")
             .bind(dep_id).fetch_all(&engine.pool).await.unwrap_or_default();
         if unresolved.is_empty() {
-            db::update_task(&engine.pool, dep_id, None, None, None, None, None, None, None, None, None, Some("backlog"), None, None, None, None, None).await.ok();
+            db::update_task(&engine.pool, dep_id, db::UpdateTaskOpts { status: Some("backlog"), ..Default::default() }).await.ok();
         }
     }
 }
@@ -26,18 +26,21 @@ pub async fn duplicate_task(State(engine): State<AppState>, claims: Claims, Path
     if task.deleted_at.is_some() { return Err(err(StatusCode::BAD_REQUEST, "Cannot duplicate deleted task")); }
     // BL7: Only owner or root can duplicate
     if task.user_id != claims.user_id && !auth::is_admin_or_root(&claims) { return Err(err(StatusCode::FORBIDDEN, "Not your task")); }
-    let t = db::create_task(&engine.pool, claims.user_id, task.parent_id,
-        &format!("{} (copy)", task.title), task.description.as_deref(),
-        task.project.as_deref(), task.tags.as_deref(),
-        task.priority as i64, task.estimated as i64,
-        task.estimated_hours, task.remaining_points, task.due_date.as_deref())
-        .await.map_err(internal)?;
+    let t = db::create_task(&engine.pool, db::CreateTaskOpts {
+        user_id: claims.user_id, parent_id: task.parent_id,
+        title: &format!("{} (copy)", task.title), description: task.description.as_deref(),
+        project: task.project.as_deref(), tags: task.tags.as_deref(),
+        priority: task.priority as i64, estimated: task.estimated as i64,
+        estimated_hours: task.estimated_hours, remaining_points: task.remaining_points, due_date: task.due_date.as_deref(),
+    }).await.map_err(internal)?;
     // Copy work_duration_minutes and PERT estimates if set
     if task.work_duration_minutes.is_some() || task.estimate_optimistic.is_some() || task.estimate_pessimistic.is_some() {
-        db::update_task(&engine.pool, t.id, None, None, None, None, None, None, None, None, None, None, None, None,
-            task.work_duration_minutes.map(Some),
-            task.estimate_optimistic.map(Some),
-            task.estimate_pessimistic.map(Some)).await.ok();
+        db::update_task(&engine.pool, t.id, db::UpdateTaskOpts {
+            work_duration_minutes: task.work_duration_minutes.map(Some),
+            estimate_optimistic: task.estimate_optimistic.map(Some),
+            estimate_pessimistic: task.estimate_pessimistic.map(Some),
+            ..Default::default()
+        }).await.ok();
     }
     // Copy labels
     if let Ok(labels) = db::get_task_labels(&engine.pool, id).await {
@@ -273,7 +276,7 @@ pub async fn unarchive_task(State(engine): State<AppState>, claims: Claims, Path
     let task = db::get_task(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Task not found"))?;
     if !is_owner_or_root(task.user_id, &claims) { return Err(err(StatusCode::FORBIDDEN, "Not owner")); }
     if task.status != "archived" { return Err(err(StatusCode::BAD_REQUEST, "Task is not archived")); }
-    db::update_task(&engine.pool, id, None, None, None, None, None, None, None, None, None, Some("completed"), None, None, None, None, None).await.map_err(internal)?;
+    db::update_task(&engine.pool, id, db::UpdateTaskOpts { status: Some("completed"), ..Default::default() }).await.map_err(internal)?;
     engine.notify(ChangeEvent::Tasks);
     Ok(StatusCode::NO_CONTENT)
 }
@@ -341,7 +344,11 @@ pub async fn create_task(State(engine): State<AppState>, claims: Claims, Json(re
         let parent = db::get_task(&engine.pool, pid).await.map_err(|_| err(StatusCode::NOT_FOUND, "Parent task not found"))?;
         if parent.user_id != claims.user_id && !auth::is_admin_or_root(&claims) { return Err(err(StatusCode::FORBIDDEN, "Parent task not owned by you")); }
     }
-    let t = db::create_task(&engine.pool, claims.user_id, req.parent_id, req.title.trim(), req.description.as_deref(), req.project.as_deref(), req.tags.as_deref(), priority, estimated, req.estimated_hours.unwrap_or(0.0), req.remaining_points.unwrap_or(0.0), req.due_date.as_deref())
+    let t = db::create_task(&engine.pool, db::CreateTaskOpts {
+        user_id: claims.user_id, parent_id: req.parent_id, title: req.title.trim(), description: req.description.as_deref(),
+        project: req.project.as_deref(), tags: req.tags.as_deref(), priority, estimated,
+        estimated_hours: req.estimated_hours.unwrap_or(0.0), remaining_points: req.remaining_points.unwrap_or(0.0), due_date: req.due_date.as_deref(),
+    })
         .await.map_err(internal)?;
     if let Err(e) = db::audit(&engine.pool, claims.user_id, "create", "task", Some(t.id), Some(&t.title)).await { tracing::warn!("Audit log failed: {}", e); }
     crate::webhook::dispatch(engine.pool.clone(), "task.created", serde_json::json!({"id": t.id, "title": &t.title}));
@@ -411,16 +418,17 @@ pub async fn update_task(State(engine): State<AppState>, claims: Claims, Path(id
         }
     }
     if let Some(Some(wdm)) = req.work_duration_minutes { if !(1..=480).contains(&wdm) { return Err(err(StatusCode::BAD_REQUEST, "work_duration_minutes must be 1-480")); } }
-    let t = db::update_task(&engine.pool, id, req.title.as_deref(),
-        req.description.as_ref().map(|o| o.as_deref()),
-        req.project.as_ref().map(|o| o.as_deref()),
-        req.tags.as_ref().map(|o| o.as_deref()),
-        req.priority, req.estimated, req.estimated_hours, req.remaining_points,
-        req.due_date.as_ref().map(|o| o.as_deref()),
-        req.status.as_deref(), req.sort_order, req.parent_id,
-        req.work_duration_minutes.as_ref().map(|o| *o),
-        req.estimate_optimistic, req.estimate_pessimistic)
-        .await.map_err(internal)?;
+    let t = db::update_task(&engine.pool, id, db::UpdateTaskOpts {
+        title: req.title.as_deref(),
+        description: req.description.as_ref().map(|o| o.as_deref()),
+        project: req.project.as_ref().map(|o| o.as_deref()),
+        tags: req.tags.as_ref().map(|o| o.as_deref()),
+        priority: req.priority, estimated: req.estimated, estimated_hours: req.estimated_hours, remaining_points: req.remaining_points,
+        due_date: req.due_date.as_ref().map(|o| o.as_deref()),
+        status: req.status.as_deref(), sort_order: req.sort_order, parent_id: req.parent_id,
+        work_duration_minutes: req.work_duration_minutes.as_ref().map(|o| *o),
+        estimate_optimistic: req.estimate_optimistic, estimate_pessimistic: req.estimate_pessimistic,
+    }).await.map_err(internal)?;
     if let Err(e) = db::audit(&engine.pool, claims.user_id, "update", "task", Some(id), None).await { tracing::warn!("Audit log failed: {}", e); }
     // BL3: Auto-unblock dependents when task is completed or done
     if req.status.as_deref() == Some("completed") || req.status.as_deref() == Some("done") {

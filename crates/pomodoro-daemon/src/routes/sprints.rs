@@ -24,8 +24,10 @@ pub async fn create_sprint(State(engine): State<AppState>, claims: Claims, Json(
     // V4: Validate end_date >= start_date
     if let (Some(ref s), Some(ref e)) = (&req.start_date, &req.end_date) { if e < s { return Err(err(StatusCode::BAD_REQUEST, "end_date must be on or after start_date")); } }
     if let Some(ch) = req.capacity_hours { if !(0.0..=10000.0).contains(&ch) { return Err(err(StatusCode::BAD_REQUEST, "capacity_hours must be 0-10000")); } }
-    let s = db::create_sprint(&engine.pool, claims.user_id, &req.name, req.project.as_deref(), req.goal.as_deref(), req.start_date.as_deref(), req.end_date.as_deref(), req.capacity_hours)
-        .await.map_err(internal)?;
+    let s = db::create_sprint(&engine.pool, db::CreateSprintOpts {
+        user_id: claims.user_id, name: &req.name, project: req.project.as_deref(), goal: req.goal.as_deref(),
+        start_date: req.start_date.as_deref(), end_date: req.end_date.as_deref(), capacity_hours: req.capacity_hours,
+    }).await.map_err(internal)?;
     db::audit(&engine.pool, claims.user_id, "create", "sprint", Some(s.id), Some(&s.name)).await.ok();
     crate::webhook::dispatch(engine.pool.clone(), "sprint.created", serde_json::json!({"id": s.id, "name": &s.name}));
     engine.notify(ChangeEvent::Sprints);
@@ -61,15 +63,16 @@ pub async fn update_sprint(State(engine): State<AppState>, claims: Claims, Path(
             return Err(err(StatusCode::CONFLICT, "Sprint was modified by another user. Please refresh and try again."));
         }
     }
-    let s = db::update_sprint(&engine.pool, id, req.name.as_deref(),
-        req.project.as_ref().map(|o| o.as_deref()),
-        req.goal.as_ref().map(|o| o.as_deref()),
-        None, // B4: Never pass status through update — use /start or /complete
-        req.start_date.as_ref().map(|o| o.as_deref()),
-        req.end_date.as_ref().map(|o| o.as_deref()),
-        req.retro_notes.as_ref().map(|o| o.as_deref()),
-        req.capacity_hours.as_ref().map(|o| *o))
-        .await.map_err(internal)?;
+    let s = db::update_sprint(&engine.pool, id, db::UpdateSprintOpts {
+        name: req.name.as_deref(),
+        project: req.project.as_ref().map(|o| o.as_deref()),
+        goal: req.goal.as_ref().map(|o| o.as_deref()),
+        status: None, // B4: Never pass status through update — use /start or /complete
+        start_date: req.start_date.as_ref().map(|o| o.as_deref()),
+        end_date: req.end_date.as_ref().map(|o| o.as_deref()),
+        retro_notes: req.retro_notes.as_ref().map(|o| o.as_deref()),
+        capacity_hours: req.capacity_hours.as_ref().map(|o| *o),
+    }).await.map_err(internal)?;
     engine.notify(ChangeEvent::Sprints);
     Ok(Json(s))
 }
@@ -87,7 +90,7 @@ pub async fn delete_sprint(State(engine): State<AppState>, claims: Claims, Path(
 pub async fn start_sprint(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>) -> ApiResult<db::Sprint> {
     let sprint = get_owned_sprint(&engine.pool, id, &claims).await?;
     if sprint.status != "planning" { return Err(err(StatusCode::BAD_REQUEST, format!("Cannot start sprint in '{}' status", sprint.status))); }
-    let s = db::update_sprint(&engine.pool, id, None, None, None, Some("active"), None, None, None, None).await.map_err(internal)?;
+    let s = db::update_sprint(&engine.pool, id, db::UpdateSprintOpts { status: Some("active"), ..Default::default() }).await.map_err(internal)?;
     db::audit(&engine.pool, claims.user_id, "start", "sprint", Some(id), None).await.ok();
     crate::webhook::dispatch(engine.pool.clone(), "sprint.started", serde_json::json!({"id": id}));
     // BL22: Notify all sprint task assignees
@@ -109,7 +112,7 @@ pub async fn complete_sprint(State(engine): State<AppState>, claims: Claims, Pat
     let sprint = get_owned_sprint(&engine.pool, id, &claims).await?;
     if sprint.status != "active" { return Err(err(StatusCode::BAD_REQUEST, format!("Cannot complete sprint in '{}' status", sprint.status))); }
     if let Err(e) = db::snapshot_sprint(&engine.pool, id).await { tracing::warn!("Snapshot failed: {}", e); }
-    let s = db::update_sprint(&engine.pool, id, None, None, None, Some("completed"), None, None, None, None).await.map_err(internal)?;
+    let s = db::update_sprint(&engine.pool, id, db::UpdateSprintOpts { status: Some("completed"), ..Default::default() }).await.map_err(internal)?;
     db::audit(&engine.pool, claims.user_id, "complete", "sprint", Some(id), None).await.ok();
     crate::webhook::dispatch(engine.pool.clone(), "sprint.completed", serde_json::json!({"id": id}));
     // BL22: Notify all sprint task assignees
@@ -135,7 +138,10 @@ pub async fn carryover_sprint(State(engine): State<AppState>, claims: Claims, Pa
     if incomplete.is_empty() { return Err(err(StatusCode::BAD_REQUEST, "No incomplete tasks to carry over")); }
     let base_name = sprint.name.trim_end_matches(" (carry-over)");
     let new_name = format!("{} (carry-over)", base_name);
-    let new_sprint = db::create_sprint(&engine.pool, claims.user_id, &new_name, sprint.project.as_deref(), sprint.goal.as_deref(), None, None, sprint.capacity_hours).await.map_err(internal)?;
+    let new_sprint = db::create_sprint(&engine.pool, db::CreateSprintOpts {
+        user_id: claims.user_id, name: &new_name, project: sprint.project.as_deref(), goal: sprint.goal.as_deref(),
+        start_date: None, end_date: None, capacity_hours: sprint.capacity_hours,
+    }).await.map_err(internal)?;
     // BL6: Filter out tasks already in an active sprint
     let ph = incomplete.iter().map(|_| "?").collect::<Vec<_>>().join(",");
     let q = format!("SELECT DISTINCT st.task_id FROM sprint_tasks st JOIN sprints s ON s.id = st.sprint_id WHERE s.status = 'active' AND st.task_id IN ({})", ph);

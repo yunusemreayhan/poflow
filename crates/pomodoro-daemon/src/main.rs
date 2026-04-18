@@ -273,9 +273,12 @@ async fn main() -> Result<()> {
                 // Clone the template task
                 if let Ok(task) = db::get_task(&engine_recur.pool, rec.task_id).await {
                     let title = format!("{} ({})", task.title, today);
-                    if let Ok(_new) = db::create_task(&engine_recur.pool, task.user_id, task.parent_id, &title,
-                        task.description.as_deref(), task.project.as_deref(), task.tags.as_deref(),
-                        task.priority, task.estimated, task.estimated_hours, task.remaining_points, task.due_date.as_deref()).await {
+                    if let Ok(_new) = db::create_task(&engine_recur.pool, db::CreateTaskOpts {
+                        user_id: task.user_id, parent_id: task.parent_id, title: &title,
+                        description: task.description.as_deref(), project: task.project.as_deref(), tags: task.tags.as_deref(),
+                        priority: task.priority, estimated: task.estimated, estimated_hours: task.estimated_hours,
+                        remaining_points: task.remaining_points, due_date: task.due_date.as_deref(),
+                    }).await {
                         // Advance next_due
                         let next = match rec.pattern.as_str() {
                             "daily" => chrono::NaiveDate::parse_from_str(&rec.next_due, "%Y-%m-%d").ok().map(|d| d + chrono::Duration::days(1)),

@@ -44,15 +44,28 @@ fn append_team_scope_filter(q: &mut String, ids: &[i64]) -> bool {
 
 pub const TASK_SELECT: &str = "SELECT t.id, t.parent_id, t.user_id, u.username as user, t.title, t.description, t.project, t.tags, t.priority, t.estimated, t.actual, t.estimated_hours, t.remaining_points, t.due_date, t.status, t.sort_order, t.created_at, t.updated_at, COALESCE(ac.cnt, 0) as attachment_count, t.deleted_at, t.work_duration_minutes, t.estimate_optimistic, t.estimate_pessimistic FROM tasks t JOIN users u ON t.user_id = u.id LEFT JOIN (SELECT task_id, COUNT(*) as cnt FROM task_attachments GROUP BY task_id) ac ON ac.task_id = t.id";
 
-#[allow(clippy::too_many_arguments)]
-pub async fn create_task(pool: &Pool, user_id: i64, parent_id: Option<i64>, title: &str, description: Option<&str>, project: Option<&str>, tags: Option<&str>, priority: i64, estimated: i64, estimated_hours: f64, remaining_points: f64, due_date: Option<&str>) -> Result<Task> {
+pub struct CreateTaskOpts<'a> {
+    pub user_id: i64,
+    pub parent_id: Option<i64>,
+    pub title: &'a str,
+    pub description: Option<&'a str>,
+    pub project: Option<&'a str>,
+    pub tags: Option<&'a str>,
+    pub priority: i64,
+    pub estimated: i64,
+    pub estimated_hours: f64,
+    pub remaining_points: f64,
+    pub due_date: Option<&'a str>,
+}
+
+pub async fn create_task(pool: &Pool, opts: CreateTaskOpts<'_>) -> Result<Task> {
     let now = now_str();
-    let max_order: (i64,) = match parent_id {
+    let max_order: (i64,) = match opts.parent_id {
         Some(pid) => sqlx::query_as("SELECT COALESCE(MAX(sort_order), 0) FROM tasks WHERE parent_id = ?").bind(pid).fetch_one(pool).await?,
-        None => sqlx::query_as("SELECT COALESCE(MAX(sort_order), 0) FROM tasks WHERE parent_id IS NULL AND user_id = ?").bind(user_id).fetch_one(pool).await?,
+        None => sqlx::query_as("SELECT COALESCE(MAX(sort_order), 0) FROM tasks WHERE parent_id IS NULL AND user_id = ?").bind(opts.user_id).fetch_one(pool).await?,
     };
     let id = sqlx::query("INSERT INTO tasks (parent_id, user_id, title, description, project, tags, priority, estimated, estimated_hours, remaining_points, due_date, status, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'backlog', ?, ?, ?)")
-        .bind(parent_id).bind(user_id).bind(title).bind(description).bind(project).bind(tags).bind(priority).bind(estimated).bind(estimated_hours).bind(remaining_points).bind(due_date).bind(max_order.0 + 1).bind(&now).bind(&now)
+        .bind(opts.parent_id).bind(opts.user_id).bind(opts.title).bind(opts.description).bind(opts.project).bind(opts.tags).bind(opts.priority).bind(opts.estimated).bind(opts.estimated_hours).bind(opts.remaining_points).bind(opts.due_date).bind(max_order.0 + 1).bind(&now).bind(&now)
         .execute(pool).await?.last_insert_rowid();
     get_task(pool, id).await
 }
@@ -133,25 +146,43 @@ pub async fn list_tasks_paged(pool: &Pool, f: TaskFilter<'_>, limit: i64, offset
     Ok(query.fetch_all(pool).await?)
 }
 
-#[allow(clippy::too_many_arguments)]
-pub async fn update_task(pool: &Pool, id: i64, title: Option<&str>, description: Option<Option<&str>>, project: Option<Option<&str>>, tags: Option<Option<&str>>, priority: Option<i64>, estimated: Option<i64>, estimated_hours: Option<f64>, remaining_points: Option<f64>, due_date: Option<Option<&str>>, status: Option<&str>, sort_order: Option<i64>, parent_id: Option<Option<i64>>, work_duration_minutes: Option<Option<i64>>, estimate_optimistic: Option<Option<f64>>, estimate_pessimistic: Option<Option<f64>>) -> Result<Task> {
+#[derive(Default)]
+pub struct UpdateTaskOpts<'a> {
+    pub title: Option<&'a str>,
+    pub description: Option<Option<&'a str>>,
+    pub project: Option<Option<&'a str>>,
+    pub tags: Option<Option<&'a str>>,
+    pub priority: Option<i64>,
+    pub estimated: Option<i64>,
+    pub estimated_hours: Option<f64>,
+    pub remaining_points: Option<f64>,
+    pub due_date: Option<Option<&'a str>>,
+    pub status: Option<&'a str>,
+    pub sort_order: Option<i64>,
+    pub parent_id: Option<Option<i64>>,
+    pub work_duration_minutes: Option<Option<i64>>,
+    pub estimate_optimistic: Option<Option<f64>>,
+    pub estimate_pessimistic: Option<Option<f64>>,
+}
+
+pub async fn update_task(pool: &Pool, id: i64, opts: UpdateTaskOpts<'_>) -> Result<Task> {
     let now = now_str();
     let existing = get_task(pool, id).await?;
-    let new_parent = match parent_id { Some(p) => p, None => existing.parent_id };
-    let new_desc = match description { Some(v) => v.map(|s| s.to_string()), None => existing.description };
-    let new_project = match project { Some(v) => v.map(|s| s.to_string()), None => existing.project };
-    let new_tags = match tags { Some(v) => v.map(|s| s.to_string()), None => existing.tags };
-    let new_due = match due_date { Some(v) => v.map(|s| s.to_string()), None => existing.due_date };
-    let new_wdm = match work_duration_minutes { Some(v) => v, None => existing.work_duration_minutes };
-    let new_eo = match estimate_optimistic { Some(v) => v, None => existing.estimate_optimistic };
-    let new_ep = match estimate_pessimistic { Some(v) => v, None => existing.estimate_pessimistic };
+    let new_parent = match opts.parent_id { Some(p) => p, None => existing.parent_id };
+    let new_desc = match opts.description { Some(v) => v.map(|s| s.to_string()), None => existing.description };
+    let new_project = match opts.project { Some(v) => v.map(|s| s.to_string()), None => existing.project };
+    let new_tags = match opts.tags { Some(v) => v.map(|s| s.to_string()), None => existing.tags };
+    let new_due = match opts.due_date { Some(v) => v.map(|s| s.to_string()), None => existing.due_date };
+    let new_wdm = match opts.work_duration_minutes { Some(v) => v, None => existing.work_duration_minutes };
+    let new_eo = match opts.estimate_optimistic { Some(v) => v, None => existing.estimate_optimistic };
+    let new_ep = match opts.estimate_pessimistic { Some(v) => v, None => existing.estimate_pessimistic };
     sqlx::query("UPDATE tasks SET parent_id=?, title=?, description=?, project=?, tags=?, priority=?, estimated=?, estimated_hours=?, remaining_points=?, due_date=?, status=?, sort_order=?, work_duration_minutes=?, estimate_optimistic=?, estimate_pessimistic=?, updated_at=? WHERE id=?")
-        .bind(new_parent).bind(title.unwrap_or(&existing.title)).bind(&new_desc)
+        .bind(new_parent).bind(opts.title.unwrap_or(&existing.title)).bind(&new_desc)
         .bind(&new_project).bind(&new_tags)
-        .bind(priority.unwrap_or(existing.priority)).bind(estimated.unwrap_or(existing.estimated))
-        .bind(estimated_hours.unwrap_or(existing.estimated_hours)).bind(remaining_points.unwrap_or(existing.remaining_points))
-        .bind(&new_due).bind(status.unwrap_or(&existing.status))
-        .bind(sort_order.unwrap_or(existing.sort_order)).bind(new_wdm).bind(new_eo).bind(new_ep).bind(&now).bind(id)
+        .bind(opts.priority.unwrap_or(existing.priority)).bind(opts.estimated.unwrap_or(existing.estimated))
+        .bind(opts.estimated_hours.unwrap_or(existing.estimated_hours)).bind(opts.remaining_points.unwrap_or(existing.remaining_points))
+        .bind(&new_due).bind(opts.status.unwrap_or(&existing.status))
+        .bind(opts.sort_order.unwrap_or(existing.sort_order)).bind(new_wdm).bind(new_eo).bind(new_ep).bind(&now).bind(id)
         .execute(pool).await?;
     get_task(pool, id).await
 }

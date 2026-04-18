@@ -23,7 +23,7 @@ pub async fn add_time_report(State(engine): State<AppState>, claims: Claims, Pat
         }
     }
     let sprint_id = db::find_task_active_sprint(&engine.pool, id).await.unwrap_or(None);
-    let b = db::log_burn(&engine.pool, sprint_id, id, None, claims.user_id, req.points.unwrap_or(0.0), req.hours, "time_report", req.description.as_deref())
+    let b = db::log_burn(&engine.pool, db::LogBurnOpts { sprint_id, task_id: id, session_id: None, user_id: claims.user_id, points: req.points.unwrap_or(0.0), hours: req.hours, source: "time_report", note: req.description.as_deref() })
         .await.map_err(internal)?;
     engine.notify(ChangeEvent::Tasks);
     Ok((StatusCode::CREATED, Json(b)))

@@ -390,7 +390,7 @@ impl Engine {
                         .map_err(|e| tracing::warn!("Failed to increment actual: {}", e)).ok();
                     let hours = c.duration_s as f64 / 3600.0;
                     let sprint_id = db::find_task_active_sprint(&self.pool, tid).await.unwrap_or(None);
-                    db::log_burn(&self.pool, sprint_id, tid, c.session_id, c.user_id, 0.0, hours, "timer", None).await
+                    db::log_burn(&self.pool, db::LogBurnOpts { sprint_id, task_id: tid, session_id: c.session_id, user_id: c.user_id, points: 0.0, hours, source: "timer", note: None }).await
                         .map_err(|e| tracing::warn!("Failed to log burn: {}", e)).ok();
                 }
             }

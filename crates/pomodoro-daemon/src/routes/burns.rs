@@ -27,7 +27,7 @@ pub async fn log_burn(State(engine): State<AppState>, claims: Claims, Path(id): 
             return Err(err(StatusCode::FORBIDDEN, "Not assigned to this task"));
         }
     }
-    let b = db::log_burn(&engine.pool, Some(id), req.task_id, None, claims.user_id, pts, hrs, "manual", req.note.as_deref())
+    let b = db::log_burn(&engine.pool, db::LogBurnOpts { sprint_id: Some(id), task_id: req.task_id, session_id: None, user_id: claims.user_id, points: pts, hours: hrs, source: "manual", note: req.note.as_deref() })
         .await.map_err(internal)?;
     engine.notify(ChangeEvent::Sprints);
     Ok((StatusCode::CREATED, Json(b)))

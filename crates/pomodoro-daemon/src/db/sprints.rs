@@ -3,11 +3,20 @@ use super::*;
 
 const SPRINT_SELECT: &str = "SELECT sp.id, sp.name, sp.project, sp.goal, sp.status, sp.start_date, sp.end_date, sp.retro_notes, sp.capacity_hours, sp.created_by_id, u.username as created_by, sp.created_at, sp.updated_at FROM sprints sp JOIN users u ON sp.created_by_id = u.id";
 
-#[allow(clippy::too_many_arguments)]
-pub async fn create_sprint(pool: &Pool, user_id: i64, name: &str, project: Option<&str>, goal: Option<&str>, start_date: Option<&str>, end_date: Option<&str>, capacity_hours: Option<f64>) -> Result<Sprint> {
+pub struct CreateSprintOpts<'a> {
+    pub user_id: i64,
+    pub name: &'a str,
+    pub project: Option<&'a str>,
+    pub goal: Option<&'a str>,
+    pub start_date: Option<&'a str>,
+    pub end_date: Option<&'a str>,
+    pub capacity_hours: Option<f64>,
+}
+
+pub async fn create_sprint(pool: &Pool, opts: CreateSprintOpts<'_>) -> Result<Sprint> {
     let now = now_str();
     let id = sqlx::query("INSERT INTO sprints (name, project, goal, start_date, end_date, capacity_hours, created_by_id, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?)")
-        .bind(name).bind(project).bind(goal).bind(start_date).bind(end_date).bind(capacity_hours).bind(user_id).bind(&now).bind(&now)
+        .bind(opts.name).bind(opts.project).bind(opts.goal).bind(opts.start_date).bind(opts.end_date).bind(opts.capacity_hours).bind(opts.user_id).bind(&now).bind(&now)
         .execute(pool).await?.last_insert_rowid();
     get_sprint(pool, id).await
 }
@@ -27,19 +36,30 @@ pub async fn list_sprints(pool: &Pool, status: Option<&str>, project: Option<&st
     Ok(query.fetch_all(pool).await?)
 }
 
-#[allow(clippy::too_many_arguments)]
-pub async fn update_sprint(pool: &Pool, id: i64, name: Option<&str>, project: Option<Option<&str>>, goal: Option<Option<&str>>, status: Option<&str>, start_date: Option<Option<&str>>, end_date: Option<Option<&str>>, retro_notes: Option<Option<&str>>, capacity_hours: Option<Option<f64>>) -> Result<Sprint> {
+#[derive(Default)]
+pub struct UpdateSprintOpts<'a> {
+    pub name: Option<&'a str>,
+    pub project: Option<Option<&'a str>>,
+    pub goal: Option<Option<&'a str>>,
+    pub status: Option<&'a str>,
+    pub start_date: Option<Option<&'a str>>,
+    pub end_date: Option<Option<&'a str>>,
+    pub retro_notes: Option<Option<&'a str>>,
+    pub capacity_hours: Option<Option<f64>>,
+}
+
+pub async fn update_sprint(pool: &Pool, id: i64, opts: UpdateSprintOpts<'_>) -> Result<Sprint> {
     let now = now_str();
     let current = get_sprint(pool, id).await?;
-    let new_project = match project { Some(v) => v.map(|s| s.to_string()), None => current.project };
-    let new_goal = match goal { Some(v) => v.map(|s| s.to_string()), None => current.goal };
-    let new_start = match start_date { Some(v) => v.map(|s| s.to_string()), None => current.start_date };
-    let new_end = match end_date { Some(v) => v.map(|s| s.to_string()), None => current.end_date };
-    let new_retro = match retro_notes { Some(v) => v.map(|s| s.to_string()), None => current.retro_notes };
-    let new_cap = match capacity_hours { Some(v) => v, None => current.capacity_hours };
+    let new_project = match opts.project { Some(v) => v.map(|s| s.to_string()), None => current.project };
+    let new_goal = match opts.goal { Some(v) => v.map(|s| s.to_string()), None => current.goal };
+    let new_start = match opts.start_date { Some(v) => v.map(|s| s.to_string()), None => current.start_date };
+    let new_end = match opts.end_date { Some(v) => v.map(|s| s.to_string()), None => current.end_date };
+    let new_retro = match opts.retro_notes { Some(v) => v.map(|s| s.to_string()), None => current.retro_notes };
+    let new_cap = match opts.capacity_hours { Some(v) => v, None => current.capacity_hours };
     sqlx::query("UPDATE sprints SET name=?, project=?, goal=?, status=?, start_date=?, end_date=?, retro_notes=?, capacity_hours=?, updated_at=? WHERE id=?")
-        .bind(name.unwrap_or(&current.name)).bind(&new_project)
-        .bind(&new_goal).bind(status.unwrap_or(&current.status))
+        .bind(opts.name.unwrap_or(&current.name)).bind(&new_project)
+        .bind(&new_goal).bind(opts.status.unwrap_or(&current.status))
         .bind(&new_start).bind(&new_end).bind(&new_retro).bind(new_cap)
         .bind(&now).bind(id).execute(pool).await?;
     get_sprint(pool, id).await

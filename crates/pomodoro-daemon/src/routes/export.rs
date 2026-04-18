@@ -384,23 +384,24 @@ pub async fn import_project(State(engine): State<AppState>, claims: Claims, Json
     for t in &req.tasks {
         let title = t["title"].as_str().unwrap_or("").trim();
         if title.is_empty() { continue; }
-        let task = db::create_task(&engine.pool, claims.user_id,
-            None, // parent_id resolved later
+        let task = db::create_task(&engine.pool, db::CreateTaskOpts {
+            user_id: claims.user_id,
+            parent_id: None, // resolved later
             title,
-            t["description"].as_str(),
-            t["project"].as_str(),
-            t["tags"].as_str(),
-            t["priority"].as_i64().unwrap_or(3),
-            t["estimated"].as_i64().unwrap_or(0),
-            t["estimated_hours"].as_f64().unwrap_or(0.0),
-            t["remaining_points"].as_f64().unwrap_or(0.0),
-            t["due_date"].as_str(),
-        ).await.map_err(internal)?;
+            description: t["description"].as_str(),
+            project: t["project"].as_str(),
+            tags: t["tags"].as_str(),
+            priority: t["priority"].as_i64().unwrap_or(3),
+            estimated: t["estimated"].as_i64().unwrap_or(0),
+            estimated_hours: t["estimated_hours"].as_f64().unwrap_or(0.0),
+            remaining_points: t["remaining_points"].as_f64().unwrap_or(0.0),
+            due_date: t["due_date"].as_str(),
+        }).await.map_err(internal)?;
         if let Some(old_id) = t["id"].as_i64() { id_map.insert(old_id, task.id); }
         // Set status if not backlog
         if let Some(status) = t["status"].as_str() {
             if status != "backlog" {
-                db::update_task(&engine.pool, task.id, None, None, None, None, None, None, None, None, None, Some(status), None, None, None, None, None).await.ok();
+                db::update_task(&engine.pool, task.id, db::UpdateTaskOpts { status: Some(status), ..Default::default() }).await.ok();
             }
         }
         created_tasks += 1;
@@ -410,7 +411,7 @@ pub async fn import_project(State(engine): State<AppState>, claims: Claims, Json
     for t in &req.tasks {
         if let (Some(old_id), Some(old_parent)) = (t["id"].as_i64(), t["parent_id"].as_i64()) {
             if let (Some(&new_id), Some(&new_parent)) = (id_map.get(&old_id), id_map.get(&old_parent)) {
-                db::update_task(&engine.pool, new_id, None, None, None, None, None, None, None, None, None, None, None, Some(Some(new_parent)), None, None, None).await.ok();
+                db::update_task(&engine.pool, new_id, db::UpdateTaskOpts { parent_id: Some(Some(new_parent)), ..Default::default() }).await.ok();
             }
         }
     }
