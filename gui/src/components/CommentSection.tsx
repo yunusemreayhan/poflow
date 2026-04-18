@@ -26,8 +26,8 @@ export default function CommentSection({ taskId, sessionId }: { taskId: number; 
   const handleAdd = async () => {
     if (!text.trim()) return;
     const content = text.trim();
-    const optimistic = { id: optimisticIdRef.current--, content, user: currentUser || "you", created_at: new Date().toISOString(), task_id: taskId, user_id: 0, session_id: sessionId ?? null };
-    setComments(prev => [...prev, optimistic as any]);
+    const optimistic: Comment = { id: optimisticIdRef.current--, content, user: currentUser || "you", created_at: new Date().toISOString(), session_id: sessionId ?? null };
+    setComments(prev => [...prev, optimistic]);
     setText("");
     await addComment(taskId, content, sessionId);
     load();

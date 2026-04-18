@@ -172,7 +172,7 @@ export default function TaskList({ selectMode, onSelect, selectedTaskId, votedTa
           className={`shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-all ${filter !== "all" ? "bg-[var(--color-accent)] text-white" : "bg-white/5 text-white/40 hover:text-white/60"}`}>
           {filter === "active" ? "Active" : filter === "mine" ? "Mine" : "All"} ({sorted.length})
         </button>
-        <Select value={sortBy} onChange={v => setSortBy(v as any)} ariaLabel="Sort tasks"
+        <Select value={sortBy} onChange={v => setSortBy(v as typeof sortBy)} ariaLabel="Sort tasks"
           options={[{value:"order",label:"Manual"},{value:"priority",label:"Priority"},{value:"due",label:"Due date"},{value:"updated",label:"Updated"}]} />
         <button onClick={() => setTreeKey(k => k + 1)} title="Expand all"
           className="shrink-0 px-2 py-1 rounded-full text-xs bg-white/5 text-white/40 hover:text-white/60">⊞</button>
@@ -182,7 +182,7 @@ export default function TaskList({ selectMode, onSelect, selectedTaskId, votedTa
       {savedFilters.length > 0 && (
         <div className="flex gap-1 flex-wrap">
           {savedFilters.map((sf, i) => (
-            <button key={i} onClick={() => { setSearch(sf.search); setFilter(sf.filter as any); }}
+            <button key={i} onClick={() => { setSearch(sf.search); setFilter(sf.filter as typeof filter); }}
               className="text-[10px] px-2 py-0.5 rounded-full bg-white/5 text-white/40 hover:text-white/60 flex items-center gap-1">
               {sf.name}
               <span onClick={e => { e.stopPropagation(); const next = savedFilters.filter((_, j) => j !== i); setSavedFilters(next); localStorage.setItem("pomo_saved_filters", JSON.stringify(next)); }}
@@ -255,7 +255,7 @@ export default function TaskList({ selectMode, onSelect, selectedTaskId, votedTa
                 {([["title","Title"],["status","Status"],["priority","Priority"],["estimated","Est"],["due","Due"],["user","Owner"]] as const).map(([k,label]) => (
                   <th key={k} scope="col" className={`py-1 px-1 cursor-pointer hover:text-white/50 ${tableSort === k ? "text-white/60" : ""}`}
                     aria-sort={tableSort === k ? "descending" : undefined}
-                    onClick={() => setTableSort(k as any)}>{label}{tableSort === k ? " ▾" : ""}</th>
+                    onClick={() => setTableSort(k as typeof tableSort)}>{label}{tableSort === k ? " ▾" : ""}</th>
                 ))}
               </tr>
             </thead>

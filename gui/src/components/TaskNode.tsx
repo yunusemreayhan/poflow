@@ -85,8 +85,8 @@ export default function TaskNode({ node, depth, onView, selectMode, onSelect, se
           e.dataTransfer?.setData("text/plain", String(t.id));
           e.dataTransfer.effectAllowed = "move";
           setTimeout(() => { if (e.target) (e.target as HTMLElement).style.opacity = "0.4"; }, 0);
-        }) as any}
-        onDragEnd={((e: React.DragEvent) => { if (e.target) (e.target as HTMLElement).style.opacity = "1"; }) as any}
+        }) as React.DragEventHandler<HTMLDivElement>}
+        onDragEnd={((e: React.DragEvent) => { if (e.target) (e.target as HTMLElement).style.opacity = "1"; }) as React.DragEventHandler<HTMLDivElement>}
         onDragOver={(e: React.DragEvent) => {
           e.preventDefault();
           const rect = e.currentTarget.getBoundingClientRect();
