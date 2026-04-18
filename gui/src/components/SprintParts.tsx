@@ -4,8 +4,10 @@ import { useStore } from "../store/store";
 import { matchSearch } from "../utils";
 import type { SprintBoard, SprintDetail, Task } from "../store/api";
 import TaskList from "./TaskList";
+import { useT } from "../i18n";
 
 export function BoardView({ board, reload, wipLimit: wipLimitProp }: { board: SprintBoard; reload: () => void; wipLimit?: number }) {
+  const tl = useT();
   const changeStatus = useCallback(async (taskId: number, status: string) => {
     await apiCall("PUT", `/api/tasks/${taskId}`, { status });
     reload();
@@ -76,10 +78,10 @@ export function BoardView({ board, reload, wipLimit: wipLimitProp }: { board: Sp
               <span>👤{t.user}</span>
             </div>
             <div className="hidden group-hover:flex gap-1 mt-1">
-              {title !== "Todo" && <button onClick={() => changeStatus(t.id, "backlog")} className="text-[10px] text-white/30 hover:text-white">→Todo</button>}
-              {title !== "In Progress" && <button onClick={() => changeStatus(t.id, "in_progress")} className="text-[10px] text-white/30 hover:text-yellow-400">→WIP</button>}
-              {title !== "Blocked" && <button onClick={() => changeStatus(t.id, "blocked")} className="text-[10px] text-white/30 hover:text-red-400">→Block</button>}
-              {title !== "Done" && <button onClick={() => changeStatus(t.id, "completed")} className="text-[10px] text-white/30 hover:text-green-400">→Done</button>}
+              {title !== tl.todo && <button onClick={() => changeStatus(t.id, "backlog")} className="text-[10px] text-white/30 hover:text-white">{tl.moveToTodo}</button>}
+              {title !== tl.inProgress && <button onClick={() => changeStatus(t.id, "in_progress")} className="text-[10px] text-white/30 hover:text-yellow-400">→{tl.wip}</button>}
+              {title !== tl.blocked && <button onClick={() => changeStatus(t.id, "blocked")} className="text-[10px] text-white/30 hover:text-red-400">→{tl.blocked}</button>}
+              {title !== tl.done && <button onClick={() => changeStatus(t.id, "completed")} className="text-[10px] text-white/30 hover:text-green-400">→{tl.done}</button>}
             </div>
           </div>
         ))}
@@ -100,10 +102,10 @@ export function BoardView({ board, reload, wipLimit: wipLimitProp }: { board: Sp
         <span>{pct}% done</span>
       </div>
       <div className="flex gap-3 overflow-x-auto min-w-0 pb-2">
-      <Column title="Todo" tasks={board.todo} color="text-white/60" status="backlog" />
-      <Column title="In Progress" tasks={board.in_progress} color="text-yellow-400" status="in_progress" />
-      {board.blocked.length > 0 && <Column title="Blocked" tasks={board.blocked} color="text-red-400" status="blocked" />}
-      <Column title="Done" tasks={board.done} color="text-green-400" status="completed" />
+      <Column title={tl.todo} tasks={board.todo} color="text-white/60" status="backlog" />
+      <Column title={tl.inProgress} tasks={board.in_progress} color="text-yellow-400" status="in_progress" />
+      {board.blocked.length > 0 && <Column title={tl.blocked} tasks={board.blocked} color="text-red-400" status="blocked" />}
+      <Column title={tl.done} tasks={board.done} color="text-green-400" status="completed" />
       </div>
     </div>
   );

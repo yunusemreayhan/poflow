@@ -69,6 +69,9 @@ export interface Locale {
   completed: string;
   active: string;
   backlog: string;
+  blocked: string;
+  wip: string;
+  moveToTodo: string;
   all: string;
   noTasks: string;
   confirmDelete: string;

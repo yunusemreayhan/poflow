@@ -2,18 +2,20 @@ import { useMemo, useState, useCallback } from "react";
 import { useStore } from "../store/store";
 import type { Task } from "../store/api";
 import Select from "./Select";
+import { useT } from "../i18n";
 
 const COLUMNS = [
-  { id: "backlog", label: "Backlog", color: "#6C7A89" },
-  { id: "active", label: "Active", color: "#F59E0B" },
-  { id: "in_progress", label: "In Progress", color: "#3B82F6" },
-  { id: "blocked", label: "Blocked", color: "#EF4444" },
-  { id: "completed", label: "Done", color: "#10B981" },
+  { id: "backlog", key: "backlog" as const, color: "#6C7A89" },
+  { id: "active", key: "active" as const, color: "#F59E0B" },
+  { id: "in_progress", key: "inProgress" as const, color: "#3B82F6" },
+  { id: "blocked", key: "blocked" as const, color: "#EF4444" },
+  { id: "completed", key: "completed" as const, color: "#10B981" },
 ] as const;
 
 
 export default function KanbanBoard() {
   const { tasks, updateTask, teamScope } = useStore();
+  const t = useT();
   const [dragId, setDragId] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState<string | null>(null);
   const [groupBy, setGroupBy] = useState<"none" | "project" | "user">("none");
@@ -98,7 +100,7 @@ export default function KanbanBoard() {
                 onDrop={e => onDrop(e, col.id)}>
                 <div className="flex items-center gap-2 px-4 py-3 border-b border-white/5">
                   <span className="w-2 h-2 rounded-full" style={{ background: col.color }} />
-                  <span className="text-xs font-medium text-white/70">{col.label}</span>
+                  <span className="text-xs font-medium text-white/70">{t[col.key]}</span>
                   <span className="text-[10px] text-white/30 ml-auto">{colTasks.length}</span>
                 </div>
                 <div className="flex-1 overflow-y-auto p-3 space-y-2" role="list">

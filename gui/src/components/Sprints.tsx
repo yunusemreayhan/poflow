@@ -83,7 +83,7 @@ export default function Sprints() {
       <div className="glass p-4 flex items-center gap-3">
         <h2 className="text-lg font-semibold text-white flex-1">Sprints</h2>
         <Select value={filter} onChange={setFilter} className="w-32 text-xs"
-          options={[{value:"all",label:"All"},{value:"planning",label:"Planning"},{value:"active",label:"Active"},{value:"completed",label:"Completed"}]} />
+          options={[{value:"all",label:t.all},{value:"planning",label:t.planning},{value:"active",label:t.active},{value:"completed",label:t.completed}]} />
         <button onClick={() => setCreating(true)} className="p-1.5 rounded bg-[var(--color-accent)] text-white"><Plus size={14} /></button>
       </div>
 

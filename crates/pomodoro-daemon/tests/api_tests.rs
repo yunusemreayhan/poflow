@@ -8169,3 +8169,206 @@ async fn test_archived_list_user_scoped() {
     let archived = body_json(resp).await;
     assert!(!archived.as_array().unwrap().iter().any(|t| t["id"] == tid));
 }
+
+// ---- Sprint 2 Task 12: Tests for previously untested routes ----
+
+// 1. PUT /api/auth/password — change password
+#[tokio::test]
+async fn test_change_password() {
+    let app = app().await;
+    let (tok, _) = register_user_full(&app, "pwuser", "OldPass123").await;
+    // Change password
+    let resp = app.clone().oneshot(auth_req("PUT", "/api/auth/password", &tok, Some(json!({"current_password":"OldPass123","new_password":"NewPass456"})))).await.unwrap();
+    assert_eq!(resp.status(), 204);
+    // Login with new password
+    let resp = app.clone().oneshot(json_req("POST", "/api/auth/login", Some(json!({"username":"pwuser","password":"NewPass456"})))).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    // Old password should fail
+    let resp = app.clone().oneshot(json_req("POST", "/api/auth/login", Some(json!({"username":"pwuser","password":"OldPass123"})))).await.unwrap();
+    assert_eq!(resp.status(), 401);
+}
+
+#[tokio::test]
+async fn test_change_password_wrong_current() {
+    let app = app().await;
+    let (tok, _) = register_user_full(&app, "pwwrong", "Pass1234").await;
+    let resp = app.clone().oneshot(auth_req("PUT", "/api/auth/password", &tok, Some(json!({"current_password":"WrongPass","new_password":"NewPass456"})))).await.unwrap();
+    assert_eq!(resp.status(), 401);
+}
+
+// 2. GET /api/notifications
+#[tokio::test]
+async fn test_list_notifications() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("GET", "/api/notifications", &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let j = body_json(resp).await;
+    assert!(j.is_array());
+}
+
+// 3. GET /api/notifications/unread
+#[tokio::test]
+async fn test_unread_count() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("GET", "/api/notifications/unread", &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let j = body_json(resp).await;
+    assert!(j["count"].is_number());
+}
+
+// 4. POST /api/notifications/read
+#[tokio::test]
+async fn test_mark_notifications_read() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    // Mark all read (no body)
+    let resp = app.clone().oneshot(auth_req("POST", "/api/notifications/read", &tok, Some(json!({})))).await.unwrap();
+    assert_eq!(resp.status(), 204);
+}
+
+// 5. POST /api/rooms/{id}/leave
+#[tokio::test]
+async fn test_leave_room() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let user_tok = reg(&app, "leaver").await;
+    // Create room
+    let resp = app.clone().oneshot(auth_req("POST", "/api/rooms", &tok, Some(json!({"name":"LeaveRoom"})))).await.unwrap();
+    let rid = body_json(resp).await["id"].as_i64().unwrap();
+    // User joins
+    app.clone().oneshot(auth_req("POST", &format!("/api/rooms/{}/join", rid), &user_tok, None)).await.unwrap();
+    // User leaves
+    let resp = app.clone().oneshot(auth_req("POST", &format!("/api/rooms/{}/leave", rid), &user_tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 204);
+}
+
+#[tokio::test]
+async fn test_leave_room_creator_cannot_leave() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("POST", "/api/rooms", &tok, Some(json!({"name":"CreatorRoom"})))).await.unwrap();
+    let rid = body_json(resp).await["id"].as_i64().unwrap();
+    let resp = app.clone().oneshot(auth_req("POST", &format!("/api/rooms/{}/leave", rid), &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 400);
+}
+
+// 6. GET /api/sprints/compare
+#[tokio::test]
+async fn test_compare_sprints() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    // Create two sprints
+    let resp = app.clone().oneshot(auth_req("POST", "/api/sprints", &tok, Some(json!({"name":"SprintA","start_date":"2026-01-01","end_date":"2026-01-14"})))).await.unwrap();
+    let a = body_json(resp).await["id"].as_i64().unwrap();
+    let resp = app.clone().oneshot(auth_req("POST", "/api/sprints", &tok, Some(json!({"name":"SprintB","start_date":"2026-01-15","end_date":"2026-01-28"})))).await.unwrap();
+    let b = body_json(resp).await["id"].as_i64().unwrap();
+    let resp = app.clone().oneshot(auth_req("GET", &format!("/api/sprints/compare?a={}&b={}", a, b), &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let j = body_json(resp).await;
+    assert!(j["a"]["name"].as_str().unwrap() == "SprintA");
+    assert!(j["b"]["name"].as_str().unwrap() == "SprintB");
+}
+
+// 7. GET /api/tasks/{id}/burn-users
+#[tokio::test]
+async fn test_task_burn_users() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"BurnTask"})))).await.unwrap();
+    let tid = body_json(resp).await["id"].as_i64().unwrap();
+    let resp = app.clone().oneshot(auth_req("GET", &format!("/api/tasks/{}/burn-users", tid), &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let j = body_json(resp).await;
+    assert!(j.is_array());
+}
+
+// 8. DELETE /api/tasks/{id}/permanent — purge task
+#[tokio::test]
+async fn test_purge_task() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"PurgeMe"})))).await.unwrap();
+    let tid = body_json(resp).await["id"].as_i64().unwrap();
+    // Must trash first
+    app.clone().oneshot(auth_req("DELETE", &format!("/api/tasks/{}", tid), &tok, None)).await.unwrap();
+    // Now purge
+    let resp = app.clone().oneshot(auth_req("DELETE", &format!("/api/tasks/{}/permanent", tid), &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 204);
+    // Verify gone
+    let resp = app.clone().oneshot(auth_req("GET", &format!("/api/tasks/{}", tid), &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 404);
+}
+
+#[tokio::test]
+async fn test_purge_task_not_trashed() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"NoPurge"})))).await.unwrap();
+    let tid = body_json(resp).await["id"].as_i64().unwrap();
+    // Purge without trashing first should fail
+    let resp = app.clone().oneshot(auth_req("DELETE", &format!("/api/tasks/{}/permanent", tid), &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 400);
+}
+
+// 9. GET /api/tasks/search
+#[tokio::test]
+async fn test_search_tasks() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"Searchable Widget"})))).await.unwrap();
+    let resp = app.clone().oneshot(auth_req("GET", "/api/tasks/search?q=Searchable", &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let j = body_json(resp).await;
+    assert!(j.as_array().unwrap().iter().any(|t| t["title"].as_str().unwrap().contains("Searchable")));
+}
+
+#[tokio::test]
+async fn test_search_tasks_empty_query() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("GET", "/api/tasks/search?q=", &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let j = body_json(resp).await;
+    assert!(j.as_array().unwrap().is_empty());
+}
+
+// 10. GET /api/tasks/{id}/time-summary
+#[tokio::test]
+async fn test_task_time_summary() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"TimeSumTask"})))).await.unwrap();
+    let tid = body_json(resp).await["id"].as_i64().unwrap();
+    let resp = app.clone().oneshot(auth_req("GET", &format!("/api/tasks/{}/time-summary", tid), &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let j = body_json(resp).await;
+    assert!(j["task_id"].as_i64().unwrap() == tid);
+    assert!(j["total_hours"].is_number());
+    assert!(j["by_user"].is_array());
+}
+
+// 11. GET /api/timer/active
+#[tokio::test]
+async fn test_active_timers() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("GET", "/api/timer/active", &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let j = body_json(resp).await;
+    assert!(j.is_array());
+}
+
+// 12. DELETE /api/rooms/{id}/members/{username} — kick member
+#[tokio::test]
+async fn test_kick_member() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let user_tok = reg(&app, "kickee").await;
+    let resp = app.clone().oneshot(auth_req("POST", "/api/rooms", &tok, Some(json!({"name":"KickRoom"})))).await.unwrap();
+    let rid = body_json(resp).await["id"].as_i64().unwrap();
+    app.clone().oneshot(auth_req("POST", &format!("/api/rooms/{}/join", rid), &user_tok, None)).await.unwrap();
+    let resp = app.clone().oneshot(auth_req("DELETE", &format!("/api/rooms/{}/members/kickee", rid), &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 204);
+}

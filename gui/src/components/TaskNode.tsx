@@ -3,6 +3,7 @@ import { Plus, Trash2, Play, CheckCircle, Circle, ChevronRight, FolderOpen, Fold
 import { useStore } from "../store/store";
 import { useShallow } from "zustand/react/shallow";
 import React, { useState, useCallback, useEffect, useContext } from "react";
+import { useT } from "../i18n";
 import { countDescendants } from "../tree";
 import type { TreeNode } from "../tree";
 import { apiCall } from "../store/api";
@@ -22,6 +23,7 @@ export default function TaskNode({ node, depth, onView, selectMode, onSelect, se
     useShallow(s => ({ engine: s.engine, createTask: s.createTask, updateTask: s.updateTask, deleteTask: s.deleteTask, start: s.start, username: s.username, role: s.role, taskSprints: s.taskSprints, taskSprintsMap: s.taskSprintsMap, burnTotals: s.burnTotals, allAssignees: s.allAssignees, config: s.config }))
   );
   const searchQuery = useContext(SearchCtx);
+  const tl = useT();
   const [expanded, setExpanded] = useState(true);
   const [adding, setAdding] = useState(false);
   const [commenting, setCommenting] = useState(false);
@@ -204,7 +206,7 @@ export default function TaskNode({ node, depth, onView, selectMode, onSelect, se
           t.status === "completed" ? "bg-[var(--color-success)]/20 text-[var(--color-success)]"
           : t.status === "active" ? "bg-[var(--color-work)]/20 text-[var(--color-work)]"
           : "bg-white/5 text-white/25"
-        }`}>{t.status === "completed" ? "Done" : t.status === "active" ? "WIP" : "Todo"}</span>
+        }`}>{t.status === "completed" ? tl.done : t.status === "active" ? tl.wip : tl.backlog}</span>
 
         <div className="flex-1 min-w-0">
           {editingTitle && isOwner ? (
