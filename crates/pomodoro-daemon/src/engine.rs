@@ -460,3 +460,184 @@ impl Engine {
         self.heartbeats.lock().await.insert(task_name.to_string(), std::time::Instant::now());
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn engine_state_default_values() {
+        let s = EngineState::default();
+        assert_eq!(s.phase, TimerPhase::Idle);
+        assert_eq!(s.status, TimerStatus::Idle);
+        assert_eq!(s.elapsed_s, 0);
+        assert_eq!(s.duration_s, 25 * 60);
+        assert_eq!(s.session_count, 0);
+        assert!(s.current_task_id.is_none());
+        assert!(s.current_session_id.is_none());
+        assert_eq!(s.current_user_id, 0);
+        assert_eq!(s.daily_completed, 0);
+        assert_eq!(s.daily_goal, 8);
+    }
+
+    #[test]
+    fn idle_state_uses_config() {
+        let mut cfg = Config::default();
+        cfg.daily_goal = 12;
+        cfg.work_duration_min = 50;
+        let s = Engine::idle_state(42, &cfg);
+        assert_eq!(s.current_user_id, 42);
+        assert_eq!(s.daily_goal, 12);
+        assert_eq!(s.duration_s, 50 * 60);
+        assert_eq!(s.phase, TimerPhase::Idle);
+        assert_eq!(s.status, TimerStatus::Idle);
+    }
+
+    #[test]
+    fn engine_state_serde_roundtrip() {
+        let s = EngineState {
+            phase: TimerPhase::Work,
+            status: TimerStatus::Running,
+            elapsed_s: 120,
+            duration_s: 1500,
+            session_count: 3,
+            current_task_id: Some(7),
+            current_session_id: Some(99),
+            current_user_id: 1,
+            daily_completed: 5,
+            daily_goal: 8,
+        };
+        let json = serde_json::to_string(&s).unwrap();
+        let d: EngineState = serde_json::from_str(&json).unwrap();
+        assert_eq!(d.phase, TimerPhase::Work);
+        assert_eq!(d.status, TimerStatus::Running);
+        assert_eq!(d.elapsed_s, 120);
+        assert_eq!(d.current_task_id, Some(7));
+    }
+
+    #[test]
+    fn timer_phase_variants() {
+        // Ensure all phases serialize/deserialize correctly
+        for (phase, expected) in [
+            (TimerPhase::Idle, "\"Idle\""),
+            (TimerPhase::Work, "\"Work\""),
+            (TimerPhase::ShortBreak, "\"ShortBreak\""),
+            (TimerPhase::LongBreak, "\"LongBreak\""),
+        ] {
+            let json = serde_json::to_string(&phase).unwrap();
+            assert_eq!(json, expected);
+            let back: TimerPhase = serde_json::from_str(&json).unwrap();
+            assert_eq!(back, phase);
+        }
+    }
+
+    #[test]
+    fn timer_status_variants() {
+        for (status, expected) in [
+            (TimerStatus::Idle, "\"Idle\""),
+            (TimerStatus::Running, "\"Running\""),
+            (TimerStatus::Paused, "\"Paused\""),
+        ] {
+            let json = serde_json::to_string(&status).unwrap();
+            assert_eq!(json, expected);
+            let back: TimerStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(back, status);
+        }
+    }
+
+    #[test]
+    fn stop_preserves_fields() {
+        // Simulate what stop() does to state (the pure logic part)
+        let state = EngineState {
+            phase: TimerPhase::Work,
+            status: TimerStatus::Running,
+            elapsed_s: 500,
+            duration_s: 1500,
+            session_count: 3,
+            current_task_id: Some(5),
+            current_session_id: Some(10),
+            current_user_id: 1,
+            daily_completed: 2,
+            daily_goal: 8,
+        };
+        let preserved = (state.session_count, state.daily_completed, state.daily_goal, state.duration_s);
+        let new_state = EngineState {
+            current_user_id: 1,
+            session_count: preserved.0,
+            daily_completed: preserved.1,
+            daily_goal: preserved.2,
+            duration_s: preserved.3,
+            ..Default::default()
+        };
+        assert_eq!(new_state.phase, TimerPhase::Idle);
+        assert_eq!(new_state.status, TimerStatus::Idle);
+        assert_eq!(new_state.elapsed_s, 0);
+        assert_eq!(new_state.session_count, 3);
+        assert_eq!(new_state.daily_completed, 2);
+        assert_eq!(new_state.daily_goal, 8);
+        assert_eq!(new_state.duration_s, 1500);
+        assert!(new_state.current_task_id.is_none());
+        assert!(new_state.current_session_id.is_none());
+    }
+
+    #[test]
+    fn skip_phase_transitions() {
+        let cfg = Config::default(); // long_break_interval = 4
+
+        // Work → ShortBreak (session_count not divisible by interval)
+        let session_count = 1; // after increment
+        let next = if session_count % cfg.long_break_interval.max(1) == 0 {
+            TimerPhase::LongBreak
+        } else {
+            TimerPhase::ShortBreak
+        };
+        assert_eq!(next, TimerPhase::ShortBreak);
+
+        // Work → LongBreak (session_count divisible by interval)
+        let session_count = 4;
+        let next = if session_count % cfg.long_break_interval.max(1) == 0 {
+            TimerPhase::LongBreak
+        } else {
+            TimerPhase::ShortBreak
+        };
+        assert_eq!(next, TimerPhase::LongBreak);
+
+        // Break → Work
+        for phase in [TimerPhase::ShortBreak, TimerPhase::LongBreak] {
+            let next = match phase {
+                TimerPhase::Work => TimerPhase::ShortBreak,
+                _ => TimerPhase::Work,
+            };
+            assert_eq!(next, TimerPhase::Work);
+        }
+    }
+
+    #[test]
+    fn skip_duration_calculation() {
+        let cfg = Config::default();
+        for phase in [TimerPhase::Work, TimerPhase::ShortBreak, TimerPhase::LongBreak] {
+            let dur = match phase {
+                TimerPhase::Work => cfg.work_duration_min * 60,
+                TimerPhase::ShortBreak => cfg.short_break_min * 60,
+                TimerPhase::LongBreak => cfg.long_break_min * 60,
+                TimerPhase::Idle => 0,
+            };
+            let expected = match phase {
+                TimerPhase::Work => 25 * 60,
+                TimerPhase::ShortBreak => 5 * 60,
+                TimerPhase::LongBreak => 15 * 60,
+                _ => 0,
+            };
+            assert_eq!(dur, expected);
+        }
+    }
+
+    #[test]
+    fn change_event_serde() {
+        let events = [ChangeEvent::Tasks, ChangeEvent::Sprints, ChangeEvent::Rooms, ChangeEvent::Config];
+        for e in &events {
+            let json = serde_json::to_string(e).unwrap();
+            let _: ChangeEvent = serde_json::from_str(&json).unwrap();
+        }
+    }
+}

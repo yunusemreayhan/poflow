@@ -210,3 +210,159 @@ pub fn is_owner_or_privileged(resource_user_id: i64, claims: &Claims) -> bool {
 pub async fn invalidate_user_cache(cache: &tokio::sync::RwLock<std::collections::HashMap<i64, std::time::Instant>>, user_id: i64) {
     cache.write().await.remove(&user_id);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_claims(user_id: i64, role: &str) -> Claims {
+        Claims {
+            sub: user_id.to_string(),
+            user_id,
+            username: "testuser".to_string(),
+            role: role.to_string(),
+            exp: 0,
+            iat: 0,
+            typ: "access".to_string(),
+            jti: "test-jti".to_string(),
+        }
+    }
+
+    #[test]
+    fn token_hash_deterministic() {
+        let h1 = token_hash(b"hello");
+        let h2 = token_hash(b"hello");
+        assert_eq!(h1, h2);
+    }
+
+    #[test]
+    fn token_hash_known_value() {
+        // SHA-256 of empty string
+        let h = token_hash(b"");
+        assert_eq!(h, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+    }
+
+    #[test]
+    fn token_hash_different_inputs() {
+        assert_ne!(token_hash(b"a"), token_hash(b"b"));
+    }
+
+    #[test]
+    fn is_owner_or_root_owner_matches() {
+        let claims = make_claims(5, "user");
+        assert!(is_owner_or_root(5, &claims));
+    }
+
+    #[test]
+    fn is_owner_or_root_root_always() {
+        let claims = make_claims(5, "root");
+        assert!(is_owner_or_root(99, &claims));
+    }
+
+    #[test]
+    fn is_owner_or_root_admin_always() {
+        let claims = make_claims(5, "admin");
+        assert!(is_owner_or_root(99, &claims));
+    }
+
+    #[test]
+    fn is_owner_or_root_non_owner_user_denied() {
+        let claims = make_claims(5, "user");
+        assert!(!is_owner_or_root(99, &claims));
+    }
+
+    #[test]
+    fn is_admin_or_root_roles() {
+        assert!(is_admin_or_root(&make_claims(1, "root")));
+        assert!(is_admin_or_root(&make_claims(1, "admin")));
+        assert!(!is_admin_or_root(&make_claims(1, "user")));
+        assert!(!is_admin_or_root(&make_claims(1, "")));
+    }
+
+    #[test]
+    fn is_owner_or_privileged_combinations() {
+        // Owner
+        assert!(is_owner_or_privileged(5, &make_claims(5, "user")));
+        // Admin (not owner)
+        assert!(is_owner_or_privileged(99, &make_claims(5, "admin")));
+        // Root (not owner)
+        assert!(is_owner_or_privileged(99, &make_claims(5, "root")));
+        // Non-owner, non-privileged
+        assert!(!is_owner_or_privileged(99, &make_claims(5, "user")));
+    }
+
+    #[test]
+    fn claims_default_token_type() {
+        let json = r#"{"sub":"1","user_id":1,"username":"u","role":"user","exp":0,"iat":0,"jti":"x"}"#;
+        let c: Claims = serde_json::from_str(json).unwrap();
+        assert_eq!(c.typ, "access"); // default_token_type
+    }
+
+    #[test]
+    fn claims_serde_roundtrip() {
+        let c = make_claims(42, "root");
+        let json = serde_json::to_string(&c).unwrap();
+        let d: Claims = serde_json::from_str(&json).unwrap();
+        assert_eq!(d.user_id, 42);
+        assert_eq!(d.role, "root");
+        assert_eq!(d.typ, "access");
+        assert_eq!(d.jti, "test-jti");
+    }
+
+    #[test]
+    fn jwt_create_and_verify_roundtrip() {
+        // Force a known secret for testing
+        std::env::set_var("POMODORO_JWT_SECRET", "test-secret-at-least-32-bytes-long!!");
+        let token = create_token(1, "alice", "user").unwrap();
+        let claims = verify_token(&token).unwrap();
+        assert_eq!(claims.user_id, 1);
+        assert_eq!(claims.username, "alice");
+        assert_eq!(claims.role, "user");
+        assert_eq!(claims.typ, "access");
+        assert!(!claims.jti.is_empty());
+    }
+
+    #[test]
+    fn jwt_refresh_token_type() {
+        std::env::set_var("POMODORO_JWT_SECRET", "test-secret-at-least-32-bytes-long!!");
+        let token = create_refresh_token(1, "alice", "user").unwrap();
+        let claims = verify_token(&token).unwrap();
+        assert_eq!(claims.typ, "refresh");
+        assert_ne!(claims.jti, ""); // unique jti
+    }
+
+    #[test]
+    fn jwt_access_and_refresh_have_different_jti() {
+        std::env::set_var("POMODORO_JWT_SECRET", "test-secret-at-least-32-bytes-long!!");
+        let access = create_token(1, "alice", "user").unwrap();
+        let refresh = create_refresh_token(1, "alice", "user").unwrap();
+        let ac = verify_token(&access).unwrap();
+        let rc = verify_token(&refresh).unwrap();
+        assert_ne!(ac.jti, rc.jti);
+    }
+
+    #[test]
+    fn jwt_tampered_token_fails() {
+        std::env::set_var("POMODORO_JWT_SECRET", "test-secret-at-least-32-bytes-long!!");
+        let token = create_token(1, "alice", "user").unwrap();
+        let tampered = format!("{}x", token);
+        assert!(verify_token(&tampered).is_err());
+    }
+
+    #[test]
+    fn jwt_garbage_token_fails() {
+        std::env::set_var("POMODORO_JWT_SECRET", "test-secret-at-least-32-bytes-long!!");
+        assert!(verify_token("not.a.token").is_err());
+        assert!(verify_token("").is_err());
+    }
+
+    #[tokio::test]
+    async fn revoke_and_check_in_memory() {
+        std::env::set_var("POMODORO_JWT_SECRET", "test-secret-at-least-32-bytes-long!!");
+        let token = create_token(1, "alice", "user").unwrap();
+        assert!(!is_revoked(&token).await);
+        // Revoke without DB (AUTH_POOL not set in unit tests — only in-memory blocklist)
+        blocklist().write().await.insert(token_hash(token.as_bytes()));
+        assert!(is_revoked(&token).await);
+    }
+}

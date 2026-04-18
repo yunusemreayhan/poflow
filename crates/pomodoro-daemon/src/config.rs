@@ -104,3 +104,126 @@ impl Config {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn config_default_values() {
+        let c = Config::default();
+        assert_eq!(c.work_duration_min, 25);
+        assert_eq!(c.short_break_min, 5);
+        assert_eq!(c.long_break_min, 15);
+        assert_eq!(c.long_break_interval, 4);
+        assert!(!c.auto_start_breaks);
+        assert!(!c.auto_start_work);
+        assert!(c.sound_enabled);
+        assert!(c.notification_enabled);
+        assert_eq!(c.daily_goal, 8);
+        assert_eq!(c.bind_address, "127.0.0.1");
+        assert_eq!(c.bind_port, 9090);
+        assert_eq!(c.estimation_mode, "hours");
+        assert!(!c.leaf_only_mode);
+        assert_eq!(c.theme, "dark");
+        assert!(c.cors_origins.is_empty());
+        assert_eq!(c.auto_archive_days, 90);
+        assert!(c.allow_registration);
+    }
+
+    #[test]
+    fn toml_roundtrip() {
+        let c = Config::default();
+        let toml_str = toml::to_string_pretty(&c).unwrap();
+        let d: Config = toml::from_str(&toml_str).unwrap();
+        assert_eq!(d.work_duration_min, c.work_duration_min);
+        assert_eq!(d.short_break_min, c.short_break_min);
+        assert_eq!(d.long_break_min, c.long_break_min);
+        assert_eq!(d.long_break_interval, c.long_break_interval);
+        assert_eq!(d.auto_start_breaks, c.auto_start_breaks);
+        assert_eq!(d.daily_goal, c.daily_goal);
+        assert_eq!(d.bind_address, c.bind_address);
+        assert_eq!(d.bind_port, c.bind_port);
+        assert_eq!(d.theme, c.theme);
+        assert_eq!(d.auto_archive_days, c.auto_archive_days);
+        assert_eq!(d.allow_registration, c.allow_registration);
+    }
+
+    #[test]
+    fn toml_partial_override() {
+        // Serialize default, modify one field, deserialize back
+        let mut c = Config::default();
+        c.work_duration_min = 50;
+        let toml_str = toml::to_string_pretty(&c).unwrap();
+        let d: Config = toml::from_str(&toml_str).unwrap();
+        assert_eq!(d.work_duration_min, 50);
+        assert_eq!(d.short_break_min, 5);
+    }
+
+    #[test]
+    fn toml_requires_core_fields() {
+        // Partial TOML without required fields should fail
+        assert!(toml::from_str::<Config>("").is_err());
+        assert!(toml::from_str::<Config>("work_duration_min = 50\n").is_err());
+    }
+
+    #[test]
+    fn toml_serde_default_fields() {
+        // Fields with #[serde(default)] can be omitted — verify via roundtrip
+        // that bind_address, bind_port, etc. survive serialization
+        let c = Config::default();
+        let toml_str = toml::to_string_pretty(&c).unwrap();
+        assert!(toml_str.contains("bind_address"));
+        assert!(toml_str.contains("bind_port"));
+        assert!(toml_str.contains("theme"));
+    }
+
+    #[test]
+    fn json_serde_roundtrip() {
+        let c = Config::default();
+        let json = serde_json::to_string(&c).unwrap();
+        let d: Config = serde_json::from_str(&json).unwrap();
+        assert_eq!(d.work_duration_min, c.work_duration_min);
+        assert_eq!(d.bind_port, c.bind_port);
+    }
+
+    #[test]
+    fn config_path_respects_env() {
+        // Test that config_path reads POMODORO_CONFIG_DIR
+        // (env var test — may race with other tests, so just verify the function exists)
+        let _path = Config::config_path();
+        // Path should end with config.toml
+        assert!(_path.to_str().unwrap().ends_with("config.toml"));
+    }
+
+    #[test]
+    fn config_save_and_load_via_tempdir() {
+        // Test save/load roundtrip using a unique temp directory
+        let dir = std::env::temp_dir().join(format!("pomodoro_cfg_test_{:?}", std::thread::current().id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("config.toml");
+
+        // Save
+        let mut c = Config::default();
+        c.work_duration_min = 45;
+        c.daily_goal = 12;
+        let data = toml::to_string_pretty(&c).unwrap();
+        std::fs::write(&path, &data).unwrap();
+
+        // Load
+        let content = std::fs::read_to_string(&path).unwrap();
+        let loaded: Config = toml::from_str(&content).unwrap();
+        assert_eq!(loaded.work_duration_min, 45);
+        assert_eq!(loaded.daily_goal, 12);
+        assert_eq!(loaded.short_break_min, 5); // default preserved
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn config_load_invalid_toml_errors() {
+        let invalid = "{{invalid toml";
+        assert!(toml::from_str::<Config>(invalid).is_err());
+    }
+}

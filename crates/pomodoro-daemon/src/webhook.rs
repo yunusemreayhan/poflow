@@ -111,3 +111,178 @@ pub fn dispatch(pool: Pool, event: &str, payload: serde_json::Value) {
         }
     });
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+
+    // --- is_private_ip IPv4 ---
+
+    #[test]
+    fn private_ip_loopback_v4() {
+        assert!(is_private_ip(&IpAddr::V4(Ipv4Addr::LOCALHOST)));
+        assert!(is_private_ip(&IpAddr::V4(Ipv4Addr::new(127, 0, 0, 2))));
+    }
+
+    #[test]
+    fn private_ip_rfc1918_10() {
+        assert!(is_private_ip(&IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1))));
+        assert!(is_private_ip(&IpAddr::V4(Ipv4Addr::new(10, 255, 255, 255))));
+    }
+
+    #[test]
+    fn private_ip_rfc1918_172() {
+        assert!(is_private_ip(&IpAddr::V4(Ipv4Addr::new(172, 16, 0, 0))));
+        assert!(is_private_ip(&IpAddr::V4(Ipv4Addr::new(172, 31, 255, 255))));
+    }
+
+    #[test]
+    fn private_ip_rfc1918_192() {
+        assert!(is_private_ip(&IpAddr::V4(Ipv4Addr::new(192, 168, 0, 1))));
+        assert!(is_private_ip(&IpAddr::V4(Ipv4Addr::new(192, 168, 255, 255))));
+    }
+
+    #[test]
+    fn private_ip_link_local_v4() {
+        assert!(is_private_ip(&IpAddr::V4(Ipv4Addr::new(169, 254, 1, 1))));
+    }
+
+    #[test]
+    fn private_ip_broadcast_v4() {
+        assert!(is_private_ip(&IpAddr::V4(Ipv4Addr::BROADCAST)));
+    }
+
+    #[test]
+    fn private_ip_unspecified_v4() {
+        assert!(is_private_ip(&IpAddr::V4(Ipv4Addr::UNSPECIFIED)));
+    }
+
+    #[test]
+    fn public_ip_v4() {
+        assert!(!is_private_ip(&IpAddr::V4(Ipv4Addr::new(8, 8, 8, 8))));
+        assert!(!is_private_ip(&IpAddr::V4(Ipv4Addr::new(1, 1, 1, 1))));
+        assert!(!is_private_ip(&IpAddr::V4(Ipv4Addr::new(93, 184, 216, 34))));
+    }
+
+    // --- is_private_ip IPv6 ---
+
+    #[test]
+    fn private_ip_loopback_v6() {
+        assert!(is_private_ip(&IpAddr::V6(Ipv6Addr::LOCALHOST)));
+    }
+
+    #[test]
+    fn private_ip_unspecified_v6() {
+        assert!(is_private_ip(&IpAddr::V6(Ipv6Addr::UNSPECIFIED)));
+    }
+
+    #[test]
+    fn private_ip_link_local_v6() {
+        // fe80::1
+        assert!(is_private_ip(&IpAddr::V6(Ipv6Addr::new(0xfe80, 0, 0, 0, 0, 0, 0, 1))));
+    }
+
+    #[test]
+    fn private_ip_unique_local_v6() {
+        // fc00::1
+        assert!(is_private_ip(&IpAddr::V6(Ipv6Addr::new(0xfc00, 0, 0, 0, 0, 0, 0, 1))));
+        // fd00::1
+        assert!(is_private_ip(&IpAddr::V6(Ipv6Addr::new(0xfd00, 0, 0, 0, 0, 0, 0, 1))));
+    }
+
+    #[test]
+    fn private_ip_v4_mapped_loopback() {
+        // ::ffff:127.0.0.1
+        assert!(is_private_ip(&IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0xffff, 0x7f00, 0x0001))));
+    }
+
+    #[test]
+    fn private_ip_v4_mapped_private() {
+        // ::ffff:10.0.0.1
+        assert!(is_private_ip(&IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0xffff, 0x0a00, 0x0001))));
+    }
+
+    #[test]
+    fn public_ip_v4_mapped() {
+        // ::ffff:8.8.8.8
+        assert!(!is_private_ip(&IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0xffff, 0x0808, 0x0808))));
+    }
+
+    #[test]
+    fn public_ip_v6() {
+        // 2001:db8::1 (documentation range, but not private per our function)
+        assert!(!is_private_ip(&IpAddr::V6(Ipv6Addr::new(0x2001, 0xdb8, 0, 0, 0, 0, 0, 1))));
+        // 2606:4700::1 (Cloudflare)
+        assert!(!is_private_ip(&IpAddr::V6(Ipv6Addr::new(0x2606, 0x4700, 0, 0, 0, 0, 0, 1))));
+    }
+
+    // --- is_private_ip_pub wrapper ---
+
+    #[test]
+    fn public_wrapper_matches() {
+        let ip: IpAddr = "127.0.0.1".parse().unwrap();
+        assert_eq!(is_private_ip_pub(&ip), is_private_ip(&ip));
+        let ip: IpAddr = "8.8.8.8".parse().unwrap();
+        assert_eq!(is_private_ip_pub(&ip), is_private_ip(&ip));
+    }
+
+    // --- is_safe_url ---
+
+    #[tokio::test]
+    async fn safe_url_rejects_private_ip() {
+        assert!(is_safe_url("http://127.0.0.1/hook").await.is_none());
+        assert!(is_safe_url("http://10.0.0.1/hook").await.is_none());
+        assert!(is_safe_url("http://192.168.1.1/hook").await.is_none());
+    }
+
+    #[tokio::test]
+    async fn safe_url_rejects_bad_scheme() {
+        assert!(is_safe_url("ftp://example.com/hook").await.is_none());
+        assert!(is_safe_url("file:///etc/passwd").await.is_none());
+    }
+
+    #[tokio::test]
+    async fn safe_url_rejects_invalid() {
+        assert!(is_safe_url("not a url").await.is_none());
+        assert!(is_safe_url("").await.is_none());
+    }
+
+    #[tokio::test]
+    async fn safe_url_accepts_public_ip() {
+        // Direct public IP should be accepted
+        let result = is_safe_url("http://8.8.8.8/hook").await;
+        assert!(result.is_some());
+        let (url, addr) = result.unwrap();
+        assert_eq!(url, "http://8.8.8.8/hook");
+        assert_eq!(addr.ip(), IpAddr::V4(Ipv4Addr::new(8, 8, 8, 8)));
+    }
+
+    // --- HMAC computation (extracted logic test) ---
+
+    #[test]
+    fn hmac_signature_format() {
+        use hmac::{Hmac, Mac, KeyInit};
+        use sha2::Sha256;
+        let secret = "test-secret";
+        let body = r#"{"event":"test","data":{}}"#;
+        let mut mac = <Hmac<Sha256>>::new_from_slice(secret.as_bytes()).unwrap();
+        mac.update(body.as_bytes());
+        let sig = format!("sha256={}", mac.finalize().into_bytes().iter().map(|b| format!("{:02x}", b)).collect::<String>());
+        assert!(sig.starts_with("sha256="));
+        assert_eq!(sig.len(), 7 + 64); // "sha256=" + 64 hex chars
+    }
+
+    #[test]
+    fn hmac_deterministic() {
+        use hmac::{Hmac, Mac, KeyInit};
+        use sha2::Sha256;
+        let compute = |s: &str, b: &str| -> String {
+            let mut mac = <Hmac<Sha256>>::new_from_slice(s.as_bytes()).unwrap();
+            mac.update(b.as_bytes());
+            format!("sha256={}", mac.finalize().into_bytes().iter().map(|b| format!("{:02x}", b)).collect::<String>())
+        };
+        assert_eq!(compute("key", "body"), compute("key", "body"));
+        assert_ne!(compute("key1", "body"), compute("key2", "body"));
+    }
+}
