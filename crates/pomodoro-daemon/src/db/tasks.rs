@@ -222,25 +222,25 @@ pub async fn count_tasks(pool: &Pool, f: TaskFilter<'_>) -> Result<i64> {
 pub async fn search_tasks_fts(pool: &Pool, query: &str, limit: i64, user_id: Option<i64>) -> Result<Vec<(i64, String, String)>> {
     if !fts5_ok() {
         let like = escape_like(query);
-        let (sql, needs_uid) = if user_id.is_some() {
-            ("SELECT id, title, COALESCE(SUBSTR(description, 1, 200), '') FROM tasks WHERE deleted_at IS NULL AND user_id = ? AND (title LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\' OR tags LIKE ? ESCAPE '\\') LIMIT ?".to_string(), true)
+        let sql = if user_id.is_some() {
+            "SELECT id, title, COALESCE(SUBSTR(description, 1, 200), '') FROM tasks WHERE deleted_at IS NULL AND user_id = ? AND (title LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\' OR tags LIKE ? ESCAPE '\\') LIMIT ?".to_string()
         } else {
-            ("SELECT id, title, COALESCE(SUBSTR(description, 1, 200), '') FROM tasks WHERE deleted_at IS NULL AND (title LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\' OR tags LIKE ? ESCAPE '\\') LIMIT ?".to_string(), false)
+            "SELECT id, title, COALESCE(SUBSTR(description, 1, 200), '') FROM tasks WHERE deleted_at IS NULL AND (title LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\' OR tags LIKE ? ESCAPE '\\') LIMIT ?".to_string()
         };
         let mut q = sqlx::query_as::<_, (i64, String, String)>(&sql);
-        if needs_uid { q = q.bind(user_id.unwrap()); }
+        if let Some(uid) = user_id { q = q.bind(uid); }
         q = q.bind(&like).bind(&like).bind(&like).bind(limit);
         return Ok(q.fetch_all(pool).await?);
     }
     let fts = format!("\"{}\"", query.replace('"', "\"\""));
-    let (sql, needs_uid) = if user_id.is_some() {
-        ("SELECT f.rowid, snippet(tasks_fts, 0, '<mark>', '</mark>', '...', 32), snippet(tasks_fts, 1, '<mark>', '</mark>', '...', 48) FROM tasks_fts f JOIN tasks t ON t.id = f.rowid WHERE tasks_fts MATCH ? AND t.user_id = ? AND t.deleted_at IS NULL ORDER BY rank LIMIT ?".to_string(), true)
+    let sql = if user_id.is_some() {
+        "SELECT f.rowid, snippet(tasks_fts, 0, '<mark>', '</mark>', '...', 32), snippet(tasks_fts, 1, '<mark>', '</mark>', '...', 48) FROM tasks_fts f JOIN tasks t ON t.id = f.rowid WHERE tasks_fts MATCH ? AND t.user_id = ? AND t.deleted_at IS NULL ORDER BY rank LIMIT ?".to_string()
     } else {
-        ("SELECT f.rowid, snippet(tasks_fts, 0, '<mark>', '</mark>', '...', 32), snippet(tasks_fts, 1, '<mark>', '</mark>', '...', 48) FROM tasks_fts f JOIN tasks t ON t.id = f.rowid WHERE tasks_fts MATCH ? AND t.deleted_at IS NULL ORDER BY rank LIMIT ?".to_string(), false)
+        "SELECT f.rowid, snippet(tasks_fts, 0, '<mark>', '</mark>', '...', 32), snippet(tasks_fts, 1, '<mark>', '</mark>', '...', 48) FROM tasks_fts f JOIN tasks t ON t.id = f.rowid WHERE tasks_fts MATCH ? AND t.deleted_at IS NULL ORDER BY rank LIMIT ?".to_string()
     };
     let mut q = sqlx::query_as::<_, (i64, String, String)>(&sql);
     q = q.bind(&fts);
-    if needs_uid { q = q.bind(user_id.unwrap()); }
+    if let Some(uid) = user_id { q = q.bind(uid); }
     q = q.bind(limit);
     Ok(q.fetch_all(pool).await?)
 }

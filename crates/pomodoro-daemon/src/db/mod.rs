@@ -309,6 +309,8 @@ async fn migrate(pool: &Pool) -> Result<()> {
     sqlx::query("CREATE INDEX IF NOT EXISTS idx_task_custom_values_task ON task_custom_values(task_id)").execute(pool).await.ok();
     sqlx::query("CREATE INDEX IF NOT EXISTS idx_checklist_items_task ON checklist_items(task_id)").execute(pool).await.ok();
     sqlx::query("CREATE INDEX IF NOT EXISTS idx_tasks_sort ON tasks(sort_order, id) WHERE deleted_at IS NULL").execute(pool).await.ok();
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_audit_log_created_at ON audit_log(created_at)").execute(pool).await.ok();
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_task_links_task ON task_links(task_id)").execute(pool).await.ok();
 
     sqlx::query("CREATE TABLE IF NOT EXISTS labels (
         id          INTEGER PRIMARY KEY AUTOINCREMENT,
