@@ -4,6 +4,7 @@ use anyhow::Result;
 use chrono::Datelike;
 use std::sync::Arc;
 use utoipa::OpenApi;
+#[cfg(feature = "swagger")]
 use utoipa_swagger_ui::SwaggerUi;
 
 #[derive(OpenApi)]
@@ -384,7 +385,9 @@ async fn main() -> Result<()> {
     });
 
     let mut app = build_router(engine.clone()).await;
+    #[cfg(feature = "swagger")]
     let swagger_enabled = std::env::var("POMODORO_SWAGGER").map_or(true, |v| v != "0" && v.to_lowercase() != "false");
+    #[cfg(feature = "swagger")]
     if swagger_enabled {
         app = app.merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()));
     }
@@ -394,6 +397,7 @@ async fn main() -> Result<()> {
     let bind_port = std::env::var("POMODORO_BIND_PORT").ok().and_then(|p| p.parse().ok()).unwrap_or(config.bind_port);
     let addr = format!("{}:{}", bind_addr, bind_port);
     tracing::info!("HTTP server listening on {}", addr);
+    #[cfg(feature = "swagger")]
     if swagger_enabled { tracing::info!("Swagger UI: http://{}/swagger-ui/", addr); }
 
     let listener = tokio::net::TcpListener::bind(&addr).await?;
