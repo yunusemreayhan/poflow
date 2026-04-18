@@ -23,7 +23,10 @@ ENV POMODORO_GUI_DIR=/usr/share/pomodoro/gui \
     POMODORO_DATA_DIR=/data \
     RUST_LOG=pomodoro_daemon=info
 
+RUN useradd -r -s /bin/false appuser && mkdir -p /data && chown appuser:appuser /data
+
 EXPOSE 9090
 VOLUME /data
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD wget -qO- http://localhost:9090/api/health || exit 1
+USER appuser
 CMD ["pomodoro-daemon"]

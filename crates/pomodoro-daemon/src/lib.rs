@@ -269,7 +269,8 @@ async fn security_headers(req: axum::extract::Request, next: axum::middleware::N
     h.insert("referrer-policy", "strict-origin-when-cross-origin".parse().unwrap());
     h.insert("x-xss-protection", "1; mode=block".parse().unwrap());
     h.insert("permissions-policy", "camera=(), microphone=(), geolocation=()".parse().unwrap());
-    h.insert("content-security-policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' ws: wss:; media-src 'self'".parse().unwrap());
+    h.insert("content-security-policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' ws: wss:; media-src 'self'".parse().unwrap());
+    h.insert("strict-transport-security", "max-age=63072000; includeSubDomains".parse().unwrap());
     resp
 }
 
