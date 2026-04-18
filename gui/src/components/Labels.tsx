@@ -76,6 +76,7 @@ export function TaskLabelPicker({ taskId }: { taskId: number }) {
       await apiCall("PUT", `/api/tasks/${taskId}/labels/${label.id}`);
     }
     load();
+    useStore.getState().loadTasks();
   };
 
   return (

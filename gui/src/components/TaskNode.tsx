@@ -309,10 +309,8 @@ export default function TaskNode({ node, depth, onView, selectMode, onSelect, se
         <TaskContextMenu pos={ctxMenu} task={t} node={node} isOwner={isOwner}
           assignees={assignees} ctxSprints={ctxSprints} ctxUsers={ctxUsers} ctxBurnUsers={ctxBurnUsers}
           taskSprints={taskSprints} config={config}
-          onClose={() => setCtxMenu(null)} updateTask={updateTask} start={start} setAssignees={setAssignees}
-          setEditingTitle={setEditingTitle} setTitleDraft={setTitleDraft}
-          setEditingDesc={setEditingDesc} setDescDraft={setDescDraft}
-          handleDelete={handleDelete} setTimeReporting={setTimeReporting} setCommenting={setCommenting} setAdding={setAdding} onView={onView} />
+          onClose={() => setCtxMenu(null)}
+          actions={{ updateTask, start, setAssignees, setEditingTitle, setTitleDraft, setEditingDesc, setDescDraft, handleDelete, setTimeReporting, setCommenting, setAdding, onView }} />
       )}
 
       <InlineTimeReport taskId={t.id} depth={depth} show={timeReporting} onClose={() => setTimeReporting(false)}

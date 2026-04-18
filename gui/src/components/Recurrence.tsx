@@ -57,7 +57,7 @@ export function TaskRecurrence({ taskId }: { taskId: number }) {
   return (
     <div className="flex items-center gap-2">
       <Select value={pattern} onChange={v => setPattern(v)} ariaLabel="Recurrence pattern"
-        options={PATTERNS.map(p => ({value:p,label:(t as unknown as Record<string, string>)[p] || p}))} />
+        options={PATTERNS.map(p => ({value:p,label:t[p] || p}))} />
       <input type="date" value={nextDue} onChange={e => setNextDue(e.target.value)} aria-label="Next due date"
         className="text-xs px-2 py-1 rounded bg-[var(--color-surface)] border border-white/10 text-[var(--color-text)]" />
       <button onClick={save} className="text-xs px-2 py-1 rounded bg-[var(--color-accent)] text-white">{t.save}</button>

@@ -1,5 +1,7 @@
 // F16: Offline storage with IndexedDB + sync queue
 
+import type { Task } from './store/types';
+
 const DB_NAME = 'pomo-offline';
 const DB_VERSION = 1;
 
@@ -30,7 +32,7 @@ function reqToPromise<T>(req: IDBRequest<T>): Promise<T> {
 
 // --- Tasks cache ---
 
-export async function cacheTasksOffline(tasks: unknown[]): Promise<void> {
+export async function cacheTasksOffline(tasks: Task[]): Promise<void> {
   try {
     const db = await openDB();
     const store = tx(db, 'tasks', 'readwrite');
@@ -48,7 +50,7 @@ export async function cacheTasksOffline(tasks: unknown[]): Promise<void> {
   }
 }
 
-export async function getOfflineTasks(): Promise<unknown[]> {
+export async function getOfflineTasks(): Promise<Task[]> {
   const db = await openDB();
   const result = await reqToPromise(tx(db, 'tasks', 'readonly').getAll());
   return result;

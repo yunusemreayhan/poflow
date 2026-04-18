@@ -1,6 +1,7 @@
 import { create } from "zustand";
 
 export interface Locale {
+  [key: string]: string;
   // App chrome
   appName: string;
   logout: string;

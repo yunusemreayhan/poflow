@@ -20,18 +20,20 @@ interface CtxMenuProps {
   taskSprints: TaskSprintInfo[];
   config: Config | null;
   onClose: () => void;
-  updateTask: (id: number, fields: Record<string, unknown>) => void;
-  start: (id: number) => void;
-  setAssignees: (fn: (prev: string[]) => string[]) => void;
-  setEditingTitle: (v: boolean) => void;
-  setTitleDraft: (v: string) => void;
-  setEditingDesc: (v: boolean) => void;
-  setDescDraft: (v: string) => void;
-  handleDelete: () => void;
-  setTimeReporting: (v: boolean) => void;
-  setCommenting: (v: boolean) => void;
-  setAdding: (v: boolean) => void;
-  onView: (id: number) => void;
+  actions: {
+    updateTask: (id: number, fields: Record<string, unknown>) => void;
+    start: (id: number) => void;
+    setAssignees: (fn: (prev: string[]) => string[]) => void;
+    setEditingTitle: (v: boolean) => void;
+    setTitleDraft: (v: string) => void;
+    setEditingDesc: (v: boolean) => void;
+    setDescDraft: (v: string) => void;
+    handleDelete: () => void;
+    setTimeReporting: (v: boolean) => void;
+    setCommenting: (v: boolean) => void;
+    setAdding: (v: boolean) => void;
+    onView: (id: number) => void;
+  };
 }
 
 export default function TaskContextMenu(p: CtxMenuProps) {
@@ -39,7 +41,7 @@ export default function TaskContextMenu(p: CtxMenuProps) {
   const [ctxSub, setCtxSub] = useState<string | null>(null);
   const [reparentSearch, setReparentSearch] = useState<string | null>(null);
   const deferredReparent = useDeferredValue(reparentSearch ?? "");
-  const { task: t, pos, node, isOwner, assignees, ctxSprints, ctxUsers, ctxBurnUsers, taskSprints, config } = p;
+  const { task: t, pos, node, isOwner, assignees, ctxSprints, ctxUsers, ctxBurnUsers, taskSprints, config, actions: act } = p;
   const close = p.onClose;
   const allTasks = useStore(s => s.tasks);
 
@@ -68,7 +70,7 @@ export default function TaskContextMenu(p: CtxMenuProps) {
         <div className="px-3 py-1 text-white/20 text-[10px] truncate">{t.title} · {t.status} · P{t.priority}</div>
         <div className="px-3 py-1 text-white/20 text-[10px] uppercase tracking-wider" role="presentation">{tl.status}</div>
         {([["backlog","Todo","○"],["active","WIP","▶"],["completed","Done","✓"],["archived","Archive","📦"]] as const).map(([s,label,icon]) => (
-          <button key={s} role="menuitem" disabled={t.status === s} onClick={() => { p.updateTask(t.id, { status: s }); close(); }}
+          <button key={s} role="menuitem" disabled={t.status === s} onClick={() => { act.updateTask(t.id, { status: s }); close(); }}
             className={`w-full text-left px-3 py-1.5 flex items-center gap-2 ${t.status === s ? "text-white/20" : "text-white/60 hover:bg-white/5"}`}>
             {icon} {label}
             {t.status === s && <span className="ml-auto text-white/20">current</span>}
@@ -79,7 +81,7 @@ export default function TaskContextMenu(p: CtxMenuProps) {
         <div className="px-3 py-1 text-white/20 text-[10px] uppercase tracking-wider">{tl.priority}</div>
         <div className="flex gap-1 px-3 py-1">
           {[1,2,3,4,5].map(pr => (
-            <button key={pr} onClick={() => { p.updateTask(t.id, { priority: pr }); close(); }}
+            <button key={pr} onClick={() => { act.updateTask(t.id, { priority: pr }); close(); }}
               className={`w-6 h-6 rounded-full border-2 transition-all ${t.priority === pr ? "scale-125" : "opacity-50 hover:opacity-100"}`}
               style={{ borderColor: PRIORITY_COLORS[pr], background: t.priority === pr ? PRIORITY_COLORS[pr] : "transparent" }}
               title={`Priority ${pr}`} />
@@ -135,7 +137,7 @@ export default function TaskContextMenu(p: CtxMenuProps) {
                     return (
                       <button key={`rm-${a}`} disabled={hasBurns} onClick={async () => {
                         await apiCall("DELETE", `/api/tasks/${t.id}/assignees/${a}`);
-                        p.setAssignees(prev => prev.filter(x => x !== a)); close();
+                        act.setAssignees(prev => prev.filter(x => x !== a)); close();
                       }} className={`w-full text-left px-3 py-1.5 flex items-center gap-2 ${hasBurns ? "text-white/20 cursor-not-allowed" : "text-red-400/70 hover:bg-white/5"}`}>
                         ✕ {a} {hasBurns && <span className="ml-auto text-[10px] text-white/15">has burns</span>}
                       </button>
@@ -149,7 +151,7 @@ export default function TaskContextMenu(p: CtxMenuProps) {
                   {ctxUsers.filter(u => !assignees.includes(u)).map(u => (
                     <button key={`add-${u}`} onClick={async () => {
                       await apiCall("POST", `/api/tasks/${t.id}/assignees`, { username: u });
-                      p.setAssignees(prev => [...prev, u]); close();
+                      act.setAssignees(prev => [...prev, u]); close();
                     }} className="w-full text-left px-3 py-1.5 text-white/60 hover:bg-white/5 flex items-center gap-2">
                       + {u}
                     </button>
@@ -166,19 +168,19 @@ export default function TaskContextMenu(p: CtxMenuProps) {
           const allTasks = useStore.getState().tasks;
           const siblings = allTasks.filter((s: Task) => s.parent_id === t.parent_id).sort((a: Task, b: Task) => a.sort_order - b.sort_order);
           const idx = siblings.findIndex((s: Task) => s.id === t.id);
-          if (idx > 0) { const prev = siblings[idx - 1]; const so = prev.sort_order === t.sort_order ? t.sort_order - 1 : prev.sort_order; await Promise.all([p.updateTask(t.id, { sort_order: so }), p.updateTask(prev.id, { sort_order: t.sort_order })]); }
+          if (idx > 0) { const prev = siblings[idx - 1]; const so = prev.sort_order === t.sort_order ? t.sort_order - 1 : prev.sort_order; await Promise.all([act.updateTask(t.id, { sort_order: so }), act.updateTask(prev.id, { sort_order: t.sort_order })]); }
           close();
         }} className="w-full text-left px-3 py-1.5 text-white/60 hover:bg-white/5 flex items-center gap-2">↑ Move up <kbd className="ml-auto text-[9px] text-white/20">Alt+↑</kbd></button>
         <button role="menuitem" onClick={async () => {
           const allTasks = useStore.getState().tasks;
           const siblings = allTasks.filter((s: Task) => s.parent_id === t.parent_id).sort((a: Task, b: Task) => a.sort_order - b.sort_order);
           const idx = siblings.findIndex((s: Task) => s.id === t.id);
-          if (idx < siblings.length - 1) { const next = siblings[idx + 1]; const so = next.sort_order === t.sort_order ? t.sort_order + 1 : next.sort_order; await Promise.all([p.updateTask(t.id, { sort_order: so }), p.updateTask(next.id, { sort_order: t.sort_order })]); }
+          if (idx < siblings.length - 1) { const next = siblings[idx + 1]; const so = next.sort_order === t.sort_order ? t.sort_order + 1 : next.sort_order; await Promise.all([act.updateTask(t.id, { sort_order: so }), act.updateTask(next.id, { sort_order: t.sort_order })]); }
           close();
         }} className="w-full text-left px-3 py-1.5 text-white/60 hover:bg-white/5 flex items-center gap-2">↓ Move down <kbd className="ml-auto text-[9px] text-white/20">Alt+↓</kbd></button>
         {/* V31-19: Keyboard-accessible reparenting */}
         {t.parent_id != null && <button role="menuitem" onClick={async () => {
-          await p.updateTask(t.id, { parent_id: null });
+          await act.updateTask(t.id, { parent_id: null });
           close();
         }} className="w-full text-left px-3 py-1.5 text-white/60 hover:bg-white/5 flex items-center gap-2">⬆ Move to root</button>}
         {/* V32-21: Reparent under another task */}
@@ -190,7 +192,7 @@ export default function TaskContextMenu(p: CtxMenuProps) {
               className="w-full bg-white/5 border border-white/10 rounded px-2 py-1 text-xs text-white outline-none" onClick={e => e.stopPropagation()} />
             <div className="max-h-24 overflow-y-auto mt-1">
               {allTasks.filter(c => c.id !== t.id && !isDescendant(c.id, t.id, allTasks) && c.title.toLowerCase().includes(deferredReparent.toLowerCase())).slice(0, 8).map(c => (
-                <button key={c.id} role="menuitem" onClick={async () => { await p.updateTask(t.id, { parent_id: c.id }); close(); }}
+                <button key={c.id} role="menuitem" onClick={async () => { await act.updateTask(t.id, { parent_id: c.id }); close(); }}
                   className="w-full text-left text-xs text-white/50 hover:text-white/80 py-0.5 truncate">→ {c.title}</button>
               ))}
             </div>
@@ -198,25 +200,25 @@ export default function TaskContextMenu(p: CtxMenuProps) {
         )}
 
         <div className="border-t border-white/5 my-1" />
-        <button role="menuitem" onClick={() => { p.start(t.id); close(); }}
+        <button role="menuitem" onClick={() => { act.start(t.id); close(); }}
           className="w-full text-left px-3 py-1.5 text-white/60 hover:bg-white/5 flex items-center gap-2"
           disabled={t.status === "completed" || (config?.leaf_only_mode && node.children.length > 0)}>▶ Start timer</button>
-        <button role="menuitem" onClick={() => { p.setTimeReporting(true); close(); }} className="w-full text-left px-3 py-1.5 text-white/60 hover:bg-white/5 flex items-center gap-2">🕐 Log time</button>
-        <button role="menuitem" onClick={() => { p.setCommenting(true); close(); }} className="w-full text-left px-3 py-1.5 text-white/60 hover:bg-white/5 flex items-center gap-2">💬 Comment</button>
-        <button role="menuitem" onClick={() => { p.setAdding(true); close(); }} className="w-full text-left px-3 py-1.5 text-white/60 hover:bg-white/5 flex items-center gap-2">＋ Add subtask</button>
-        <button role="menuitem" onClick={() => { p.onView(t.id); close(); }} className="w-full text-left px-3 py-1.5 text-white/60 hover:bg-white/5 flex items-center gap-2">👁 View details</button>
+        <button role="menuitem" onClick={() => { act.setTimeReporting(true); close(); }} className="w-full text-left px-3 py-1.5 text-white/60 hover:bg-white/5 flex items-center gap-2">🕐 Log time</button>
+        <button role="menuitem" onClick={() => { act.setCommenting(true); close(); }} className="w-full text-left px-3 py-1.5 text-white/60 hover:bg-white/5 flex items-center gap-2">💬 Comment</button>
+        <button role="menuitem" onClick={() => { act.setAdding(true); close(); }} className="w-full text-left px-3 py-1.5 text-white/60 hover:bg-white/5 flex items-center gap-2">＋ Add subtask</button>
+        <button role="menuitem" onClick={() => { act.onView(t.id); close(); }} className="w-full text-left px-3 py-1.5 text-white/60 hover:bg-white/5 flex items-center gap-2">👁 View details</button>
 
         {isOwner && (
           <>
             <div className="border-t border-white/5 my-1" />
-            <button role="menuitem" onClick={() => { p.setEditingTitle(true); p.setTitleDraft(t.title); close(); }} className="w-full text-left px-3 py-1.5 text-white/60 hover:bg-white/5 flex items-center gap-2">✏️ Rename</button>
-            <button role="menuitem" onClick={() => { p.setEditingDesc(true); p.setDescDraft(t.description || ""); close(); }} className="w-full text-left px-3 py-1.5 text-white/60 hover:bg-white/5 flex items-center gap-2">📝 Edit description</button>
+            <button role="menuitem" onClick={() => { act.setEditingTitle(true); act.setTitleDraft(t.title); close(); }} className="w-full text-left px-3 py-1.5 text-white/60 hover:bg-white/5 flex items-center gap-2">✏️ Rename</button>
+            <button role="menuitem" onClick={() => { act.setEditingDesc(true); act.setDescDraft(t.description || ""); close(); }} className="w-full text-left px-3 py-1.5 text-white/60 hover:bg-white/5 flex items-center gap-2">📝 Edit description</button>
             <button role="menuitem" onClick={async () => {
               const data = { title: t.title, priority: t.priority, estimated: t.estimated, estimated_hours: t.estimated_hours, remaining_points: t.remaining_points, project: t.project, description: t.description };
               await apiCall("POST", "/api/templates", { name: t.title, data });
               useStore.getState().toast("Saved as template"); close();
             }} className="w-full text-left px-3 py-1.5 text-white/60 hover:bg-white/5 flex items-center gap-2">📋 Save as template</button>
-            <button role="menuitem" onClick={() => { p.handleDelete(); close(); }} className="w-full text-left px-3 py-1.5 text-red-400/70 hover:bg-red-500/10 flex items-center gap-2">🗑 Delete</button>
+            <button role="menuitem" onClick={() => { act.handleDelete(); close(); }} className="w-full text-left px-3 py-1.5 text-red-400/70 hover:bg-red-500/10 flex items-center gap-2">🗑 Delete</button>
           </>
         )}
       </div>
