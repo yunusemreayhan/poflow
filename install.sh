@@ -25,6 +25,13 @@ sudo install -Dm644 assets/pomodoro.service /usr/lib/systemd/user/pomodoro.servi
 echo "Installing desktop entry..."
 sudo install -Dm644 assets/pomodoro.desktop /usr/share/applications/pomodoro.desktop
 
+echo "Installing icons..."
+for size in 32 64 128 256; do
+  sudo install -Dm644 "assets/icons/pomodoro-${size}.png" "/usr/share/icons/hicolor/${size}x${size}/apps/pomodoro.png"
+done
+sudo install -Dm644 assets/icons/pomodoro.svg /usr/share/icons/hicolor/scalable/apps/pomodoro.svg
+sudo gtk-update-icon-cache /usr/share/icons/hicolor 2>/dev/null || true
+
 echo ""
 echo "Installation complete! Start with:"
 echo "  systemctl --user daemon-reload"

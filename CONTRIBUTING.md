@@ -27,11 +27,20 @@ cd e2etests && python -m venv .venv && source .venv/bin/activate && pip install 
 ./check.sh
 
 # Or individually:
-cargo test -p pomodoro-daemon          # 393+ backend tests
+cargo test -p pomodoro-daemon          # 416+ backend tests
 cd gui && npm test                      # 154+ frontend tests
-cd e2etests && pytest -x -q            # 600+ E2E tests
 cargo clippy -p pomodoro-daemon -- -D warnings  # zero warnings required
 ```
+
+## Quality Gates — ALL MUST PASS
+
+Every PR and commit must pass these gates. Run `./check.sh` to verify all at once.
+
+1. **Backend tests** — `cargo test -p pomodoro-daemon` — zero failures
+2. **Frontend tests** — `cd gui && npm test` — zero failures
+3. **Clippy** — `cargo clippy -p pomodoro-daemon -- -D warnings` — zero warnings
+4. No test disabling — fix code or adapt test, never skip
+5. New features MUST have tests
 
 ## Development Workflow
 

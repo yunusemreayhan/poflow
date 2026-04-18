@@ -1,3 +1,0 @@
-[submodule "e2etests/tauriTester"]
-	path = e2etests/tauriTester
-	url = git@github.com:yunusemreayhan/tauriTester.git
