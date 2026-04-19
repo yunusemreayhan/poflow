@@ -105,6 +105,7 @@ use utoipa_swagger_ui::SwaggerUi;
         routes::time_tracking_report, routes::sla_report, routes::standup_report,
         // Project export/import, templates
         routes::export_project, routes::save_task_as_template,
+        routes::import_project, routes::list_archived_tasks, routes::unarchive_task,
     ),
     components(schemas(
         db::Task, db::Session, db::Comment, db::User, db::TaskDetail, db::SessionWithPath, db::DayStat, db::TaskAssignee,
@@ -138,6 +139,7 @@ use utoipa_swagger_ui::SwaggerUi;
         routes::AddChecklistItemRequest, routes::UpdateChecklistItemRequest,
         routes::BulkAssignRequest, routes::BulkSprintMoveRequest,
         routes::AdvancedSearchRequest, routes::SearchFilter,
+        routes::ProjectImportRequest,
     )),
     modifiers(&SecurityAddon),
     info(title = "Pomodoro API", version = "2.1.0", description = "Multi-user Pomodoro timer with hierarchical task management")
@@ -249,6 +251,8 @@ async fn main() -> Result<()> {
             }
             // BL4: Cleanup expired token blocklist entries
             sqlx::query("DELETE FROM token_blocklist WHERE expires_at < ?").bind(db::now_str()).execute(&engine_snap.pool).await.ok();
+            // A2: Prune in-memory token blocklist to match DB
+            auth::prune_blocklist().await;
             engine_snap.heartbeat("snapshot").await;
         }
     });

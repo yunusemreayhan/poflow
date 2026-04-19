@@ -128,6 +128,23 @@ pub async fn is_revoked(token: &str) -> bool {
     blocklist().read().await.contains(&hash)
 }
 
+/// Prune expired entries from the in-memory blocklist (call periodically).
+pub async fn prune_blocklist() {
+    if let Some(pool) = AUTH_POOL.get() {
+        let now = crate::db::now_str();
+        let valid: Vec<(String,)> = sqlx::query_as("SELECT token_hash FROM token_blocklist WHERE expires_at > ?")
+            .bind(&now).fetch_all(pool).await.unwrap_or_default();
+        let valid_set: HashSet<String> = valid.into_iter().map(|(h,)| h).collect();
+        let mut bl = blocklist().write().await;
+        let before = bl.len();
+        *bl = valid_set;
+        let after = bl.len();
+        if before > after {
+            tracing::debug!("Pruned token blocklist: {} → {} entries", before, after);
+        }
+    }
+}
+
 fn token_hash(data: &[u8]) -> String {
     use sha2::{Sha256, Digest};
     hex::encode(Sha256::digest(data))

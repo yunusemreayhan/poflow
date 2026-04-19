@@ -86,7 +86,7 @@ export const createUiSlice: StateCreator<UiSlice & { token: string | null; loadT
 
   loadSprints: async () => {
     if (!get().token) return;
-    const sprints = await apiCall<Sprint[]>("GET", "/api/sprints").catch(() => [] as Sprint[]);
+    const sprints = await apiCall<Sprint[]>("GET", "/api/sprints").catch(e => { console.error("Load sprints:", e); return [] as Sprint[]; });
     set({ sprints });
   },
 

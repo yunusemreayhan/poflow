@@ -363,7 +363,7 @@ pub async fn export_project(State(engine): State<AppState>, claims: Claims, Quer
 }
 
 // Import from comprehensive project export format
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 pub struct ProjectImportRequest {
     pub tasks: Vec<serde_json::Value>,
     #[serde(default)] pub comments: Vec<serde_json::Value>,
@@ -372,6 +372,7 @@ pub struct ProjectImportRequest {
     #[serde(default)] pub custom_fields: Vec<serde_json::Value>,
 }
 
+#[utoipa::path(post, path = "/api/import/project", request_body = ProjectImportRequest, responses((status = 200, body = serde_json::Value)), security(("bearer" = [])))]
 pub async fn import_project(State(engine): State<AppState>, claims: Claims, Json(req): Json<ProjectImportRequest>) -> ApiResult<serde_json::Value> {
     if req.tasks.len() > 2000 { return Err(err(StatusCode::BAD_REQUEST, "Too many tasks (max 2000)")); }
     let mut created_tasks = 0i64;

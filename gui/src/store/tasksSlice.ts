@@ -82,7 +82,7 @@ export const createTasksSlice: StateCreator<
         }
       }
       set({ tasks: tasksChanged ? resp.tasks : prev, taskSprints: ts, taskSprintsMap, burnTotals, allAssignees, taskLabelsMap, tasksLoadedAt: Date.now() });
-      cacheTasksOffline(resp.tasks).catch(() => {});
+      cacheTasksOffline(resp.tasks).catch(e => console.error("Cache tasks offline:", e));
     } catch {
       if (!navigator.onLine) {
         try {
@@ -153,7 +153,7 @@ export const createTasksSlice: StateCreator<
     if (teamId) {
       apiCall<number[]>("GET", `/api/teams/${teamId}/scope`).then(ids => {
         set({ activeTeamId: teamId, teamScope: ids && ids.length > 0 ? new Set(ids) : new Set() } as any);
-      }).catch(() => {});
+      }).catch(e => console.error("Load team scope:", e));
     } else {
       set({ activeTeamId: null, teamScope: null } as any);
     }

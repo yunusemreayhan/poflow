@@ -37,6 +37,9 @@ pub async fn build_router(engine: Arc<engine::Engine>) -> Router {
     all_origins.extend(extra);
 
     let allow_all_cors = std::env::var("POMODORO_CORS_ALLOW_ALL").is_ok();
+    if allow_all_cors {
+        tracing::warn!("POMODORO_CORS_ALLOW_ALL is set — CORS allows ALL origins. Do not use in production!");
+    }
     let cors = CorsLayer::new()
         .allow_origin(if allow_all_cors { AllowOrigin::any() } else { AllowOrigin::list(all_origins) })
         .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE, Method::OPTIONS])
@@ -49,11 +52,13 @@ pub async fn build_router(engine: Arc<engine::Engine>) -> Router {
 
     let mut router = Router::new()
         .route("/api/health", get(routes::health))
+        // Auth
         .route("/api/auth/register", post(routes::register))
         .route("/api/auth/login", post(routes::login))
         .route("/api/auth/logout", post(routes::logout))
         .route("/api/auth/password", put(routes::change_password))
         .route("/api/auth/refresh", post(routes::refresh_token))
+        // Timer
         .route("/api/timer", get(routes::get_state))
         .route("/api/timer/active", get(routes::get_active_timers))
         .route("/api/timer/start", post(routes::start))
@@ -63,6 +68,10 @@ pub async fn build_router(engine: Arc<engine::Engine>) -> Router {
         .route("/api/timer/skip", post(routes::skip))
         .route("/api/timer/join/{session_id}", post(routes::join_session))
         .route("/api/timer/participants/{session_id}", get(routes::session_participants))
+        .route("/api/timer/sse", get(routes::sse_timer))
+        .route("/api/timer/ticket", axum::routing::post(routes::create_sse_ticket))
+        // Tasks
+        // Tasks
         .route("/api/tasks", get(routes::list_tasks).post(routes::create_task))
         .route("/api/tasks/trash", get(routes::list_deleted_tasks))
         .route("/api/tasks/archived", get(routes::list_archived_tasks))
@@ -88,6 +97,7 @@ pub async fn build_router(engine: Arc<engine::Engine>) -> Router {
         .route("/api/watched", get(routes::get_watched_tasks))
         .route("/api/tasks/{id}/votes", get(routes::get_task_votes))
         .route("/api/tasks/{id}/links", get(routes::get_task_links).post(routes::add_task_link))
+        // Integrations & Automations
         .route("/api/integrations/github", post(routes::github_webhook))
         .route("/api/automations", get(routes::list_automations).post(routes::create_automation))
         .route("/api/automations/{id}", delete(routes::delete_automation))
@@ -116,6 +126,7 @@ pub async fn build_router(engine: Arc<engine::Engine>) -> Router {
         .route("/api/config", get(routes::get_config).put(routes::update_config))
         .route("/api/profile", put(routes::update_profile))
         .route("/api/profile/notifications", get(routes::get_notif_prefs).put(routes::update_notif_prefs))
+        // Admin
         .route("/api/admin/users", get(routes::list_users))
         .route("/api/admin/users/{id}/role", put(routes::update_user_role))
         .route("/api/admin/users/{id}/password", put(routes::admin_reset_password))
@@ -123,6 +134,7 @@ pub async fn build_router(engine: Arc<engine::Engine>) -> Router {
         .route("/api/admin/backup", post(routes::create_backup))
         .route("/api/admin/backups", get(routes::list_backups))
         .route("/api/admin/restore", post(routes::restore_backup))
+        // Rooms (Planning Poker)
         .route("/api/rooms", get(routes::list_rooms).post(routes::create_room))
         .route("/api/rooms/{id}", get(routes::get_room_state).delete(routes::delete_room))
         .route("/api/rooms/{id}/join", post(routes::join_room))
@@ -136,6 +148,7 @@ pub async fn build_router(engine: Arc<engine::Engine>) -> Router {
         .route("/api/rooms/{id}/close", post(routes::close_room))
         .route("/api/rooms/{id}/ws", get(routes::room_ws))
         .route("/api/rooms/{id}/export", get(routes::export_room_history))
+        // Sprints
         .route("/api/sprints", get(routes::list_sprints).post(routes::create_sprint))
         .route("/api/sprints/{id}", get(routes::get_sprint_detail).put(routes::update_sprint).delete(routes::delete_sprint))
         .route("/api/sprints/{id}/start", post(routes::start_sprint))
@@ -147,6 +160,7 @@ pub async fn build_router(engine: Arc<engine::Engine>) -> Router {
         .route("/api/sprints/burndown", get(routes::get_global_burndown))
         .route("/api/sprints/velocity", get(routes::get_velocity))
         .route("/api/sprints/compare", get(routes::compare_sprints))
+        // Epics
         .route("/api/epics", get(routes::list_epic_groups).post(routes::create_epic_group))
         .route("/api/epics/{id}", get(routes::get_epic_group).delete(routes::delete_epic_group))
         .route("/api/epics/{id}/tasks", post(routes::add_epic_group_tasks))
@@ -155,6 +169,7 @@ pub async fn build_router(engine: Arc<engine::Engine>) -> Router {
         .route("/api/sprints/{id}/roots", get(routes::get_sprint_root_tasks).post(routes::add_sprint_root_tasks))
         .route("/api/sprints/{id}/roots/{task_id}", delete(routes::remove_sprint_root_task))
         .route("/api/sprints/{id}/scope", get(routes::get_sprint_scope))
+        // Teams
         .route("/api/teams", get(routes::list_teams).post(routes::create_team))
         .route("/api/teams/{id}", get(routes::get_team).delete(routes::delete_team))
         .route("/api/teams/{id}/members", post(routes::add_team_member))
@@ -171,11 +186,13 @@ pub async fn build_router(engine: Arc<engine::Engine>) -> Router {
         .route("/api/sprints/{id}/burns/{burn_id}", delete(routes::cancel_burn))
         .route("/api/sprints/{id}/burn-summary", get(routes::get_burn_summary))
         .route("/api/task-sprints", get(routes::get_task_sprints))
+        // Shared data
         .route("/api/users", get(routes::list_usernames))
         .route("/api/burn-totals", get(routes::get_all_burn_totals))
         .route("/api/assignees", get(routes::get_all_assignees))
         .route("/api/tasks/full", get(routes::get_tasks_full))
         .route("/api/tasks/reorder", axum::routing::post(routes::reorder_tasks))
+        // Export & Import
         .route("/api/export/tasks", get(routes::export_tasks))
         .route("/api/export/sessions", get(routes::export_sessions))
         .route("/api/export/burns/{sprint_id}", get(routes::export_burns))
@@ -185,6 +202,7 @@ pub async fn build_router(engine: Arc<engine::Engine>) -> Router {
         .route("/api/import/tasks", post(routes::import_tasks_csv))
         .route("/api/import/tasks/json", post(routes::import_tasks_json))
         .route("/api/audit", get(routes::list_audit))
+        // Labels, Recurrence, Dependencies
         .route("/api/labels", get(routes::list_labels).post(routes::create_label))
         .route("/api/labels/{id}", put(routes::update_label).delete(routes::delete_label))
         .route("/api/tasks/{id}/labels/{label_id}", axum::routing::put(routes::add_task_label).delete(routes::remove_task_label))
@@ -193,6 +211,7 @@ pub async fn build_router(engine: Arc<engine::Engine>) -> Router {
         .route("/api/tasks/{id}/dependencies", get(routes::get_dependencies).post(routes::add_dependency))
         .route("/api/tasks/{id}/dependencies/{dep_id}", delete(routes::remove_dependency))
         .route("/api/dependencies", get(routes::get_all_dependencies))
+        // Webhooks & Templates
         .route("/api/webhooks", get(routes::list_webhooks).post(routes::create_webhook))
         .route("/api/webhooks/{id}", put(routes::update_webhook).delete(routes::delete_webhook))
         .route("/api/templates", get(routes::list_templates).post(routes::create_template))
@@ -210,6 +229,7 @@ pub async fn build_router(engine: Arc<engine::Engine>) -> Router {
         // Task checklists
         .route("/api/tasks/{id}/checklist", get(routes::list_checklist).post(routes::add_checklist_item))
         .route("/api/checklist/{id}", put(routes::update_checklist_item).delete(routes::delete_checklist_item))
+        // Attachments
         .route("/api/tasks/{id}/attachments", get(routes::list_attachments)
             .post(routes::upload_attachment.layer(axum::extract::DefaultBodyLimit::max(10 * 1024 * 1024))))
         .route("/api/attachments/{id}/download", get(routes::download_attachment))
@@ -218,8 +238,6 @@ pub async fn build_router(engine: Arc<engine::Engine>) -> Router {
         .route("/api/notifications", get(routes::list_notifications))
         .route("/api/notifications/unread", get(routes::unread_count))
         .route("/api/notifications/read", post(routes::mark_notifications_read))
-        .route("/api/timer/sse", get(routes::sse_timer))
-        .route("/api/timer/ticket", axum::routing::post(routes::create_sse_ticket))
         .layer(axum::extract::DefaultBodyLimit::max(2 * 1024 * 1024)) // 2MB max request body
         .layer(cors)
         .layer(axum::middleware::from_fn(security_headers))
