@@ -229,5 +229,21 @@ const en: Locale = {
   filterUsers: "Users",
   filterSprints: "Sprints",
   filterRooms: "Rooms",
+  // Sprint 19: i18n
+  notificationsTitle: "Notifications",
+  markAllRead: "Mark all read",
+  noNotifications: "No notifications",
+  createButton: "Create",
+  newTaskPlaceholder: "New task title...",
+  taskCreated: "Task created",
+  refreshed: "Refreshed",
+  allTeams: "All",
+  offlineBanner: "⚡ Offline — changes will sync when reconnected",
+  daemonNotRunning: "Daemon not running. Start with:",
+  switchTabs: "Switch tabs",
+  refreshShortcut: "Refresh",
+  newTaskShortcut: "New task (on tasks tab)",
+  pauseResumeShortcut: "Pause/Resume timer",
+  stopTimerShortcut: "Stop timer",
 };
 export default en;

@@ -125,7 +125,7 @@ export default function App() {
         <Sidebar />
       </nav>
       <main id="main-content" className={`flex-1 overflow-hidden relative ${focusMode ? "pb-0" : "pb-14 md:pb-0"}`}>
-        {!focusMode && offline && <div className="bg-yellow-600/80 text-white text-xs text-center py-1 px-2" role="alert">⚡ Offline — changes will sync when reconnected</div>}
+        {!focusMode && offline && <div className="bg-yellow-600/80 text-white text-xs text-center py-1 px-2" role="alert">{t.offlineBanner}</div>}
         {focusMode && (
           <button onClick={() => useStore.getState().toggleFocusMode()}
             className="absolute top-2 right-2 z-50 text-xs text-white/0 hover:text-white/50 px-2 py-1 rounded transition-colors duration-300"
@@ -171,7 +171,7 @@ export default function App() {
               className="absolute bottom-6 left-6 right-6 glass p-4 flex items-center gap-3 text-sm text-[var(--color-warning)]"
             >
               <WifiOff size={16} />
-              Daemon not running. Start with: <code className="bg-white/5 px-2 py-1 rounded text-xs">pomodoro-daemon</code>
+              {t.daemonNotRunning} <code className="bg-white/5 px-2 py-1 rounded text-xs">pomodoro-daemon</code>
             </motion.div>
           )}
         </AnimatePresence>
@@ -259,11 +259,11 @@ export default function App() {
               <h2 className="text-sm font-semibold text-white mb-3">{t.keyboardShortcuts}</h2>
               <div className="space-y-1.5 text-xs">
                 {[
-                  ["0-6", "Switch tabs"],
-                  ["r", "Refresh"],
-                  ["n", "New task (on tasks tab)"],
-                  ["Space", "Pause/Resume timer"],
-                  ["Escape", "Stop timer"],
+                  ["0-6", t.switchTabs],
+                  ["r", t.refreshShortcut],
+                  ["n", t.newTaskShortcut],
+                  ["Space", t.pauseResumeShortcut],
+                  ["Escape", t.stopTimerShortcut],
                   ["/", t.focusSearch],
                   ["⌘K", "Command palette (global search)"],
                   ["?", t.toggleShortcuts],

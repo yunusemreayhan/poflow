@@ -124,7 +124,7 @@ export default function Sidebar() {
         <div className="flex flex-col items-center gap-0.5 mb-2 overflow-y-auto overflow-x-hidden scrollbar-hide min-h-0 flex-1">
           <button onClick={() => setActiveTeam(null)}
             className={`w-11 h-7 flex items-center justify-center rounded text-[9px] font-medium transition-all shrink-0 ${!activeTeamId ? "bg-[var(--color-accent)] text-white" : "text-white/30 hover:text-white/50"}`}
-            title="All teams">All</button>
+            title="All teams">{t.allTeams}</button>
           {teams.map(t => (
             <button key={t.id} onClick={() => setActiveTeam(t.id)}
               className={`w-11 h-7 flex items-center justify-center rounded text-[9px] font-medium truncate transition-all shrink-0 ${activeTeamId === t.id ? "bg-[var(--color-accent)] text-white" : "text-white/30 hover:text-white/50"}`}
@@ -141,7 +141,7 @@ export default function Sidebar() {
           className="w-11 h-11 flex items-center justify-center rounded-xl text-white/30 hover:text-white/60 transition-all" title="Toggle theme" aria-label="Toggle theme">
           {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
         </button>
-        <button onClick={() => { useStore.getState().loadTasks(); useStore.getState().toast("Refreshed"); }}
+        <button onClick={() => { useStore.getState().loadTasks(); useStore.getState().toast(t.refreshed); }}
           className="w-11 h-11 flex items-center justify-center rounded-xl text-white/30 hover:text-white/60 transition-all" title="Refresh data" aria-label="Refresh data">
           <RefreshCw size={16} />
         </button>

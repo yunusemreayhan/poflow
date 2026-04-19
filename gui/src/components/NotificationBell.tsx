@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { Bell } from "lucide-react";
 import { apiCall } from "../store/api";
+import { useT } from "../i18n";
 
 // BL21-23: Notification bell with unread count and dropdown
 export default function NotificationBell() {
+  const t = useT();
   const [count, setCount] = useState(0);
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<{ id: number; kind: string; message: string; read: boolean; created_at: string }[]>([]);
@@ -54,11 +56,11 @@ export default function NotificationBell() {
           }}
           className="absolute left-14 bottom-0 w-72 bg-[var(--color-surface)] border border-white/10 rounded-lg shadow-xl z-50 max-h-80 overflow-y-auto">
           <div className="flex justify-between items-center p-2 border-b border-white/5">
-            <span className="text-xs text-white/50 font-medium">Notifications</span>
-            {count > 0 && <button onClick={markRead} className="text-[10px] text-[var(--color-accent)]">Mark all read</button>}
+            <span className="text-xs text-white/50 font-medium">{t.notificationsTitle}</span>
+            {count > 0 && <button onClick={markRead} className="text-[10px] text-[var(--color-accent)]">{t.markAllRead}</button>}
           </div>
           {items.length === 0 ? (
-            <div className="p-4 text-xs text-white/20 text-center">No notifications</div>
+            <div className="p-4 text-xs text-white/20 text-center">{t.noNotifications}</div>
           ) : items.map(n => (
             <div key={n.id} className={`p-2 border-b border-white/5 text-xs ${n.read ? "text-white/30" : "text-white/60 bg-white/[0.02]"}`}>
               <div className="truncate">{n.message}</div>

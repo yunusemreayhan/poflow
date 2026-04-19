@@ -78,3 +78,33 @@ describe("formatNumber", () => {
     expect(result).toContain("3");
   });
 });
+
+// --- dedup utility ---
+
+import { dedup } from "../store/dedup";
+
+describe("dedup utility", () => {
+  it("runs the function once for concurrent calls with same key", async () => {
+    let count = 0;
+    const slow = () => new Promise<void>(r => { count++; setTimeout(r, 50); });
+    const p1 = dedup("a", slow);
+    const p2 = dedup("a", slow);
+    await Promise.all([p1, p2]);
+    expect(count).toBe(1);
+  });
+
+  it("allows re-entry after completion", async () => {
+    let count = 0;
+    const fn = () => new Promise<void>(r => { count++; setTimeout(r, 10); });
+    await dedup("b", fn);
+    await dedup("b", fn);
+    expect(count).toBe(2);
+  });
+
+  it("allows different keys concurrently", async () => {
+    let count = 0;
+    const fn = () => new Promise<void>(r => { count++; setTimeout(r, 10); });
+    await Promise.all([dedup("c", fn), dedup("d", fn)]);
+    expect(count).toBe(2);
+  });
+});

@@ -253,6 +253,23 @@ export interface Locale {
   filterUsers: string;
   filterSprints: string;
   filterRooms: string;
+
+  // Sprint 19
+  notificationsTitle: string;
+  markAllRead: string;
+  noNotifications: string;
+  createButton: string;
+  newTaskPlaceholder: string;
+  taskCreated: string;
+  refreshed: string;
+  allTeams: string;
+  offlineBanner: string;
+  daemonNotRunning: string;
+  switchTabs: string;
+  refreshShortcut: string;
+  newTaskShortcut: string;
+  pauseResumeShortcut: string;
+  stopTimerShortcut: string;
 }
 
 import en from "./locales/en";

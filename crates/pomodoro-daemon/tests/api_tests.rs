@@ -4242,7 +4242,7 @@ async fn test_config_theme_validation() {
 async fn test_rate_limit_get_not_limited() {
     let app = app().await;
     let tok = login_root(&app).await;
-    // GET requests should never be rate limited
+    // GET requests have a higher rate limit (1000/min) — 10 requests should always pass
     for _ in 0..10 {
         let resp = app.clone().oneshot(auth_req("GET", "/api/tasks", &tok, None)).await.unwrap();
         assert_eq!(resp.status(), 200);
@@ -6039,4 +6039,55 @@ async fn test_timer_persist_pause_resume() {
     engine.resume(1).await.unwrap();
     let rows = db::load_timer_states(&pool).await.unwrap();
     assert_eq!(rows[0].status, "Running");
+}
+
+// ============================================================
+// Sprint 19: Missing test coverage
+// ============================================================
+
+#[tokio::test]
+async fn test_read_rate_limiter_enforced() {
+    // F3: GET requests are rate-limited at 1000/min (not unlimited)
+    if std::env::var("POMODORO_NO_RATE_LIMIT").is_ok() { return; }
+    let limiter = pomodoro_daemon::routes::read_limiter();
+    limiter.reset();
+    let ip = "10.88.88.88";
+    for _ in 0..1000 {
+        assert!(limiter.check_and_record(ip));
+    }
+    assert!(!limiter.check_and_record(ip), "GET rate limiter should reject after 1000 requests");
+}
+
+#[tokio::test]
+async fn test_tasks_full_scoped_joins() {
+    // F4: burn_totals, assignees, labels should only contain data for tasks in the current page
+    let app = app().await;
+    let tok = login_root(&app).await;
+    // Create 3 tasks
+    let mut ids = vec![];
+    for i in 0..3 {
+        let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title": format!("Scoped{}", i)})))).await.unwrap();
+        let j = body_json(resp).await;
+        ids.push(j["id"].as_i64().unwrap());
+    }
+    // Assign user to task 0 only
+    app.clone().oneshot(auth_req("POST", &format!("/api/tasks/{}/assignees", ids[0]), &tok, Some(json!({"username": "root"})))).await.unwrap();
+    // Create a label and attach to task 2 only
+    let resp = app.clone().oneshot(auth_req("POST", "/api/labels", &tok, Some(json!({"name": "scoped-lbl", "color": "#ff0000"})))).await.unwrap();
+    let label_id = body_json(resp).await["id"].as_i64().unwrap();
+    app.clone().oneshot(auth_req("PUT", &format!("/api/tasks/{}/labels/{}", ids[2], label_id), &tok, None)).await.unwrap();
+    // Fetch page 1 with per_page=1 (should only get task 0's join data)
+    let resp = app.clone().oneshot(auth_req("GET", "/api/tasks/full?per_page=1&page=1", &tok, None)).await.unwrap();
+    let j = body_json(resp).await;
+    let tasks = j["tasks"].as_array().unwrap();
+    assert_eq!(tasks.len(), 1);
+    let page_id = tasks[0]["id"].as_i64().unwrap();
+    // Assignees should only contain entries for the page task
+    for a in j["assignees"].as_array().unwrap() {
+        assert_eq!(a["task_id"].as_i64().unwrap(), page_id, "assignee leaked from another page");
+    }
+    // Labels should only contain entries for the page task
+    for l in j["labels"].as_array().unwrap() {
+        assert_eq!(l["task_id"].as_i64().unwrap(), page_id, "label leaked from another page");
+    }
 }

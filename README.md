@@ -1,6 +1,6 @@
 # Pomodoro Linux
 
-A production-grade multi-user Pomodoro timer and project management platform for Linux. Rust HTTP backend (207 API endpoints), Tauri v2 desktop GUI, web GUI (PWA), hierarchical task management, sprint planning, estimation rooms, Gantt charts, custom workflows, RBAC, and time tracking. Packaged as a single `.deb`.
+A production-grade multi-user Pomodoro timer and project management platform for Linux. Rust HTTP backend (221 API endpoints), Tauri v2 desktop GUI, web GUI (PWA), hierarchical task management, sprint planning, estimation rooms, Gantt charts, custom workflows, RBAC, and time tracking. Packaged as a single `.deb`.
 
 ## Features
 
@@ -8,6 +8,7 @@ A production-grade multi-user Pomodoro timer and project management platform for
 - Pomodoro work/break cycles with configurable durations
 - Auto-start breaks and work sessions
 - Desktop notifications on session completion
+- **Timer state persistence**: Timer state survives daemon restarts (restored as paused)
 - Daily goal tracking
 
 ### Hierarchical Task Management
@@ -51,6 +52,12 @@ A production-grade multi-user Pomodoro timer and project management platform for
 - Auto-snapshot: hourly background task captures burndown data for active sprints
 - Sprint badges on all task views (green = active sprint, pale green = past sprint)
 
+### Projects
+- First-class project entities with name, description, unique key, lead user, and status
+- CRUD via `GET/POST /api/projects`, `GET/PUT/DELETE /api/projects/{id}`
+- Tasks, sprints, and rooms can reference a project by `project_id`
+- Admin-only creation; project lead can update/delete
+
 ### Burn Log (Unified Time & Point Tracking)
 - Single source of truth for all burned time and points
 - Three sources: `manual` (sprint burns), `timer` (auto-logged on pomodoro completion), `time_report` (ad-hoc hour logging)
@@ -72,6 +79,9 @@ A production-grade multi-user Pomodoro timer and project management platform for
 - Each status has a category (`todo`, `in_progress`, `done`) for sprint board column mapping
 - Sprint board automatically maps custom statuses to the correct column
 - CRUD via `GET/POST /api/statuses`, `PUT/DELETE /api/statuses/{id}`
+- **Workflow transition rules**: Define allowed status transitions per project (e.g., `backlog` → `active` → `in_progress` → `done`)
+- Enforced on task update — returns 422 if transition is not allowed
+- CRUD via `GET/POST /api/workflows/transitions`, `DELETE /api/workflows/transitions/{id}`
 
 ### Custom Fields
 - Define custom fields on tasks: text, number, select, date, user types
@@ -101,6 +111,7 @@ A production-grade multi-user Pomodoro timer and project management platform for
 - Filter by: status (eq/neq/in), project, assignee, label, priority (gt/gte/lt), due_date, title (contains), custom fields (`custom:field_name`)
 - Sort by: priority, due_date, created_at, updated_at, title
 - Pagination via limit/offset
+- **Saved views**: Save and restore custom task filters and sort orders
 
 ### Time Tracking Reports
 - `GET /api/reports/time-tracking` — hours per user per project per week
@@ -145,6 +156,7 @@ A production-grade multi-user Pomodoro timer and project management platform for
 - HMAC-SHA256 signature verification for GitHub push webhooks
 - Slack and Discord webhook support
 - GitHub/GitLab commit auto-linking (parses #123 / task-123 from commit messages)
+- **Webhook delivery logs**: Track webhook dispatch history with status and response
 
 ### Notifications & Watchers
 - In-app notification system with per-event-type preferences
@@ -169,6 +181,7 @@ A production-grade multi-user Pomodoro timer and project management platform for
 - Full audit log of all user actions
 - JWT with refresh token rotation and token revocation
 - Rate limiting and CSRF validation
+- **Read rate limiting**: GET endpoints limited to 1000 req/min per IP (mutations: 200/min)
 - Auto-archive completed tasks (configurable days)
 
 ### Architecture
@@ -509,6 +522,24 @@ All user references use `user_id INTEGER REFERENCES users(id)` — usernames are
 | GET | `/api/rooms/{id}/export` | Export room voting results |
 | GET | `/api/health` | Health check |
 
+### Projects
+| Method | Endpoint | Description |
+|---|---|---|
+| GET/POST | `/api/projects` | List/create projects |
+| GET/PUT/DELETE | `/api/projects/{id}` | Get/update/delete project |
+
+### Workflow Transitions
+| Method | Endpoint | Description |
+|---|---|---|
+| GET/POST | `/api/workflows/transitions` | List/create transition rules (?project=) |
+| DELETE | `/api/workflows/transitions/{id}` | Delete transition rule |
+
+### Saved Views
+| Method | Endpoint | Description |
+|---|---|---|
+| GET/POST | `/api/views` | List/create saved views |
+| PUT/DELETE | `/api/views/{id}` | Update/delete saved view |
+
 ## Installation
 
 ### Docker (recommended)
@@ -563,7 +594,7 @@ All three gates must pass before pushing to main.
 
 ### Unit & Integration Tests
 
-416 integration tests run automatically (`cargo test -p pomodoro-daemon`):
+520 backend tests run automatically (`cargo test -p pomodoro-daemon`):
 
 ```bash
 cargo test -p pomodoro-daemon
@@ -573,7 +604,7 @@ Tests use in-memory SQLite — no disk I/O, fully isolated, no port conflicts.
 
 ### Frontend Unit Tests
 
-154 frontend tests across 11 test files (`cd gui && npm test`):
+209 frontend tests across 17 test files (`cd gui && npm test`):
 
 ```bash
 cd gui && npm test
@@ -583,7 +614,7 @@ Tests cover store logic, i18n, utils, tree operations, rollup, and error boundar
 
 ### E2E GUI Tests
 
-887 end-to-end tests across 46 files drive the real Tauri GUI via WebDriver against an isolated daemon. 100% API endpoint coverage (207/207 endpoints tested).
+887 end-to-end tests across 46 files drive the real Tauri GUI via WebDriver against an isolated daemon. 100% API endpoint coverage (221/221 endpoints tested).
 
 ```bash
 # Run all E2E tests
@@ -598,7 +629,7 @@ Tests cover store logic, i18n, utils, tree operations, rollup, and error boundar
 
 **Coverage areas:**
 - GUI flows: login, registration, timer, task detail, sprint board, settings, theme, sidebar, keyboard shortcuts
-- API exhaustive: every endpoint (207/207), every status transition, every config field, pagination, search
+- API exhaustive: every endpoint (221/221), every status transition, every config field, pagination, search
 - Security: JWT tampering, IDOR, privilege escalation, rate limiting, SQL injection, path traversal
 - Edge cases: unicode/emoji, 10K-char strings, HTML injection, boundary values, input validation
 - Data integrity: lifecycle counts, sprint column invariants, dependency chains, import/export round-trips

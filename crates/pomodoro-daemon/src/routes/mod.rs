@@ -20,7 +20,7 @@ impl RateLimiter {
     fn new(max_requests: u32, window_secs: u64) -> Self {
         Self { buckets: parking_lot::Mutex::new(std::collections::HashMap::new()), max_requests, window_secs }
     }
-    pub(crate) fn check_and_record(&self, key: &str) -> bool {
+    pub fn check_and_record(&self, key: &str) -> bool {
         let now = std::time::SystemTime::now().duration_since(std::time::SystemTime::UNIX_EPOCH).unwrap_or_default().as_secs();
         let window = self.window_secs;
         let curr_window = now / window;
@@ -71,7 +71,7 @@ pub(crate) fn api_limiter() -> &'static RateLimiter {
 
 // Read rate limiter: 1000 requests per 60 seconds per IP (for GET/HEAD/OPTIONS)
 static READ_LIMITER: std::sync::OnceLock<RateLimiter> = std::sync::OnceLock::new();
-pub(crate) fn read_limiter() -> &'static RateLimiter {
+pub fn read_limiter() -> &'static RateLimiter {
     READ_LIMITER.get_or_init(|| RateLimiter::new(1000, 60))
 }
 

@@ -209,5 +209,21 @@ const tr: Locale = {
   filterUsers: "Kullanıcılar",
   filterSprints: "Sprintler",
   filterRooms: "Odalar",
+  // Sprint 19
+  notificationsTitle: "Bildirimler",
+  markAllRead: "Tümünü okundu işaretle",
+  noNotifications: "Bildirim yok",
+  createButton: "Oluştur",
+  newTaskPlaceholder: "Yeni görev başlığı...",
+  taskCreated: "Görev oluşturuldu",
+  refreshed: "Yenilendi",
+  allTeams: "Tümü",
+  offlineBanner: "⚡ Çevrimdışı — bağlantı kurulduğunda değişiklikler senkronize edilecek",
+  daemonNotRunning: "Daemon çalışmıyor. Başlatmak için:",
+  switchTabs: "Sekme değiştir",
+  refreshShortcut: "Yenile",
+  newTaskShortcut: "Yeni görev (görevler sekmesinde)",
+  pauseResumeShortcut: "Duraklat/Devam et",
+  stopTimerShortcut: "Zamanlayıcıyı durdur",
 };
 export default tr;
