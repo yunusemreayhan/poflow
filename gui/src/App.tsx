@@ -217,7 +217,7 @@ export default function App() {
         else if (s.engine?.status === "Paused") s.resume();
         else s.start(s.timerTaskId);
       }).then(fn => { unlisten = fn; });
-    }).catch(() => {});
+    }).catch(e => console.debug("Tauri global-shortcut:", e));
     return () => { unlisten?.(); };
   }, [token]);
 

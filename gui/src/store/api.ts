@@ -19,7 +19,7 @@ export async function apiCall<T = unknown>(method: string, path: string, body?: 
         // instead of staying in a broken "logged in but disconnected" state
         import("./store").then(({ useStore }) => {
           if (useStore.getState().token) useStore.getState().logout();
-        }).catch(() => {});
+        }).catch(e => console.error("Force-logout import failed:", e));
       }
     }
     if (method !== "GET") {
@@ -60,7 +60,7 @@ async function tryRefreshToken(): Promise<boolean> {
 function showErrorToast(msg: string) {
   import("./store").then(({ useStore }) => {
     useStore.getState().toast(msg, "error");
-  }).catch(() => {});
+  }).catch(e => console.error("Toast import failed:", e));
 }
 
 export async function setToken(token: string) {

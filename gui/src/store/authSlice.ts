@@ -73,8 +73,8 @@ export const createAuthSlice: StateCreator<AuthSlice & { mutating: boolean; toas
   },
 
   logout: () => {
-    apiCall("POST", "/api/auth/logout").catch(() => {});
-    platformClearAuth().catch(() => {});
+    apiCall("POST", "/api/auth/logout").catch(e => console.debug("Logout API:", e));
+    platformClearAuth().catch(e => console.debug("Clear auth:", e));
     localStorage.removeItem("auth");
     const url = get().serverUrl;
     const username = get().username;
@@ -84,8 +84,8 @@ export const createAuthSlice: StateCreator<AuthSlice & { mutating: boolean; toas
       set({ savedServers: servers });
     }
     set({ token: null, username: null, role: null });
-    platformSetToken("").catch(() => {});
-    if (typeof caches !== 'undefined') caches.delete('pomo-v1').catch(() => {});
+    platformSetToken("").catch(e => console.debug("Clear token:", e));
+    if (typeof caches !== 'undefined') caches.delete('pomo-v1').catch(e => console.debug("Clear cache:", e));
   },
 
   restoreAuth: async () => {

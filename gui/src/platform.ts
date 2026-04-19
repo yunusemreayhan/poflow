@@ -66,7 +66,7 @@ export async function platformSaveAuth(data: string): Promise<void> {
 export async function platformClearAuth(): Promise<void> {
   if (isTauri) {
     const { invoke } = await import("@tauri-apps/api/core");
-    await invoke("clear_auth").catch(() => {});
+    await invoke("clear_auth").catch(e => console.debug("Tauri clear_auth:", e));
     return;
   }
   localStorage.removeItem("auth");
