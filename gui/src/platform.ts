@@ -83,6 +83,49 @@ export async function platformSetConnection(baseUrl: string): Promise<void> {
 
 // ── Desktop-only features ──────────────────────────────────────
 
+export async function platformBinaryDownload(path: string): Promise<Blob> {
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    const b64 = await invoke<string>("binary_download", { path });
+    const bin = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+    return new Blob([bin]);
+  }
+  const url = `${webBaseUrl()}${path}`;
+  const headers: Record<string, string> = { "x-requested-with": "web-gui" };
+  if (_webToken) headers["authorization"] = `Bearer ${_webToken}`;
+  const resp = await fetch(url, { headers });
+  if (!resp.ok) throw new Error(`${resp.status} ${resp.statusText}`);
+  return resp.blob();
+}
+
+export async function platformBinaryUpload(path: string, data: ArrayBuffer, filename: string, mime: string): Promise<void> {
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    const b64 = btoa(String.fromCharCode(...new Uint8Array(data)));
+    await invoke("binary_upload", { path, data: b64, filename, mime });
+    return;
+  }
+  const url = `${webBaseUrl()}${path}`;
+  const headers: Record<string, string> = {
+    "x-requested-with": "web-gui",
+    "content-type": mime || "application/octet-stream",
+    "x-filename": filename,
+  };
+  if (_webToken) headers["authorization"] = `Bearer ${_webToken}`;
+  const resp = await fetch(url, { method: "POST", headers, body: data });
+  if (!resp.ok) throw new Error(`${resp.status} ${resp.statusText}`);
+}
+
+export async function platformLoadAuth(): Promise<string | null> {
+  if (isTauri) {
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      return await invoke<string>("load_auth");
+    } catch { return null; }
+  }
+  return localStorage.getItem("auth");
+}
+
 export async function platformIndicatorStatus(): Promise<boolean> {
   if (!isTauri) return false;
   const { invoke } = await import("@tauri-apps/api/core");

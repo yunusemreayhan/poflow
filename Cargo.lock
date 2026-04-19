@@ -3743,6 +3743,7 @@ name = "pomodoro-gui"
 version = "0.1.0"
 dependencies = [
  "aes-gcm",
+ "base64 0.22.1",
  "dirs 5.0.1",
  "getrandom 0.4.2",
  "reqwest 0.12.28",

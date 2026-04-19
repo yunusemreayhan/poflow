@@ -1,6 +1,6 @@
 import type { StateCreator } from "zustand";
 import { apiCall, setToken } from "./api";
-import { platformSaveAuth, platformClearAuth, platformSetConnection, platformSetToken, platformApiCall } from "../platform";
+import { platformSaveAuth, platformClearAuth, platformSetConnection, platformSetToken, platformApiCall, platformLoadAuth, isTauri } from "../platform";
 import type { AuthResponse } from "./api";
 
 // Dedup guard
@@ -91,6 +91,26 @@ export const createAuthSlice: StateCreator<AuthSlice & { mutating: boolean; toas
   restoreAuth: async () => {
     const url = localStorage.getItem("serverUrl");
     if (url) { set({ serverUrl: url }); platformSetConnection(url); }
+
+    // Restore saved auth — prefer encrypted Tauri store, fall back to localStorage
+    const raw = await platformLoadAuth();
+    if (raw) {
+      try {
+        const auth = JSON.parse(raw) as AuthResponse & { refresh_token?: string };
+        if (auth.token) {
+          await setToken(auth.token);
+          set({ token: auth.token, username: auth.username, role: auth.role });
+          // Merge into savedServers if not already present
+          const sUrl = url || get().serverUrl;
+          const servers = loadServers();
+          if (!servers.some(s => s.url === sUrl && s.username === auth.username)) {
+            servers.unshift({ url: sUrl, username: auth.username, token: auth.token, refresh_token: auth.refresh_token || "", role: auth.role });
+            saveServers(servers);
+            set({ savedServers: servers });
+          }
+        }
+      } catch { /* corrupt data — ignore */ }
+    }
   },
 
   setServerUrl: async (url) => {

@@ -2,6 +2,7 @@ use serde_json::Value;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tauri::Emitter;
+use base64::Engine as _;
 
 #[derive(Clone)]
 struct ConnectionConfig {
@@ -134,6 +135,53 @@ async fn write_file(path: String, content: String) -> Result<(), String> {
         }
     }
     tokio::fs::write(&path, content).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn binary_download(state: tauri::State<'_, Arc<AppState>>, path: String) -> Result<String, String> {
+    if !path.starts_with("/api") {
+        return Err("Invalid API path".to_string());
+    }
+    let config = state.config.lock().await.clone();
+    let url = format!("{}{}", config.base_url, path);
+    let mut req = state.client.get(&url).header("X-Requested-With", "PomodoroGUI");
+    if let Some(token) = &config.token {
+        req = req.header("Authorization", format!("Bearer {}", token));
+    }
+    let resp = req.send().await.map_err(|e| e.to_string())?;
+    if resp.status().as_u16() >= 400 {
+        return Err(format!("Download failed ({})", resp.status().as_u16()));
+    }
+    let bytes = resp.bytes().await.map_err(|e| e.to_string())?;
+    Ok(base64::engine::general_purpose::STANDARD.encode(&bytes))
+}
+
+#[tauri::command]
+async fn binary_upload(state: tauri::State<'_, Arc<AppState>>, path: String, data: String, filename: String, mime: String) -> Result<Value, String> {
+    if !path.starts_with("/api") {
+        return Err("Invalid API path".to_string());
+    }
+    let config = state.config.lock().await.clone();
+    let url = format!("{}{}", config.base_url, path);
+    let bytes = base64::engine::general_purpose::STANDARD.decode(&data).map_err(|e| e.to_string())?;
+    let mut req = state.client.post(&url)
+        .header("X-Requested-With", "PomodoroGUI")
+        .header("Content-Type", if mime.is_empty() { "application/octet-stream" } else { &mime })
+        .header("X-Filename", &filename)
+        .body(bytes);
+    if let Some(token) = &config.token {
+        req = req.header("Authorization", format!("Bearer {}", token));
+    }
+    let resp = req.send().await.map_err(|e| e.to_string())?;
+    let status = resp.status().as_u16();
+    let text = resp.text().await.map_err(|e| e.to_string())?;
+    if status >= 400 {
+        return Err(serde_json::from_str::<Value>(&text).ok()
+            .and_then(|v| v.get("error").and_then(|e| e.as_str().map(String::from)))
+            .unwrap_or_else(|| format!("Upload failed ({})", status)));
+    }
+    if text.is_empty() { return Ok(Value::Null); }
+    serde_json::from_str(&text).map_err(|e| e.to_string())
 }
 
 fn auth_key() -> Vec<u8> {
@@ -297,7 +345,7 @@ pub fn run() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![api_call, set_token, get_connection, set_connection, write_file, save_auth, load_auth, clear_auth, indicator_status, indicator_toggle])
+        .invoke_handler(tauri::generate_handler![api_call, set_token, get_connection, set_connection, write_file, save_auth, load_auth, clear_auth, indicator_status, indicator_toggle, binary_download, binary_upload])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

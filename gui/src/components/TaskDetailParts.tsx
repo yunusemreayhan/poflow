@@ -2,6 +2,7 @@ import { Paperclip } from "lucide-react";
 import { useStore } from "../store/store";
 import { useState, useEffect } from "react";
 import { apiCall, getFreshToken } from "../store/api";
+import { platformBinaryDownload, platformBinaryUpload } from "../platform";
 
 interface AuditEntry { id: number; user_id: number; username: string; action: string; entity_type: string; entity_id: number | null; detail: string | null; created_at: string }
 
@@ -52,13 +53,10 @@ function AuthImage({ id, alt }: { id: number; alt: string }) {
   useEffect(() => {
     let url: string | undefined;
     (async () => {
-      const { serverUrl } = useStore.getState();
-      const token = await getFreshToken().catch(() => null);
-      if (!token) return;
-      const r = await fetch(`${serverUrl}/api/attachments/${id}/download`, {
-        headers: { "authorization": `Bearer ${token}`, "x-requested-with": "PomodoroGUI" },
-      });
-      if (r.ok) { const b = await r.blob(); url = URL.createObjectURL(b); setSrc(url); }
+      await getFreshToken().catch(() => null);
+      const blob = await platformBinaryDownload(`/api/attachments/${id}/download`);
+      url = URL.createObjectURL(blob);
+      setSrc(url);
     })().catch(e => console.error(e));
     return () => { if (url) URL.revokeObjectURL(url); };
   }, [id]);
@@ -76,20 +74,10 @@ export function TaskAttachments({ taskId }: { taskId: number }) {
   const upload = async (file: File) => {
     setUploading(true);
     try {
-      const { serverUrl } = useStore.getState();
-      const token = await getFreshToken();
+      await getFreshToken();
       const buf = await file.arrayBuffer();
-      const resp = await fetch(`${serverUrl}/api/tasks/${taskId}/attachments`, {
-        method: "POST",
-        headers: {
-          "content-type": file.type || "application/octet-stream",
-          "x-filename": file.name,
-          "x-requested-with": "PomodoroGUI",
-          "authorization": `Bearer ${token}`,
-        },
-        body: buf,
-      });
-      if (resp.ok) load();
+      await platformBinaryUpload(`/api/tasks/${taskId}/attachments`, buf, file.name, file.type || "application/octet-stream");
+      load();
     } catch { /* ignore */ }
     setUploading(false);
   };
@@ -102,18 +90,12 @@ export function TaskAttachments({ taskId }: { taskId: number }) {
   };
 
   const download = async (id: number, filename: string) => {
-    const { serverUrl } = useStore.getState();
-    const token = await getFreshToken();
-    const resp = await fetch(`${serverUrl}/api/attachments/${id}/download`, {
-      headers: { "authorization": `Bearer ${token}`, "x-requested-with": "PomodoroGUI" },
-    });
-    if (resp.ok) {
-      const blob = await resp.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url; a.download = filename; a.click();
-      URL.revokeObjectURL(url);
-    }
+    await getFreshToken();
+    const blob = await platformBinaryDownload(`/api/attachments/${id}/download`);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
   };
 
   const fmt = (bytes: number) => bytes < 1024 ? `${bytes}B` : bytes < 1048576 ? `${(bytes / 1024).toFixed(1)}KB` : `${(bytes / 1048576).toFixed(1)}MB`;
