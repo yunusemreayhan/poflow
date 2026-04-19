@@ -1,8 +1,11 @@
 import { useMemo, useState, useCallback } from "react";
 import { useStore } from "../store/store";
-import type { Task } from "../store/api";
+import type { Task, TaskSprintInfo, Config } from "../store/api";
+import { apiCall } from "../store/api";
 import Select from "./Select";
+import TaskContextMenu from "./TaskContextMenu";
 import { useT } from "../i18n";
+import type { TreeNode } from "../tree";
 
 const COLUMNS = [
   { id: "backlog", key: "backlog" as const, color: "#6C7A89" },
@@ -122,26 +125,66 @@ export default function KanbanBoard() {
 function KanbanCard({ task, onDragStart, ancestors }: { task: Task; onDragStart: (e: React.DragEvent, id: number) => void; ancestors?: string[] }) {
   const labels = useStore(s => s.taskLabelsMap.get(task.id));
   const updateTask = useStore(s => s.updateTask);
+  const start = useStore(s => s.start);
+  const deleteTask = useStore(s => s.deleteTask);
+  const allAssignees = useStore(s => s.allAssignees);
+  const taskSprintsMap = useStore(s => s.taskSprintsMap);
+  const config = useStore(s => s.config);
+  const username = useStore(s => s.username);
+  const tasks = useStore(s => s.tasks);
   const nextStatus = task.status === "backlog" ? "in_progress" : task.status === "in_progress" ? "completed" : task.status === "active" ? "in_progress" : null;
+
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
+  const [ctxSprints, setCtxSprints] = useState<{ id: number; name: string; status: string }[]>([]);
+  const [ctxUsers, setCtxUsers] = useState<string[]>([]);
+  const [assignees, setAssignees] = useState<string[]>(() => allAssignees.get(task.id) || []);
+
+  const isOwner = task.user === username;
+  const taskSprints = taskSprintsMap.get(task.id) || [];
+  const node: TreeNode = { task, children: [], depth: 0 };
+
+  const onContextMenu = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    setAssignees(allAssignees.get(task.id) || []);
+    setCtxMenu({ x: e.clientX, y: e.clientY });
+    const [sprints, planning, users] = await Promise.all([
+      apiCall<{ id: number; name: string; status: string }[]>("GET", "/api/sprints?status=active").catch(() => []),
+      apiCall<{ id: number; name: string; status: string }[]>("GET", "/api/sprints?status=planning").catch(() => []),
+      apiCall<{ id: number; username: string }[]>("GET", "/api/users").catch(() => []),
+    ]);
+    setCtxSprints([...sprints, ...planning]);
+    setCtxUsers(users.map(u => u.username));
+  };
+
   return (
-    <div draggable onDragStart={e => onDragStart(e, task.id)} tabIndex={0}
-      onKeyDown={e => { if (e.key === "Enter" && nextStatus) { e.preventDefault(); updateTask(task.id, { status: nextStatus }); } }}
-      role="listitem" aria-label={`${task.title}, ${task.status}${nextStatus ? `. Press Enter to move to ${nextStatus}` : ""}`}
-      className="bg-[var(--color-surface)] p-3 rounded-xl border border-white/5 cursor-grab active:cursor-grabbing hover:border-white/10 focus:ring-2 focus:ring-[var(--color-accent)] focus:outline-none transition-colors">
-      {ancestors && ancestors.length > 0 && (
-        <div className="text-[9px] text-white/20 leading-tight mb-1 truncate" title={ancestors.join(" › ")}>
-          {ancestors.join(" › ")}
+    <>
+      <div draggable onDragStart={e => onDragStart(e, task.id)} tabIndex={0}
+        onContextMenu={onContextMenu}
+        onKeyDown={e => { if (e.key === "Enter" && nextStatus) { e.preventDefault(); updateTask(task.id, { status: nextStatus }); } }}
+        role="listitem" aria-label={`${task.title}, ${task.status}${nextStatus ? `. Press Enter to move to ${nextStatus}` : ""}`}
+        className="bg-[var(--color-surface)] p-3 rounded-xl border border-white/5 cursor-grab active:cursor-grabbing hover:border-white/10 focus:ring-2 focus:ring-[var(--color-accent)] focus:outline-none transition-colors">
+        {ancestors && ancestors.length > 0 && (
+          <div className="text-[9px] text-white/20 leading-tight mb-1 truncate" title={ancestors.join(" › ")}>
+            {ancestors.join(" › ")}
+          </div>
+        )}
+        <div className="text-xs text-white/80 leading-tight">{task.title}</div>
+        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+          {task.project && <span className="text-[9px] bg-white/5 px-1 py-0.5 rounded text-white/30">{task.project}</span>}
+          <span className="text-[9px] text-white/20">@{task.user}</span>
+          {task.priority >= 4 && <span className="text-[9px] text-red-400">P{task.priority}</span>}
+          {task.due_date && <span className="text-[9px] text-white/20">{task.due_date.slice(5)}</span>}
+          {labels?.map(l => <span key={l.name} className="text-[8px] px-1 rounded" style={{ background: l.color + "30", color: l.color }}>{l.name}</span>)}
         </div>
-      )}
-      <div className="text-xs text-white/80 leading-tight">{task.title}</div>
-      <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-        {task.project && <span className="text-[9px] bg-white/5 px-1 py-0.5 rounded text-white/30">{task.project}</span>}
-        <span className="text-[9px] text-white/20">@{task.user}</span>
-        {task.priority >= 4 && <span className="text-[9px] text-red-400">P{task.priority}</span>}
-        {task.due_date && <span className="text-[9px] text-white/20">{task.due_date.slice(5)}</span>}
-        {labels?.map(l => <span key={l.name} className="text-[8px] px-1 rounded" style={{ background: l.color + "30", color: l.color }}>{l.name}</span>)}
       </div>
-    </div>
+      {ctxMenu && (
+        <TaskContextMenu pos={ctxMenu} task={task} node={node} isOwner={isOwner}
+          assignees={assignees} ctxSprints={ctxSprints} ctxUsers={ctxUsers} ctxBurnUsers={assignees}
+          taskSprints={taskSprints} config={config}
+          onClose={() => setCtxMenu(null)}
+          actions={{ updateTask, start: (id) => start(id), setAssignees, setEditingTitle: () => {}, setTitleDraft: () => {}, setEditingDesc: () => {}, setDescDraft: () => {}, handleDelete: () => deleteTask(task.id), setTimeReporting: () => {}, setCommenting: () => {}, setAdding: () => {}, onView: () => useStore.getState().setTab("tasks") }} />
+      )}
+    </>
   );
 }
 
