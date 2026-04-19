@@ -4,6 +4,7 @@ import { Timer as TimerIcon, ListTodo, BarChart3, Settings as SettingsIcon, Wifi
 import { useStore } from "./store/store";
 import { useT } from "./i18n";
 import { apiCall } from "./store/api";
+import { isTauri } from "./platform";
 import { useSseConnection } from "./hooks/useSseConnection";
 import Timer from "./components/Timer";
 import TaskList from "./components/TaskList";
@@ -205,6 +206,21 @@ export default function App() {
 
   useSseConnection(token);
 
+  // U6: Listen for global shortcut (Tauri) to toggle timer
+  useEffect(() => {
+    if (!isTauri || !token) return;
+    let unlisten: (() => void) | undefined;
+    import("@tauri-apps/api/event").then(({ listen }) => {
+      listen("global-timer-toggle", () => {
+        const s = useStore.getState();
+        if (s.engine?.status === "Running") s.pause();
+        else if (s.engine?.status === "Paused") s.resume();
+        else s.start(s.timerTaskId);
+      }).then(fn => { unlisten = fn; });
+    }).catch(() => {});
+    return () => { unlisten?.(); };
+  }, [token]);
+
   useEffect(() => {
     if (!token) return;
     poll();
@@ -266,12 +282,12 @@ export default function App() {
       <nav aria-label="Main navigation" className="hidden md:block" style={{ display: focusMode ? "none" : undefined }}>
         <Sidebar />
       </nav>
-      <main id="main-content" className="flex-1 overflow-hidden relative pb-14 md:pb-0">
-        {offline && <div className="bg-yellow-600/80 text-white text-xs text-center py-1 px-2" role="alert">⚡ Offline — changes will sync when reconnected</div>}
+      <main id="main-content" className={`flex-1 overflow-hidden relative ${focusMode ? "pb-0" : "pb-14 md:pb-0"}`}>
+        {!focusMode && offline && <div className="bg-yellow-600/80 text-white text-xs text-center py-1 px-2" role="alert">⚡ Offline — changes will sync when reconnected</div>}
         {focusMode && (
           <button onClick={() => useStore.getState().toggleFocusMode()}
-            className="absolute top-2 right-2 z-50 text-xs text-white/30 hover:text-white/60 px-2 py-1 rounded bg-white/5"
-            title="Exit focus mode (F11)">✕ Exit Focus</button>
+            className="absolute top-2 right-2 z-50 text-xs text-white/0 hover:text-white/50 px-2 py-1 rounded transition-colors duration-300"
+            title="Exit focus mode (F11)" aria-label="Exit focus mode">✕</button>
         )}
         {/* Loading indicator */}
         {(loading.tasks || loading.history || loading.stats || loading.config) && (

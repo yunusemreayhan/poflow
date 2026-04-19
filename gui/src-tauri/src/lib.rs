@@ -1,6 +1,7 @@
 use serde_json::Value;
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use tauri::Emitter;
 
 #[derive(Clone)]
 struct ConnectionConfig {
@@ -253,6 +254,49 @@ pub fn run() {
     tauri::Builder::default()
         .manage(app_state)
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .setup(|app| {
+            // U6: Register global shortcut Ctrl+Shift+P to toggle timer
+            use tauri_plugin_global_shortcut::GlobalShortcutExt;
+            let handle = app.handle().clone();
+            app.global_shortcut().on_shortcut("CmdOrCtrl+Shift+P", move |_app, _shortcut, event| {
+                if event.state == tauri_plugin_global_shortcut::ShortcutState::Pressed {
+                    let _ = handle.emit("global-timer-toggle", ());
+                }
+            })?;
+
+            // U7: Native tray icon
+            use tauri::tray::TrayIconBuilder;
+            use tauri::menu::{MenuBuilder, MenuItemBuilder};
+            let handle2 = app.handle().clone();
+            let handle3 = app.handle().clone();
+            let toggle_item = MenuItemBuilder::with_id("toggle", "Start/Pause").build(app)?;
+            let quit_item = MenuItemBuilder::with_id("quit", "Quit").build(app)?;
+            let menu = MenuBuilder::new(app).items(&[&toggle_item, &quit_item]).build()?;
+            TrayIconBuilder::new()
+                .icon(app.default_window_icon().cloned().unwrap_or_else(|| tauri::image::Image::new(&[], 0, 0)))
+                .tooltip("Pomodoro")
+                .menu(&menu)
+                .on_menu_event(move |_app, event| {
+                    match event.id().as_ref() {
+                        "toggle" => { let _ = handle2.emit("global-timer-toggle", ()); }
+                        "quit" => { std::process::exit(0); }
+                        _ => {}
+                    }
+                })
+                .on_tray_icon_event(move |_tray, event| {
+                    if let tauri::tray::TrayIconEvent::Click { button: tauri::tray::MouseButton::Left, .. } = event {
+                        // Show/focus the main window on left click
+                        if let Some(w) = handle3.get_webview_window("main") {
+                            let _ = w.show();
+                            let _ = w.set_focus();
+                        }
+                    }
+                })
+                .build(app)?;
+
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![api_call, set_token, get_connection, set_connection, write_file, save_auth, load_auth, clear_auth, indicator_status, indicator_toggle])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -19,7 +19,7 @@ function webBaseUrl(): string {
 
 // ── Core API call ──────────────────────────────────────────────
 
-export async function platformApiCall<T = unknown>(method: string, path: string, body?: unknown): Promise<T> {
+export async function platformApiCall<T = unknown>(method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
   if (isTauri) {
     const { invoke } = await import("@tauri-apps/api/core");
     return invoke<T>("api_call", { method, path, body: body ?? null });
@@ -32,6 +32,7 @@ export async function platformApiCall<T = unknown>(method: string, path: string,
     method,
     headers,
     body: body != null ? JSON.stringify(body) : undefined,
+    signal,
   });
   if (!resp.ok) {
     const text = await resp.text().catch(() => "");

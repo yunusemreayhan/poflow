@@ -20,10 +20,19 @@ export function useSseConnection(token: string | null) {
 
     const connectSse = async () => {
       try {
+        // N5: Re-validate token on reconnect — apiCall handles 401/refresh automatically
+        // If token was refreshed elsewhere, this uses the new token; if expired, triggers refresh
         const resp = await apiCall<{ ticket: string }>("POST", "/api/timer/ticket");
         if (unmounted) return;
-        sseInstance = new EventSource(`${url}/api/timer/sse?ticket=${encodeURIComponent(resp.ticket)}`);
+        const currentUrl = useStore.getState().serverUrl;
+        sseInstance = new EventSource(`${currentUrl}/api/timer/sse?ticket=${encodeURIComponent(resp.ticket)}`);
       } catch {
+        // Ticket fetch failed (even after refresh attempt) — schedule retry
+        if (!unmounted) {
+          const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
+          reconnectAttempts++;
+          reconnectId = setTimeout(connectSse, delay);
+        }
         return;
       }
 

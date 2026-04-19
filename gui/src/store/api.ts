@@ -2,16 +2,18 @@ import { platformApiCall, platformSetToken } from "../platform";
 
 // --- HTTP API helper ---
 
-export async function apiCall<T = unknown>(method: string, path: string, body?: unknown): Promise<T> {
+export async function apiCall<T = unknown>(method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
   try {
-    return await platformApiCall<T>(method, path, body ?? null);
+    return await platformApiCall<T>(method, path, body ?? null, signal);
   } catch (e) {
+    // N4: Don't retry or toast on aborted requests
+    if (signal?.aborted) throw e;
     const msg = typeof e === "string" ? e : (e as Error)?.message || "";
     // Auto-refresh on 401 (expired token)
     if (msg.includes("401") || msg.includes("expired") || msg.includes("Unauthorized")) {
       const refreshed = await tryRefreshToken();
       if (refreshed) {
-        try { return await platformApiCall<T>(method, path, body ?? null); } catch { /* retry failed — fall through to original error */ }
+        try { return await platformApiCall<T>(method, path, body ?? null, signal); } catch { /* retry failed — fall through to original error */ }
       } else {
         // Refresh failed — force logout so user gets a clean login screen
         // instead of staying in a broken "logged in but disconnected" state
