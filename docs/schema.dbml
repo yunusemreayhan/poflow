@@ -308,3 +308,16 @@ Table projects {
   created_at  text    [not null]
   updated_at  text    [not null]
 }
+
+Table status_transitions {
+  id INTEGER [pk, increment]
+  from_status TEXT [not null]
+  to_status TEXT [not null]
+  project_id INTEGER [ref: > projects.id]
+  created_at TEXT [not null]
+
+  indexes {
+    (from_status, to_status, project_id) [unique]
+    (from_status, project_id)
+  }
+}

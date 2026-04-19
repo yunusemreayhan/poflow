@@ -32,9 +32,7 @@ Create a `projects` table (id, name, description, lead_user_id, status, created_
 
 ### 1. No Workflow Transition Rules for Custom Statuses
 
-`custom_statuses` has `name`, `color`, `category` (todo/in_progress/done), `sort_order`. But there are **no transition rules**. Any task can jump from any status to any other. The `category` field maps to board columns but enforces nothing.
-
-**Recommendation:** Add `status_transitions` table (from_status, to_status, project_id). Enforce on task update. Default to "any→any" but let admins restrict per project.
+`custom_statuses` has `name`, `color`, `category` (todo/in_progress/done), `sort_order`. ~~But there are **no transition rules**. Any task can jump from any status to any other.~~ **FIXED (Sprint 15):** `status_transitions` table added with per-project and global rules. Enforced on single and bulk task status updates.
 
 ### 2. Missing Tables for "Implemented" Features
 
@@ -85,7 +83,7 @@ When someone comments on a task, there's no notification to watchers. `task_watc
 
 ### 5. Automation Rules Are a Skeleton
 
-`automation_rules` table exists with CRUD endpoints, but `automation.rs` is only 3.5KB. Rules are not evaluated on task events — the trigger/condition/action system is defined but not wired into the task update flow.
+`automation_rules` table exists with CRUD endpoints. ~~`automation.rs` is only 3.5KB. Rules are not evaluated on task events — the trigger/condition/action system is defined but not wired into the task update flow.~~ **FIXED (Sprint 15):** Automation rules now fire on 5 trigger events: `task.status_changed`, `task.all_subtasks_done`, `task.created`, `task.assigned`, `task.priority_changed`. All wired into the respective route handlers.
 
 ---
 
@@ -131,12 +129,12 @@ Pool set to `max_connections(8)` with 10s busy timeout. No pool metrics, no moni
 | # | Item | Effort | Impact |
 |---|---|---|---|
 | 1 | ~~Create `projects` table, migrate text fields to FK~~ | ~~High~~ | ~~Critical~~ — **DONE (Sprint 14)** |
-| 2 | Add workflow transition rules (`status_transitions` table) | Medium | High — enforces process, differentiates from toy tools |
+| 2 | ~~Add workflow transition rules (`status_transitions` table)~~ | ~~Medium~~ | ~~High~~ — **DONE (Sprint 15)** |
 | 3 | Wire watcher notifications into comment/status-change flows | Low | High — basic collaboration expectation |
 | 4 | Add `updated_by` to tasks | Low | Medium — traceability |
 | 5 | Paginate or scope `/api/tasks/full` | Medium | High — scaling prerequisite |
 | 6 | Create `saved_views` table for F26 | Low | Medium — cross-device view persistence |
-| 7 | Wire automation rules into task event flow | Medium | Medium — automation is defined but inert |
+| 7 | ~~Wire automation rules into task event flow~~ | ~~Medium~~ | ~~Medium~~ — **DONE (Sprint 15)** |
 | 8 | Add user timezone to `users` table | Low | Medium — correct scheduled reports and reminders |
 | 9 | Add `webhook_deliveries` table for observability | Low | Medium — integration reliability |
 | 10 | Persist timer state to DB for restart resilience | Medium | Low — rare edge case but poor UX when it hits |

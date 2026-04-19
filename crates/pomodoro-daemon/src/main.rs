@@ -106,6 +106,8 @@ use utoipa_swagger_ui::SwaggerUi;
         // Project export/import, templates
         routes::export_project, routes::save_task_as_template,
         routes::import_project, routes::list_archived_tasks, routes::unarchive_task,
+        // Workflow transitions
+        routes::list_transitions, routes::create_transition, routes::delete_transition,
     ),
     components(schemas(
         db::Task, db::Session, db::Comment, db::User, db::TaskDetail, db::SessionWithPath, db::DayStat, db::TaskAssignee,
@@ -140,6 +142,7 @@ use utoipa_swagger_ui::SwaggerUi;
         routes::BulkAssignRequest, routes::BulkSprintMoveRequest,
         routes::AdvancedSearchRequest, routes::SearchFilter,
         routes::ProjectImportRequest,
+        db::StatusTransition, routes::CreateTransitionRequest,
     )),
     modifiers(&SecurityAddon),
     info(title = "Pomodoro API", version = "2.1.0", description = "Multi-user Pomodoro timer with hierarchical task management")

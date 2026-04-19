@@ -684,6 +684,20 @@ async fn migrate(pool: &Pool) -> Result<()> {
         sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (26, ?)").bind(now_str()).execute(pool).await.ok();
     }
 
+    // Migration 27: Workflow transition rules
+    if !applied_set.contains(&27) {
+        sqlx::query("CREATE TABLE IF NOT EXISTS status_transitions (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            from_status TEXT NOT NULL,
+            to_status   TEXT NOT NULL,
+            project_id  INTEGER REFERENCES projects(id) ON DELETE CASCADE,
+            created_at  TEXT NOT NULL,
+            UNIQUE(from_status, to_status, project_id)
+        )").execute(pool).await.ok();
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_status_transitions_from ON status_transitions(from_status, project_id)").execute(pool).await.ok();
+        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (27, ?)").bind(now_str()).execute(pool).await.ok();
+    }
+
     Ok(())
 }
 
@@ -739,3 +753,5 @@ mod webhook_deliveries;
 pub use webhook_deliveries::*;
 mod projects;
 pub use projects::*;
+mod status_transitions;
+pub use status_transitions::*;

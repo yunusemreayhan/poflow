@@ -358,6 +358,10 @@ pub async fn create_task(State(engine): State<AppState>, claims: Claims, Json(re
         .await.map_err(internal)?;
     if let Err(e) = db::audit(&engine.pool, claims.user_id, "create", "task", Some(t.id), Some(&t.title)).await { tracing::warn!("Audit log failed: {}", e); }
     crate::webhook::dispatch(engine.pool.clone(), "task.created", serde_json::json!({"id": t.id, "title": &t.title}));
+    // F19: Run task.created automations
+    let pool = engine.pool.clone();
+    let tid = t.id;
+    tokio::spawn(async move { crate::automation::run_task_created(&pool, tid).await; });
     engine.notify(ChangeEvent::Tasks);
     Ok((StatusCode::CREATED, Json(t)))
 }
@@ -399,6 +403,11 @@ pub async fn update_task(State(engine): State<AppState>, claims: Claims, Path(id
         if !VALID_TASK_STATUSES.contains(&s.as_str()) {
             db::get_custom_status_by_name(&engine.pool, s).await.map_err(internal)?
                 .ok_or_else(|| err(StatusCode::BAD_REQUEST, format!("Unknown status '{}'. Create it via POST /api/statuses first", s)))?;
+        }
+        // Enforce workflow transition rules (skip if status unchanged)
+        if s != &task.status {
+            db::validate_status_transition(&engine.pool, &task.status, s, task.project_id).await
+                .map_err(|e| err(StatusCode::BAD_REQUEST, e.to_string()))?;
         }
     }
     if let Some(p) = req.priority { if !(1..=5).contains(&p) { return Err(err(StatusCode::BAD_REQUEST, "Priority must be 1-5")); } }
@@ -467,6 +476,14 @@ pub async fn update_task(State(engine): State<AppState>, claims: Claims, Path(id
             });
         }
     }
+    // F19: Run priority change automations
+    if let Some(new_priority) = req.priority {
+        if new_priority != task.priority {
+            let pool = engine.pool.clone();
+            let old_p = task.priority;
+            tokio::spawn(async move { crate::automation::run_priority_changed(&pool, id, old_p, new_priority).await; });
+        }
+    }
     crate::webhook::dispatch(engine.pool.clone(), "task.updated", serde_json::json!({"id": id}));
     engine.notify(ChangeEvent::Tasks);
     Ok(Json(t))
@@ -525,6 +542,15 @@ pub async fn bulk_update_status(State(engine): State<AppState>, claims: Claims, 
         query = query.bind(claims.user_id);
         let (foreign,): (i64,) = query.fetch_one(&engine.pool).await.map_err(internal)?;
         if foreign > 0 { return Err(err(StatusCode::FORBIDDEN, "Cannot update other users' tasks")); }
+    }
+    // Enforce workflow transition rules for each task
+    for tid in &req.task_ids {
+        if let Ok(t) = db::get_task(&engine.pool, *tid).await {
+            if t.status != req.status {
+                db::validate_status_transition(&engine.pool, &t.status, &req.status, t.project_id).await
+                    .map_err(|e| err(StatusCode::BAD_REQUEST, format!("Task #{}: {}", tid, e)))?;
+            }
+        }
     }
     // Batch update
     let ph = req.task_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");

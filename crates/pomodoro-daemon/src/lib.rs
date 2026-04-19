@@ -245,6 +245,9 @@ pub async fn build_router(engine: Arc<engine::Engine>) -> Router {
         // Projects
         .route("/api/projects", get(routes::list_projects).post(routes::create_project))
         .route("/api/projects/{id}", get(routes::get_project).put(routes::update_project).delete(routes::delete_project))
+        // Workflow transitions
+        .route("/api/workflows/transitions", get(routes::list_transitions).post(routes::create_transition))
+        .route("/api/workflows/transitions/{id}", delete(routes::delete_transition))
         .layer(axum::extract::DefaultBodyLimit::max(2 * 1024 * 1024)) // 2MB max request body
         .layer(cors)
         .layer(axum::middleware::from_fn(security_headers))

@@ -5619,3 +5619,355 @@ async fn test_project_delete_unlinks_tasks() {
     let task = body_json(resp).await;
     assert!(task["task"]["project_id"].is_null());
 }
+
+// ── Status Transition Rules ────────────────────────────────────
+
+#[tokio::test]
+async fn test_transition_rules_crud() {
+    let app = common::app().await;
+    let token = common::login_root(&app).await;
+
+    // List transitions (empty initially)
+    let resp = app.clone().oneshot(common::auth_req("GET", "/api/workflows/transitions", &token, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let body = common::body_json(resp).await;
+    assert_eq!(body.as_array().unwrap().len(), 0);
+
+    // Create a transition rule
+    let resp = app.clone().oneshot(common::auth_req("POST", "/api/workflows/transitions", &token,
+        Some(serde_json::json!({"from_status": "backlog", "to_status": "active"})))).await.unwrap();
+    assert_eq!(resp.status(), 201);
+    let t = common::body_json(resp).await;
+    assert_eq!(t["from_status"], "backlog");
+    assert_eq!(t["to_status"], "active");
+    assert!(t["project_id"].is_null());
+    let tid = t["id"].as_i64().unwrap();
+
+    // List again — should have 1
+    let resp = app.clone().oneshot(common::auth_req("GET", "/api/workflows/transitions", &token, None)).await.unwrap();
+    let body = common::body_json(resp).await;
+    assert_eq!(body.as_array().unwrap().len(), 1);
+
+    // Delete
+    let resp = app.clone().oneshot(common::auth_req("DELETE", &format!("/api/workflows/transitions/{}", tid), &token, None)).await.unwrap();
+    assert_eq!(resp.status(), 204);
+
+    // List again — empty
+    let resp = app.clone().oneshot(common::auth_req("GET", "/api/workflows/transitions", &token, None)).await.unwrap();
+    let body = common::body_json(resp).await;
+    assert_eq!(body.as_array().unwrap().len(), 0);
+}
+
+#[tokio::test]
+async fn test_transition_rules_non_admin_rejected() {
+    let app = common::app().await;
+    let user_token = common::register_user(&app, "transuser").await;
+
+    let resp = app.clone().oneshot(common::auth_req("POST", "/api/workflows/transitions", &user_token,
+        Some(serde_json::json!({"from_status": "backlog", "to_status": "active"})))).await.unwrap();
+    assert_eq!(resp.status(), 403);
+}
+
+#[tokio::test]
+async fn test_transition_rules_duplicate_rejected() {
+    let app = common::app().await;
+    let token = common::login_root(&app).await;
+
+    let resp = app.clone().oneshot(common::auth_req("POST", "/api/workflows/transitions", &token,
+        Some(serde_json::json!({"from_status": "backlog", "to_status": "active"})))).await.unwrap();
+    assert_eq!(resp.status(), 201);
+
+    // Duplicate should fail
+    let resp = app.clone().oneshot(common::auth_req("POST", "/api/workflows/transitions", &token,
+        Some(serde_json::json!({"from_status": "backlog", "to_status": "active"})))).await.unwrap();
+    assert_eq!(resp.status(), 409);
+}
+
+#[tokio::test]
+async fn test_transition_rules_same_status_rejected() {
+    let app = common::app().await;
+    let token = common::login_root(&app).await;
+
+    let resp = app.clone().oneshot(common::auth_req("POST", "/api/workflows/transitions", &token,
+        Some(serde_json::json!({"from_status": "active", "to_status": "active"})))).await.unwrap();
+    assert_eq!(resp.status(), 400);
+}
+
+#[tokio::test]
+async fn test_transition_enforcement_blocks_invalid() {
+    let app = common::app().await;
+    let token = common::login_root(&app).await;
+
+    // Create transition rules: only backlog→active and active→completed allowed
+    app.clone().oneshot(common::auth_req("POST", "/api/workflows/transitions", &token,
+        Some(serde_json::json!({"from_status": "backlog", "to_status": "active"})))).await.unwrap();
+    app.clone().oneshot(common::auth_req("POST", "/api/workflows/transitions", &token,
+        Some(serde_json::json!({"from_status": "active", "to_status": "completed"})))).await.unwrap();
+
+    // Create a task (starts as backlog)
+    let resp = app.clone().oneshot(common::auth_req("POST", "/api/tasks", &token,
+        Some(serde_json::json!({"title": "Trans test"})))).await.unwrap();
+    let task = common::body_json(resp).await;
+    let task_id = task["id"].as_i64().unwrap();
+
+    // Try to go directly from backlog→completed (not allowed)
+    let resp = app.clone().oneshot(common::auth_req("PUT", &format!("/api/tasks/{}", task_id), &token,
+        Some(serde_json::json!({"status": "completed"})))).await.unwrap();
+    assert_eq!(resp.status(), 400);
+
+    // Go backlog→active (allowed)
+    let resp = app.clone().oneshot(common::auth_req("PUT", &format!("/api/tasks/{}", task_id), &token,
+        Some(serde_json::json!({"status": "active"})))).await.unwrap();
+    assert_eq!(resp.status(), 200);
+
+    // Go active→completed (allowed)
+    let resp = app.clone().oneshot(common::auth_req("PUT", &format!("/api/tasks/{}", task_id), &token,
+        Some(serde_json::json!({"status": "completed"})))).await.unwrap();
+    assert_eq!(resp.status(), 200);
+}
+
+#[tokio::test]
+async fn test_transition_no_rules_allows_all() {
+    let app = common::app().await;
+    let token = common::login_root(&app).await;
+
+    // No transition rules defined — any transition should work
+    let resp = app.clone().oneshot(common::auth_req("POST", "/api/tasks", &token,
+        Some(serde_json::json!({"title": "Free trans"})))).await.unwrap();
+    let task = common::body_json(resp).await;
+    let task_id = task["id"].as_i64().unwrap();
+
+    let resp = app.clone().oneshot(common::auth_req("PUT", &format!("/api/tasks/{}", task_id), &token,
+        Some(serde_json::json!({"status": "completed"})))).await.unwrap();
+    assert_eq!(resp.status(), 200);
+}
+
+#[tokio::test]
+async fn test_transition_enforcement_bulk_status() {
+    let app = common::app().await;
+    let token = common::login_root(&app).await;
+
+    // Create transition rules: only backlog→active
+    app.clone().oneshot(common::auth_req("POST", "/api/workflows/transitions", &token,
+        Some(serde_json::json!({"from_status": "backlog", "to_status": "active"})))).await.unwrap();
+
+    // Create tasks
+    let resp = app.clone().oneshot(common::auth_req("POST", "/api/tasks", &token,
+        Some(serde_json::json!({"title": "Bulk1"})))).await.unwrap();
+    let t1 = common::body_json(resp).await["id"].as_i64().unwrap();
+
+    // Bulk update to "completed" should fail (backlog→completed not allowed)
+    let resp = app.clone().oneshot(common::auth_req("PUT", "/api/tasks/bulk-status", &token,
+        Some(serde_json::json!({"task_ids": [t1], "status": "completed"})))).await.unwrap();
+    assert_eq!(resp.status(), 400);
+
+    // Bulk update to "active" should succeed
+    let resp = app.clone().oneshot(common::auth_req("PUT", "/api/tasks/bulk-status", &token,
+        Some(serde_json::json!({"task_ids": [t1], "status": "active"})))).await.unwrap();
+    assert_eq!(resp.status(), 204);
+}
+
+#[tokio::test]
+async fn test_transition_project_specific_rules() {
+    let app = common::app().await;
+    let token = common::login_root(&app).await;
+
+    // Create a project
+    let resp = app.clone().oneshot(common::auth_req("POST", "/api/projects", &token,
+        Some(serde_json::json!({"name": "TransProj", "key": "TP"})))).await.unwrap();
+    let proj_id = common::body_json(resp).await["id"].as_i64().unwrap();
+
+    // Create project-specific rule: only backlog→active
+    app.clone().oneshot(common::auth_req("POST", "/api/workflows/transitions", &token,
+        Some(serde_json::json!({"from_status": "backlog", "to_status": "active", "project_id": proj_id})))).await.unwrap();
+
+    // Create task in that project
+    let resp = app.clone().oneshot(common::auth_req("POST", "/api/tasks", &token,
+        Some(serde_json::json!({"title": "Proj task", "project_id": proj_id})))).await.unwrap();
+    let task_id = common::body_json(resp).await["id"].as_i64().unwrap();
+
+    // backlog→completed should fail (project rule restricts it)
+    let resp = app.clone().oneshot(common::auth_req("PUT", &format!("/api/tasks/{}", task_id), &token,
+        Some(serde_json::json!({"status": "completed"})))).await.unwrap();
+    assert_eq!(resp.status(), 400);
+
+    // backlog→active should succeed
+    let resp = app.clone().oneshot(common::auth_req("PUT", &format!("/api/tasks/{}", task_id), &token,
+        Some(serde_json::json!({"status": "active"})))).await.unwrap();
+    assert_eq!(resp.status(), 200);
+
+    // Task without project should still be free (no global rules)
+    let resp = app.clone().oneshot(common::auth_req("POST", "/api/tasks", &token,
+        Some(serde_json::json!({"title": "No proj task"})))).await.unwrap();
+    let task2_id = common::body_json(resp).await["id"].as_i64().unwrap();
+    let resp = app.clone().oneshot(common::auth_req("PUT", &format!("/api/tasks/{}", task2_id), &token,
+        Some(serde_json::json!({"status": "completed"})))).await.unwrap();
+    assert_eq!(resp.status(), 200);
+}
+
+// ── Automation Rules Wiring ────────────────────────────────────
+
+#[tokio::test]
+async fn test_automation_status_change_sets_priority() {
+    let app = common::app().await;
+    let token = common::login_root(&app).await;
+
+    // Create automation: when status changes to "active", set priority to 5
+    let resp = app.clone().oneshot(common::auth_req("POST", "/api/automations", &token,
+        Some(serde_json::json!({
+            "name": "Urgent on active",
+            "trigger_event": "task.status_changed",
+            "condition_json": r#"{"to_status":"active"}"#,
+            "action_json": r#"{"set_priority":5}"#
+        })))).await.unwrap();
+    assert_eq!(resp.status(), 201);
+
+    // Create task
+    let resp = app.clone().oneshot(common::auth_req("POST", "/api/tasks", &token,
+        Some(serde_json::json!({"title": "Auto test", "priority": 3})))).await.unwrap();
+    let task = common::body_json(resp).await;
+    let task_id = task["id"].as_i64().unwrap();
+
+    // Change status to active
+    let resp = app.clone().oneshot(common::auth_req("PUT", &format!("/api/tasks/{}", task_id), &token,
+        Some(serde_json::json!({"status": "active"})))).await.unwrap();
+    assert_eq!(resp.status(), 200);
+
+    // Wait for async automation to complete
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+    // Check priority was updated to 5
+    let resp = app.clone().oneshot(common::auth_req("GET", &format!("/api/tasks/{}", task_id), &token, None)).await.unwrap();
+    let detail = common::body_json(resp).await;
+    assert_eq!(detail["task"]["priority"], 5);
+}
+
+#[tokio::test]
+async fn test_automation_all_subtasks_done() {
+    let app = common::app().await;
+    let token = common::login_root(&app).await;
+
+    // Create automation: when all subtasks done, set parent to "completed"
+    app.clone().oneshot(common::auth_req("POST", "/api/automations", &token,
+        Some(serde_json::json!({
+            "name": "Auto complete parent",
+            "trigger_event": "task.all_subtasks_done",
+            "condition_json": "{}",
+            "action_json": r#"{"set_status":"completed"}"#
+        })))).await.unwrap();
+
+    // Create parent + child
+    let resp = app.clone().oneshot(common::auth_req("POST", "/api/tasks", &token,
+        Some(serde_json::json!({"title": "Parent"})))).await.unwrap();
+    let parent_id = common::body_json(resp).await["id"].as_i64().unwrap();
+
+    let resp = app.clone().oneshot(common::auth_req("POST", "/api/tasks", &token,
+        Some(serde_json::json!({"title": "Child", "parent_id": parent_id})))).await.unwrap();
+    let child_id = common::body_json(resp).await["id"].as_i64().unwrap();
+
+    // Complete the child
+    app.clone().oneshot(common::auth_req("PUT", &format!("/api/tasks/{}", child_id), &token,
+        Some(serde_json::json!({"status": "completed"})))).await.unwrap();
+
+    // Wait for automation
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+    // Parent should be completed
+    let resp = app.clone().oneshot(common::auth_req("GET", &format!("/api/tasks/{}", parent_id), &token, None)).await.unwrap();
+    let detail = common::body_json(resp).await;
+    assert_eq!(detail["task"]["status"], "completed");
+}
+
+#[tokio::test]
+async fn test_automation_task_created_trigger() {
+    let app = common::app().await;
+    let token = common::login_root(&app).await;
+
+    // Create automation: when task created, set priority to 1
+    let resp = app.clone().oneshot(common::auth_req("POST", "/api/automations", &token,
+        Some(serde_json::json!({
+            "name": "Low priority default",
+            "trigger_event": "task.created",
+            "condition_json": "{}",
+            "action_json": r#"{"set_priority":1}"#
+        })))).await.unwrap();
+    assert_eq!(resp.status(), 201);
+
+    // Create task with default priority 3
+    let resp = app.clone().oneshot(common::auth_req("POST", "/api/tasks", &token,
+        Some(serde_json::json!({"title": "Auto created"})))).await.unwrap();
+    let task_id = common::body_json(resp).await["id"].as_i64().unwrap();
+
+    // Wait for async automation
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+
+    // Priority should be 1
+    let resp = app.clone().oneshot(common::auth_req("GET", &format!("/api/tasks/{}", task_id), &token, None)).await.unwrap();
+    let detail = common::body_json(resp).await;
+    assert_eq!(detail["task"]["priority"], 1);
+}
+
+#[tokio::test]
+async fn test_automation_task_assigned_trigger() {
+    let app = common::app().await;
+    let token = common::login_root(&app).await;
+    common::register_user(&app, "assignee1").await;
+
+    // Create automation: when task assigned, set status to "in_progress"
+    app.clone().oneshot(common::auth_req("POST", "/api/automations", &token,
+        Some(serde_json::json!({
+            "name": "Auto in-progress on assign",
+            "trigger_event": "task.assigned",
+            "condition_json": "{}",
+            "action_json": r#"{"set_status":"in_progress"}"#
+        })))).await.unwrap();
+
+    // Create task
+    let resp = app.clone().oneshot(common::auth_req("POST", "/api/tasks", &token,
+        Some(serde_json::json!({"title": "Assign test"})))).await.unwrap();
+    let task_id = common::body_json(resp).await["id"].as_i64().unwrap();
+
+    // Assign user
+    app.clone().oneshot(common::auth_req("POST", &format!("/api/tasks/{}/assignees", task_id), &token,
+        Some(serde_json::json!({"username": "assignee1"})))).await.unwrap();
+
+    // Wait for async automation
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+    // Status should be in_progress
+    let resp = app.clone().oneshot(common::auth_req("GET", &format!("/api/tasks/{}", task_id), &token, None)).await.unwrap();
+    let detail = common::body_json(resp).await;
+    assert_eq!(detail["task"]["status"], "in_progress");
+}
+
+#[tokio::test]
+async fn test_automation_priority_changed_trigger() {
+    let app = common::app().await;
+    let token = common::login_root(&app).await;
+
+    // Create automation: when priority changes to 5, set status to "active"
+    app.clone().oneshot(common::auth_req("POST", "/api/automations", &token,
+        Some(serde_json::json!({
+            "name": "Activate on urgent",
+            "trigger_event": "task.priority_changed",
+            "condition_json": r#"{"priority":5}"#,
+            "action_json": r#"{"set_status":"active"}"#
+        })))).await.unwrap();
+
+    // Create task
+    let resp = app.clone().oneshot(common::auth_req("POST", "/api/tasks", &token,
+        Some(serde_json::json!({"title": "Priority test", "priority": 3})))).await.unwrap();
+    let task_id = common::body_json(resp).await["id"].as_i64().unwrap();
+
+    // Change priority to 5
+    app.clone().oneshot(common::auth_req("PUT", &format!("/api/tasks/{}", task_id), &token,
+        Some(serde_json::json!({"priority": 5})))).await.unwrap();
+
+    // Wait for async automation
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+    // Status should be active
+    let resp = app.clone().oneshot(common::auth_req("GET", &format!("/api/tasks/{}", task_id), &token, None)).await.unwrap();
+    let detail = common::body_json(resp).await;
+    assert_eq!(detail["task"]["status"], "active");
+}

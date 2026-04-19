@@ -307,7 +307,7 @@ pub struct AutomationRule {
     pub condition_json: String, pub action_json: String, pub enabled: i64, pub created_at: String,
 }
 
-const VALID_TRIGGERS: &[&str] = &["task.status_changed", "task.due_approaching", "task.all_subtasks_done"];
+const VALID_TRIGGERS: &[&str] = &["task.status_changed", "task.due_approaching", "task.all_subtasks_done", "task.created", "task.assigned", "task.priority_changed"];
 
 #[utoipa::path(get, path = "/api/automations", responses((status = 200)), security(("bearer" = [])))]
 pub async fn list_automations(State(engine): State<AppState>, claims: Claims) -> ApiResult<Vec<AutomationRule>> {
