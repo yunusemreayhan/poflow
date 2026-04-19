@@ -328,18 +328,22 @@ async fn api_rate_limit(
     next: axum::middleware::Next,
 ) -> impl IntoResponse {
     let method = req.method().clone();
-    if method == axum::http::Method::GET || method == axum::http::Method::HEAD || method == axum::http::Method::OPTIONS {
+    let ip = routes::extract_ip(req.headers());
+    if std::env::var("POMODORO_NO_RATE_LIMIT").is_ok() {
+        static WARN: std::sync::Once = std::sync::Once::new();
+        WARN.call_once(|| tracing::warn!("POMODORO_NO_RATE_LIMIT is set — API rate limiting DISABLED"));
         return next.run(req).await.into_response();
     }
-    let ip = routes::extract_ip(req.headers());
-    if std::env::var("POMODORO_NO_RATE_LIMIT").is_err() {
-        let limiter = routes::api_limiter();
+    if method == axum::http::Method::GET || method == axum::http::Method::HEAD || method == axum::http::Method::OPTIONS {
+        let limiter = routes::read_limiter();
         if !limiter.check_and_record(&ip) {
             return (axum::http::StatusCode::TOO_MANY_REQUESTS, "Rate limit exceeded").into_response();
         }
     } else {
-        static WARN: std::sync::Once = std::sync::Once::new();
-        WARN.call_once(|| tracing::warn!("POMODORO_NO_RATE_LIMIT is set — API rate limiting DISABLED"));
+        let limiter = routes::api_limiter();
+        if !limiter.check_and_record(&ip) {
+            return (axum::http::StatusCode::TOO_MANY_REQUESTS, "Rate limit exceeded").into_response();
+        }
     }
     next.run(req).await.into_response()
 }

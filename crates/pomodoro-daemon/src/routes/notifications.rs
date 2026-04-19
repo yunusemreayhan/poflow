@@ -1,4 +1,5 @@
 use super::*;
+use crate::engine::ChangeEvent;
 
 #[utoipa::path(get, path = "/api/notifications", responses((status = 200, body = Vec<db::Notification>)), security(("bearer" = [])))]
 pub async fn list_notifications(State(engine): State<AppState>, claims: Claims, Query(q): Query<std::collections::HashMap<String, String>>) -> ApiResult<Vec<db::Notification>> {
@@ -16,5 +17,6 @@ pub async fn unread_count(State(engine): State<AppState>, claims: Claims) -> Api
 pub async fn mark_notifications_read(State(engine): State<AppState>, claims: Claims, body: Option<Json<serde_json::Value>>) -> Result<StatusCode, ApiError> {
     let id = body.and_then(|b| b.get("id").and_then(|v| v.as_i64()));
     db::mark_read(&engine.pool, claims.user_id, id).await.map_err(internal)?;
+    engine.notify(ChangeEvent::Notifications);
     Ok(StatusCode::NO_CONTENT)
 }

@@ -2,14 +2,7 @@ import type { StateCreator } from "zustand";
 import { apiCall } from "./api";
 import type { Task, Comment, TaskDetail, TaskSprintInfo, BurnTotalEntry, TaskAssignee } from "./api";
 import { cacheTasksOffline, getOfflineTasks, enqueueOfflineAction } from "../offlineStore";
-
-// Dedup guard
-const _inflight = new Set<string>();
-function dedup(key: string, fn: () => Promise<void>): Promise<void> {
-  if (_inflight.has(key)) return Promise.resolve();
-  _inflight.add(key);
-  return fn().finally(() => _inflight.delete(key));
-}
+import { dedup } from './dedup';
 
 export interface TasksSlice {
   tasks: Task[];

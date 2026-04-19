@@ -2,6 +2,7 @@ use serde_json::Value;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tauri::Emitter;
+use tauri::Manager;
 use base64::Engine as _;
 
 #[derive(Clone)]
@@ -325,7 +326,7 @@ pub fn run() {
                 .icon(app.default_window_icon().cloned().unwrap_or_else(|| tauri::image::Image::new(&[], 0, 0)))
                 .tooltip("Pomodoro")
                 .menu(&menu)
-                .on_menu_event(move |_app, event| {
+                .on_menu_event(move |_app, event: tauri::menu::MenuEvent| {
                     match event.id().as_ref() {
                         "toggle" => { let _ = handle2.emit("global-timer-toggle", ()); }
                         "quit" => { std::process::exit(0); }

@@ -97,24 +97,23 @@ pub async fn get_tasks_full(State(engine): State<AppState>, _claims: Claims, hea
             .fetch_one(&engine.pool).await.map_err(internal)?
     };
 
-    let (tasks, task_sprints, burn_totals_raw, assignees, labels) = tokio::join!(
-        db::list_tasks_paged(&engine.pool, db::TaskFilter {
-            status: None, project: project_filter, search: None, assignee: None,
-            due_before: None, due_after: None, priority: None, team_id: None,
-            user_id: None, label: None,
-        }, per_page, offset),
-        db::get_all_task_sprints(&engine.pool),
-        db::get_all_burn_totals(&engine.pool),
-        db::get_all_assignees(&engine.pool),
-        db::get_all_task_labels(&engine.pool),
+    let tasks = db::list_tasks_paged(&engine.pool, db::TaskFilter {
+        status: None, project: project_filter, search: None, assignee: None,
+        due_before: None, due_after: None, priority: None, team_id: None,
+        user_id: None, label: None,
+    }, per_page, offset).await.map_err(internal)?;
+
+    let task_ids: Vec<i64> = tasks.iter().map(|t| t.id).collect();
+    let (task_sprints, burn_totals, assignees, labels) = tokio::join!(
+        scoped_task_sprints(&engine.pool, &task_ids),
+        scoped_burn_totals(&engine.pool, &task_ids),
+        scoped_assignees(&engine.pool, &task_ids),
+        scoped_labels(&engine.pool, &task_ids),
     );
-    let burn_totals: Vec<BurnTotalEntry> = burn_totals_raw.map_err(internal)?.into_iter()
-        .map(|(tid, bt)| BurnTotalEntry { task_id: tid, total_points: bt.total_points, total_hours: bt.total_hours, count: bt.count })
-        .collect();
     let resp = TasksFullResponse {
-        tasks: tasks.map_err(internal)?,
+        tasks,
         task_sprints: task_sprints.map_err(internal)?,
-        burn_totals,
+        burn_totals: burn_totals.map_err(internal)?,
         assignees: assignees.map_err(internal)?,
         labels: labels.map_err(internal)?,
     };
@@ -203,6 +202,43 @@ pub async fn sse_timer(State(engine): State<AppState>, Query(q): Query<SseQuery>
     Ok(axum::response::Sse::new(stream).keep_alive(axum::response::sse::KeepAlive::default()))
 }
 
+
+async fn scoped_task_sprints(pool: &db::Pool, ids: &[i64]) -> Result<Vec<db::TaskSprintInfo>, String> {
+    if ids.is_empty() { return Ok(vec![]); }
+    let ph = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+    let q = format!("SELECT st.task_id, sp.id as sprint_id, sp.name as sprint_name, sp.status as sprint_status FROM sprint_tasks st JOIN sprints sp ON st.sprint_id = sp.id WHERE st.task_id IN ({}) ORDER BY st.task_id", ph);
+    let mut query = sqlx::query_as::<_, db::TaskSprintInfo>(&q);
+    for id in ids { query = query.bind(*id); }
+    query.fetch_all(pool).await.map_err(|e| e.to_string())
+}
+
+async fn scoped_burn_totals(pool: &db::Pool, ids: &[i64]) -> Result<Vec<BurnTotalEntry>, String> {
+    if ids.is_empty() { return Ok(vec![]); }
+    let ph = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+    let q = format!("SELECT task_id, COALESCE(SUM(points), 0), COALESCE(SUM(hours), 0), COUNT(*) FROM burn_log WHERE cancelled = 0 AND task_id IN ({}) GROUP BY task_id", ph);
+    let mut query = sqlx::query_as::<_, (i64, f64, f64, i64)>(&q);
+    for id in ids { query = query.bind(*id); }
+    let rows = query.fetch_all(pool).await.map_err(|e| e.to_string())?;
+    Ok(rows.into_iter().map(|(tid, p, h, c)| BurnTotalEntry { task_id: tid, total_points: p, total_hours: h, count: c }).collect())
+}
+
+async fn scoped_assignees(pool: &db::Pool, ids: &[i64]) -> Result<Vec<db::TaskAssignee>, String> {
+    if ids.is_empty() { return Ok(vec![]); }
+    let ph = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+    let q = format!("SELECT ta.task_id, ta.user_id, u.username FROM task_assignees ta JOIN users u ON ta.user_id = u.id WHERE ta.task_id IN ({}) ORDER BY ta.task_id, u.username", ph);
+    let mut query = sqlx::query_as::<_, db::TaskAssignee>(&q);
+    for id in ids { query = query.bind(*id); }
+    query.fetch_all(pool).await.map_err(|e| e.to_string())
+}
+
+async fn scoped_labels(pool: &db::Pool, ids: &[i64]) -> Result<Vec<db::TaskLabel>, String> {
+    if ids.is_empty() { return Ok(vec![]); }
+    let ph = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+    let q = format!("SELECT tl.task_id, l.id, l.name, l.color FROM labels l JOIN task_labels tl ON l.id = tl.label_id WHERE tl.task_id IN ({}) ORDER BY tl.task_id, l.name", ph);
+    let mut query = sqlx::query_as::<_, db::TaskLabel>(&q);
+    for id in ids { query = query.bind(*id); }
+    query.fetch_all(pool).await.map_err(|e| e.to_string())
+}
 
 // --- Rooms ---
 

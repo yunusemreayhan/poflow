@@ -57,6 +57,7 @@ pub enum ChangeEvent {
     Sprints,
     Rooms,
     Config,
+    Notifications,
 }
 
 pub struct Engine {

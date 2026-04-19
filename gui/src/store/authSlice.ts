@@ -2,14 +2,7 @@ import type { StateCreator } from "zustand";
 import { apiCall, setToken } from "./api";
 import { platformSaveAuth, platformClearAuth, platformSetConnection, platformSetToken, platformApiCall, platformLoadAuth, isTauri } from "../platform";
 import type { AuthResponse } from "./api";
-
-// Dedup guard
-const _inflight = new Set<string>();
-function dedup(key: string, fn: () => Promise<void>): Promise<void> {
-  if (_inflight.has(key)) return Promise.resolve();
-  _inflight.add(key);
-  return fn().finally(() => _inflight.delete(key));
-}
+import { dedup } from './dedup';
 
 export interface SavedServer {
   url: string;
@@ -23,7 +16,8 @@ export function loadServers(): SavedServer[] {
   try { return JSON.parse((typeof localStorage !== "undefined" && localStorage.getItem("servers")) || "[]"); } catch { return []; }
 }
 function saveServers(servers: SavedServer[]) {
-  localStorage.setItem("servers", JSON.stringify(servers));
+  const safe = servers.map(({ url, username, role }) => ({ url, username, token: '', refresh_token: '', role }));
+  localStorage.setItem("servers", JSON.stringify(safe));
 }
 
 export interface AuthSlice {
@@ -125,6 +119,11 @@ export const createAuthSlice: StateCreator<AuthSlice & { mutating: boolean; toas
     set({ mutating: true } as any);
     localStorage.setItem("serverUrl", server.url);
     await platformSetConnection(server.url);
+    if (!server.token) {
+      set({ serverUrl: server.url, token: null, username: null, role: null, mutating: false } as any);
+      get().toast("Session expired — please log in again", "error");
+      return;
+    }
     await setToken(server.token);
     platformSaveAuth(JSON.stringify({ token: server.token, refresh_token: server.refresh_token, username: server.username, role: server.role })).catch(() => {
       localStorage.setItem("auth", JSON.stringify({ token: server.token, refresh_token: server.refresh_token, username: server.username, role: server.role }));

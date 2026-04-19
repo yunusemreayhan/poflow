@@ -69,6 +69,12 @@ pub(crate) fn api_limiter() -> &'static RateLimiter {
     API_LIMITER.get_or_init(|| RateLimiter::new(200, 60))
 }
 
+// Read rate limiter: 1000 requests per 60 seconds per IP (for GET/HEAD/OPTIONS)
+static READ_LIMITER: std::sync::OnceLock<RateLimiter> = std::sync::OnceLock::new();
+pub(crate) fn read_limiter() -> &'static RateLimiter {
+    READ_LIMITER.get_or_init(|| RateLimiter::new(1000, 60))
+}
+
 pub(crate) fn extract_ip(headers: &axum::http::HeaderMap) -> String {
     headers.get("x-real-ip")
         .or_else(|| headers.get("x-forwarded-for"))

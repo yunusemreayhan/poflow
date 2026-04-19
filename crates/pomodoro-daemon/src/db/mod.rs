@@ -311,6 +311,9 @@ async fn migrate(pool: &Pool) -> Result<()> {
     sqlx::query("CREATE INDEX IF NOT EXISTS idx_tasks_sort ON tasks(sort_order, id) WHERE deleted_at IS NULL").execute(pool).await.ok();
     sqlx::query("CREATE INDEX IF NOT EXISTS idx_audit_log_created_at ON audit_log(created_at)").execute(pool).await.ok();
     sqlx::query("CREATE INDEX IF NOT EXISTS idx_task_links_task ON task_links(task_id)").execute(pool).await.ok();
+    // F7: Composite indexes for common query patterns
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_tasks_deleted_user ON tasks(deleted_at, user_id)").execute(pool).await.ok();
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_tasks_deleted_project ON tasks(deleted_at, project)").execute(pool).await.ok();
 
     sqlx::query("CREATE TABLE IF NOT EXISTS labels (
         id          INTEGER PRIMARY KEY AUTOINCREMENT,

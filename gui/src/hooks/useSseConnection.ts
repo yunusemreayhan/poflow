@@ -58,6 +58,9 @@ export function useSseConnection(token: string | null) {
         if (pending.has("Rooms")) {
           window.dispatchEvent(new CustomEvent("sse-rooms"));
         }
+        if (pending.has("Notifications")) {
+          window.dispatchEvent(new CustomEvent("sse-notifications"));
+        }
         pending.clear();
       };
 
