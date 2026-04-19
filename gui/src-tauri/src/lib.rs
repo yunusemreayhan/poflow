@@ -305,14 +305,18 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .setup(|app| {
-            // U6: Register global shortcut Ctrl+Shift+P to toggle timer
-            use tauri_plugin_global_shortcut::GlobalShortcutExt;
-            let handle = app.handle().clone();
-            app.global_shortcut().on_shortcut("CmdOrCtrl+Shift+P", move |_app, _shortcut, event| {
-                if event.state == tauri_plugin_global_shortcut::ShortcutState::Pressed {
-                    let _ = handle.emit("global-timer-toggle", ());
+            // U6: Register global shortcut Ctrl+Shift+P (non-fatal)
+            {
+                use tauri_plugin_global_shortcut::GlobalShortcutExt;
+                let handle = app.handle().clone();
+                if let Err(e) = app.global_shortcut().on_shortcut("CmdOrCtrl+Shift+P", move |_app, _shortcut, event| {
+                    if event.state == tauri_plugin_global_shortcut::ShortcutState::Pressed {
+                        let _ = handle.emit("global-timer-toggle", ());
+                    }
+                }) {
+                    eprintln!("Global shortcut registration failed (non-fatal): {e}");
                 }
-            })?;
+            }
 
             // U7: Native tray icon (non-fatal — app works without it)
             if let Err(e) = (|| -> Result<(), Box<dyn std::error::Error>> {

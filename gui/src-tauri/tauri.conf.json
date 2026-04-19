@@ -11,6 +11,7 @@
     "beforeBundleCommand": "cargo build --release -p pomodoro-daemon 2>&1"
   },
   "app": {
+    "withGlobalTauri": true,
     "windows": [
       {
         "title": "Pomodoro",
@@ -24,7 +25,6 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:*; img-src 'self' data: blob:"
     }
   },
   "bundle": {
