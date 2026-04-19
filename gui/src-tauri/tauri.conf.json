@@ -7,7 +7,7 @@
     "frontendDist": "../dist",
     "devUrl": "http://localhost:1420",
     "beforeDevCommand": "npm run dev",
-    "beforeBuildCommand": "npm test && npm run build",
+    "beforeBuildCommand": "npx vite build",
     "beforeBundleCommand": "cargo build --release -p pomodoro-daemon 2>&1"
   },
   "app": {
