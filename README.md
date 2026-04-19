@@ -555,21 +555,47 @@ docker run -d -p 9090:9090 -v pomodoro-data:/data pomodoro
 # Open http://localhost:9090
 ```
 
-### From source
+### From source (Ubuntu/Debian)
+
+The install script handles everything: dependency checks, building, and installing.
 
 ```bash
+# Server + web GUI + CLI (most users)
 ./install.sh
-# Then: systemctl --user enable --now pomodoro
-# Open http://localhost:9090
+
+# Server + web GUI + CLI + Tauri desktop app
+./install.sh --desktop
+
+# Just install system dependencies (useful for CI)
+./install.sh --deps-only
 ```
 
-### .deb package
+After install:
+```bash
+systemctl --user daemon-reload
+systemctl --user enable --now pomodoro
+# Web GUI: http://localhost:9090
+# Desktop: pomodoro-gui
+# CLI: pomo --help
+```
+
+**Prerequisites:** Rust (via rustup), Node.js 20+, npm. For `--desktop`: `cargo install tauri-cli`.
+
+**System packages** (auto-installed by the script):
+- Base: `build-essential pkg-config libssl-dev libsqlite3-dev`
+- Desktop only: `libwebkit2gtk-4.1-dev libgtk-3-dev libappindicator3-dev librsvg2-dev libjavascriptcoregtk-4.1-dev libsoup-3.0-dev`
+
+### .deb package (server + web GUI only)
 
 ```bash
-cd gui && npm ci && npm run build && cd ..
+cd gui && npm ci && npx vite build && cd ..
 cargo deb -p pomodoro-daemon
 sudo dpkg -i target/debian/pomodoro-daemon_*.deb
 ```
+
+### ⚠️ Desktop GUI build note
+
+The desktop app **must** be built with `cargo tauri build`, not `cargo build -p pomodoro-gui`. Regular `cargo build` produces a dev binary that tries to connect to `localhost:1420` (Vite dev server) instead of using the embedded frontend. The install script handles this automatically with `--desktop`.
 
 ## Testing
 
