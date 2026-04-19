@@ -9,6 +9,7 @@
     "core:default",
     "dialog:default",
     "dialog:allow-save",
-    "global-shortcut:default"
+    "global-shortcut:default",
+    "core:tray:default"
   ]
 }

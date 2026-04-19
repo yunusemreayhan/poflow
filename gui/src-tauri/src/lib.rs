@@ -314,35 +314,39 @@ pub fn run() {
                 }
             })?;
 
-            // U7: Native tray icon
-            use tauri::tray::TrayIconBuilder;
-            use tauri::menu::{MenuBuilder, MenuItemBuilder};
-            let handle2 = app.handle().clone();
-            let handle3 = app.handle().clone();
-            let toggle_item = MenuItemBuilder::with_id("toggle", "Start/Pause").build(app)?;
-            let quit_item = MenuItemBuilder::with_id("quit", "Quit").build(app)?;
-            let menu = MenuBuilder::new(app).items(&[&toggle_item, &quit_item]).build()?;
-            TrayIconBuilder::new()
-                .icon(app.default_window_icon().cloned().unwrap_or_else(|| tauri::image::Image::new(&[], 0, 0)))
-                .tooltip("Pomodoro")
-                .menu(&menu)
-                .on_menu_event(move |_app, event: tauri::menu::MenuEvent| {
-                    match event.id().as_ref() {
-                        "toggle" => { let _ = handle2.emit("global-timer-toggle", ()); }
-                        "quit" => { std::process::exit(0); }
-                        _ => {}
-                    }
-                })
-                .on_tray_icon_event(move |_tray, event| {
-                    if let tauri::tray::TrayIconEvent::Click { button: tauri::tray::MouseButton::Left, .. } = event {
-                        // Show/focus the main window on left click
-                        if let Some(w) = handle3.get_webview_window("main") {
-                            let _ = w.show();
-                            let _ = w.set_focus();
+            // U7: Native tray icon (non-fatal — app works without it)
+            if let Err(e) = (|| -> Result<(), Box<dyn std::error::Error>> {
+                use tauri::tray::TrayIconBuilder;
+                use tauri::menu::{MenuBuilder, MenuItemBuilder};
+                let handle2 = app.handle().clone();
+                let handle3 = app.handle().clone();
+                let toggle_item = MenuItemBuilder::with_id("toggle", "Start/Pause").build(app)?;
+                let quit_item = MenuItemBuilder::with_id("quit", "Quit").build(app)?;
+                let menu = MenuBuilder::new(app).items(&[&toggle_item, &quit_item]).build()?;
+                TrayIconBuilder::new()
+                    .icon(app.default_window_icon().cloned().unwrap_or_else(|| tauri::image::Image::new(&[], 0, 0)))
+                    .tooltip("Pomodoro")
+                    .menu(&menu)
+                    .on_menu_event(move |_app, event: tauri::menu::MenuEvent| {
+                        match event.id().as_ref() {
+                            "toggle" => { let _ = handle2.emit("global-timer-toggle", ()); }
+                            "quit" => { std::process::exit(0); }
+                            _ => {}
                         }
-                    }
-                })
-                .build(app)?;
+                    })
+                    .on_tray_icon_event(move |_tray, event| {
+                        if let tauri::tray::TrayIconEvent::Click { button: tauri::tray::MouseButton::Left, .. } = event {
+                            if let Some(w) = handle3.get_webview_window("main") {
+                                let _ = w.show();
+                                let _ = w.set_focus();
+                            }
+                        }
+                    })
+                    .build(app)?;
+                Ok(())
+            })() {
+                eprintln!("Tray icon setup failed (non-fatal): {e}");
+            }
 
             Ok(())
         })

@@ -94,14 +94,16 @@ export const createAuthSlice: StateCreator<AuthSlice & { mutating: boolean; toas
         if (auth.token) {
           await setToken(auth.token);
           set({ token: auth.token, username: auth.username, role: auth.role });
-          // Merge into savedServers if not already present
+          // Merge into savedServers — update tokens from encrypted store
           const sUrl = url || get().serverUrl;
           const servers = loadServers();
-          if (!servers.some(s => s.url === sUrl && s.username === auth.username)) {
+          const idx = servers.findIndex(s => s.url === sUrl && s.username === auth.username);
+          if (idx >= 0) {
+            servers[idx] = { ...servers[idx], token: auth.token, refresh_token: auth.refresh_token || "" };
+          } else {
             servers.unshift({ url: sUrl, username: auth.username, token: auth.token, refresh_token: auth.refresh_token || "", role: auth.role });
-            saveServers(servers);
-            set({ savedServers: servers });
           }
+          set({ savedServers: servers });
         }
       } catch { /* corrupt data — ignore */ }
     }
