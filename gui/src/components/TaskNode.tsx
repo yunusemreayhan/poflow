@@ -142,9 +142,9 @@ export default function TaskNode({ node, depth, onView, selectMode, onSelect, se
           const now = Date.now();
           if (!ctxSprints.length || ctxCacheTime < now - 5000) {
             const [sprints, planning, users] = await Promise.all([
-              apiCall<{ id: number; name: string; status: string }[]>("GET", "/api/sprints?status=active").catch(() => []),
-              apiCall<{ id: number; name: string; status: string }[]>("GET", "/api/sprints?status=planning").catch(() => []),
-              apiCall<{id: number; username: string}[]>("GET", "/api/users").catch(() => []),
+              apiCall<{ id: number; name: string; status: string }[]>("GET", "/api/sprints?status=active").catch(e => { console.error("Load active sprints:", e); return []; }),
+              apiCall<{ id: number; name: string; status: string }[]>("GET", "/api/sprints?status=planning").catch(e => { console.error("Load planning sprints:", e); return []; }),
+              apiCall<{id: number; username: string}[]>("GET", "/api/users").catch(e => { console.error("Load users:", e); return []; }),
             ]);
             setCtxSprints([...sprints, ...planning]);
             setCtxUsers(users.map(u => u.username));
@@ -193,15 +193,18 @@ export default function TaskNode({ node, depth, onView, selectMode, onSelect, se
           />
         )}
         <button onClick={() => setExpanded(!expanded)}
-          className={`w-6 h-6 flex items-center justify-center rounded transition-all shrink-0 ${hasChildren ? "text-white/40 hover:text-white" : "text-transparent"}`}>
+          className={`w-6 h-6 flex items-center justify-center rounded transition-all shrink-0 ${hasChildren ? "text-white/40 hover:text-white" : "text-transparent"}`}
+          aria-label={expanded ? "Collapse" : "Expand"} aria-expanded={expanded}>
           <ChevronRight size={14} className={`transition-transform ${expanded ? "rotate-90" : ""}`} />
         </button>
         <button onClick={() => isOwner && updateTask(t.id, { status: t.status === "completed" ? "backlog" : "completed" })}
-          className={`shrink-0 transition-colors ${isOwner ? "text-white/40 hover:text-white" : "text-white/20 cursor-default"}`}>
+          className={`shrink-0 transition-colors ${isOwner ? "text-white/40 hover:text-white" : "text-white/20 cursor-default"}`}
+          aria-label={t.status === "completed" ? "Mark incomplete" : "Mark complete"}>
           {t.status === "completed" ? <CheckCircle size={18} className="text-[var(--color-success)]" /> : <Circle size={18} />}
         </button>
         {isProject && <span className="shrink-0 text-white/40">{expanded ? <FolderOpen size={16} /> : <Folder size={16} />}</span>}
         <div className="w-2 h-2 rounded-full shrink-0" style={{ background: PRIORITY_COLORS[t.priority] ?? "#6C7A89" }} title={`Priority ${t.priority}`} aria-label={`Priority ${t.priority}`} />
+        {t.priority > 0 && <span className="text-[9px] font-mono text-white/30 shrink-0 -ml-1">P{t.priority}</span>}
         <span className={`text-[10px] px-1.5 py-0.5 rounded shrink-0 ${
           t.status === "completed" ? "bg-[var(--color-success)]/20 text-[var(--color-success)]"
           : t.status === "active" ? "bg-[var(--color-work)]/20 text-[var(--color-work)]"
@@ -266,15 +269,15 @@ export default function TaskNode({ node, depth, onView, selectMode, onSelect, se
         )}
 
         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-          <button onClick={() => setCommenting(!commenting)} className="w-7 h-7 flex items-center justify-center rounded-lg text-white/30 hover:text-[var(--color-accent)] hover:bg-white/5 transition-all" title="Comment"><MessageSquare size={14} /></button>
-          <button onClick={() => setTimeReporting(!timeReporting)} className="w-7 h-7 flex items-center justify-center rounded-lg text-white/30 hover:text-[var(--color-work)] hover:bg-white/5 transition-all" title="Log time"><Clock size={14} /></button>
-          <button onClick={() => { setEditingDesc(!editingDesc); setDescDraft(t.description || ""); }} className={`w-7 h-7 flex items-center justify-center rounded-lg transition-all ${isOwner ? "text-white/30 hover:text-[var(--color-accent)] hover:bg-white/5" : "hidden"}`} title="Edit description"><FileText size={14} /></button>
-          <button onClick={() => onView(t.id)} className="w-7 h-7 flex items-center justify-center rounded-lg text-white/30 hover:text-[var(--color-accent)] hover:bg-white/5 transition-all" title="View & Export"><Eye size={14} /></button>
-          <button onClick={() => setAdding(!adding)} className="w-7 h-7 flex items-center justify-center rounded-lg text-white/30 hover:text-[var(--color-accent)] hover:bg-white/5 transition-all" title="Add subtask"><Plus size={14} /></button>
+          <button onClick={() => setCommenting(!commenting)} className="w-7 h-7 flex items-center justify-center rounded-lg text-white/30 hover:text-[var(--color-accent)] hover:bg-white/5 transition-all" title="Comment" aria-label="Comment"><MessageSquare size={14} /></button>
+          <button onClick={() => setTimeReporting(!timeReporting)} className="w-7 h-7 flex items-center justify-center rounded-lg text-white/30 hover:text-[var(--color-work)] hover:bg-white/5 transition-all" title="Log time" aria-label="Log time"><Clock size={14} /></button>
+          <button onClick={() => { setEditingDesc(!editingDesc); setDescDraft(t.description || ""); }} className={`w-7 h-7 flex items-center justify-center rounded-lg transition-all ${isOwner ? "text-white/30 hover:text-[var(--color-accent)] hover:bg-white/5" : "hidden"}`} title="Edit description" aria-label="Edit description"><FileText size={14} /></button>
+          <button onClick={() => onView(t.id)} className="w-7 h-7 flex items-center justify-center rounded-lg text-white/30 hover:text-[var(--color-accent)] hover:bg-white/5 transition-all" title="View & Export" aria-label="View & Export"><Eye size={14} /></button>
+          <button onClick={() => setAdding(!adding)} className="w-7 h-7 flex items-center justify-center rounded-lg text-white/30 hover:text-[var(--color-accent)] hover:bg-white/5 transition-all" title="Add subtask" aria-label="Add subtask"><Plus size={14} /></button>
           {t.status !== "completed" && (!config?.leaf_only_mode || node.children.length === 0) && (
-            <button onClick={() => start(t.id)} className="w-7 h-7 flex items-center justify-center rounded-lg text-white/30 hover:text-[var(--color-work)] hover:bg-white/5 transition-all" title="Focus on this"><Play size={14} /></button>
+            <button onClick={() => start(t.id)} className="w-7 h-7 flex items-center justify-center rounded-lg text-white/30 hover:text-[var(--color-work)] hover:bg-white/5 transition-all" title="Focus on this" aria-label="Focus on this task"><Play size={14} /></button>
           )}
-          <button onClick={handleDelete} className={`w-7 h-7 flex items-center justify-center rounded-lg transition-all ${isOwner ? "text-white/30 hover:text-[var(--color-danger)] hover:bg-white/5" : "hidden"}`} title={isActive ? "Stop timer first" : "Delete"}><Trash2 size={14} /></button>
+          <button onClick={handleDelete} className={`w-7 h-7 flex items-center justify-center rounded-lg transition-all ${isOwner ? "text-white/30 hover:text-[var(--color-danger)] hover:bg-white/5" : "hidden"}`} title={isActive ? "Stop timer first" : "Delete"} aria-label={isActive ? "Stop timer first" : "Delete task"}><Trash2 size={14} /></button>
         </div>
       </motion.div>
 
@@ -286,7 +289,7 @@ export default function TaskNode({ node, depth, onView, selectMode, onSelect, se
                 onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); if (e.key === "Escape") { setAdding(false); setNewTitle(""); } }}
                 placeholder={`Add subtask to "${t.title}"...`} aria-label={`Add subtask to ${t.title}`}
                 className="flex-1 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-white/30 px-3 py-2 outline-none focus:border-[var(--color-accent)]" autoFocus />
-              <button onClick={handleAdd} className="w-8 h-8 flex items-center justify-center rounded-lg bg-[var(--color-accent)] text-white shrink-0"><Plus size={14} /></button>
+              <button onClick={handleAdd} className="w-8 h-8 flex items-center justify-center rounded-lg bg-[var(--color-accent)] text-white shrink-0" aria-label="Submit subtask"><Plus size={14} /></button>
             </div>
           </motion.div>
         )}
@@ -314,7 +317,7 @@ export default function TaskNode({ node, depth, onView, selectMode, onSelect, se
       )}
 
       <InlineTimeReport taskId={t.id} depth={depth} show={timeReporting} onClose={() => setTimeReporting(false)}
-        onLogged={(h) => { setTotalHours(prev => prev + h); apiCall<string[]>("GET", `/api/tasks/${t.id}/assignees`).then(setAssignees).catch(() => {}); }} />
+        onLogged={(h) => { setTotalHours(prev => prev + h); apiCall<string[]>("GET", `/api/tasks/${t.id}/assignees`).then(setAssignees).catch(e => console.error("Load assignees:", e)); }} />
 
       <AnimatePresence>
         {commenting && (

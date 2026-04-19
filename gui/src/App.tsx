@@ -60,12 +60,12 @@ function Sidebar() {
     if (cur) {
       const updated = { ...cur, theme: th };
       useStore.setState({ config: updated });
-      apiCall("PUT", "/api/config", updated).catch(() => {});
+      apiCall("PUT", "/api/config", updated).catch(e => console.error("Save config:", e));
     }
   };
 
   useEffect(() => {
-    apiCall<{ id: number; name: string }[]>("GET", "/api/me/teams").then(res => res && setTeams(res)).catch(() => {});
+    apiCall<{ id: number; name: string }[]>("GET", "/api/me/teams").then(res => res && setTeams(res)).catch(e => console.error("Load teams:", e));
   }, []);
 
   useEffect(() => {
@@ -267,7 +267,7 @@ export default function App() {
         <Sidebar />
       </nav>
       <main id="main-content" className="flex-1 overflow-hidden relative pb-14 md:pb-0">
-        {offline && <div className="bg-yellow-600/80 text-white text-xs text-center py-1 px-2">⚡ Offline — changes will sync when reconnected</div>}
+        {offline && <div className="bg-yellow-600/80 text-white text-xs text-center py-1 px-2" role="alert">⚡ Offline — changes will sync when reconnected</div>}
         {focusMode && (
           <button onClick={() => useStore.getState().toggleFocusMode()}
             className="absolute top-2 right-2 z-50 text-xs text-white/30 hover:text-white/60 px-2 py-1 rounded bg-white/5"
@@ -275,7 +275,7 @@ export default function App() {
         )}
         {/* Loading indicator */}
         {(loading.tasks || loading.history || loading.stats || loading.config) && (
-          <div className="absolute top-0 left-0 right-0 h-0.5 z-40 bg-[var(--color-accent)]/20 overflow-hidden">
+          <div className="absolute top-0 left-0 right-0 h-0.5 z-40 bg-[var(--color-accent)]/20 overflow-hidden" role="status" aria-label="Loading">
             <div className="h-full w-1/3 bg-[var(--color-accent)] animate-[slide_1s_ease-in-out_infinite]" />
           </div>
         )}
@@ -444,13 +444,13 @@ function NotificationBell() {
   }, [open]);
 
   useEffect(() => {
-    const poll = () => apiCall<{ count: number }>("GET", "/api/notifications/unread").then(d => d && setCount(d.count)).catch(() => {});
+    const poll = () => apiCall<{ count: number }>("GET", "/api/notifications/unread").then(d => d && setCount(d.count)).catch(e => console.error("Poll notifications:", e));
     poll();
     const id = setInterval(poll, 30000);
     return () => clearInterval(id);
   }, []);
 
-  const loadItems = () => apiCall<typeof items>("GET", "/api/notifications?limit=20").then(d => d && setItems(d)).catch(() => {});
+  const loadItems = () => apiCall<typeof items>("GET", "/api/notifications?limit=20").then(d => d && setItems(d)).catch(e => console.error("Load notifications:", e));
 
   const markRead = async () => {
     await apiCall("POST", "/api/notifications/read", {});

@@ -45,7 +45,7 @@ export default function TaskList({ selectMode, onSelect, selectedTaskId, votedTa
   useEffect(() => {
     if (search.trim().length < 2) { setFtsResults(null); return; }
     const timer = setTimeout(() => {
-      apiCall<typeof ftsResults>("GET", `/api/tasks/search?q=${encodeURIComponent(search)}&limit=20`).then(setFtsResults).catch(() => setFtsResults(null));
+      apiCall<typeof ftsResults>("GET", `/api/tasks/search?q=${encodeURIComponent(search)}&limit=20`).then(setFtsResults).catch(e => { console.error("FTS search:", e); setFtsResults(null); });
     }, 300);
     return () => clearTimeout(timer);
   }, [search]);
@@ -53,7 +53,7 @@ export default function TaskList({ selectMode, onSelect, selectedTaskId, votedTa
   useEffect(() => {
     if (bulkSelected.size > 0 && bulkSprints.length === 0) {
       apiCall<{ id: number; name: string; status: string }[]>("GET", "/api/sprints?status=active")
-        .then(s => setBulkSprints(s || [])).catch(() => {});
+        .then(s => setBulkSprints(s || [])).catch(e => console.error("Load bulk sprints:", e));
     }
   }, [bulkSelected.size]);
 
@@ -142,7 +142,7 @@ export default function TaskList({ selectMode, onSelect, selectedTaskId, votedTa
         <motion.button
           whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
           onClick={handleAddRoot}
-          className="w-9 h-9 flex items-center justify-center rounded-lg bg-[var(--color-accent)] text-white shrink-0"
+          className="w-9 h-9 flex items-center justify-center rounded-lg bg-[var(--color-accent)] text-white shrink-0" aria-label="Add task"
         >
           <Plus size={18} />
         </motion.button>
@@ -160,7 +160,7 @@ export default function TaskList({ selectMode, onSelect, selectedTaskId, votedTa
             <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
               <span className="text-[10px] text-white/30">{sorted.length} results</span>
               <button onClick={() => setSearch("")} className="text-white/30 hover:text-white/60 text-xs" aria-label="Clear search">✕</button>
-              <button onClick={saveCurrentFilter} className="text-white/30 hover:text-[var(--color-accent)] text-xs" title="Save filter">💾</button>
+              <button onClick={saveCurrentFilter} className="text-white/30 hover:text-[var(--color-accent)] text-xs" title="Save filter" aria-label="Save filter">💾</button>
               {savingFilter && <input autoFocus value={filterNameDraft} onChange={e => setFilterNameDraft(e.target.value)}
                 onKeyDown={e => { if (e.key === "Enter") saveCurrentFilter(); if (e.key === "Escape") setSavingFilter(false); }}
                 onBlur={() => setSavingFilter(false)}
@@ -174,9 +174,9 @@ export default function TaskList({ selectMode, onSelect, selectedTaskId, votedTa
         </button>
         <Select value={sortBy} onChange={v => setSortBy(v as typeof sortBy)} ariaLabel="Sort tasks"
           options={[{value:"order",label:"Manual"},{value:"priority",label:"Priority"},{value:"due",label:"Due date"},{value:"updated",label:"Updated"}]} />
-        <button onClick={() => setTreeKey(k => k + 1)} title="Expand all"
+        <button onClick={() => setTreeKey(k => k + 1)} title="Expand all" aria-label="Expand all"
           className="shrink-0 px-2 py-1 rounded-full text-xs bg-white/5 text-white/40 hover:text-white/60">⊞</button>
-        <button onClick={() => setViewMode(v => v === "tree" ? "table" : "tree")} title={viewMode === "tree" ? "Table view" : "Tree view"}
+        <button onClick={() => setViewMode(v => v === "tree" ? "table" : "tree")} title={viewMode === "tree" ? "Table view" : "Tree view"} aria-label={viewMode === "tree" ? "Switch to table view" : "Switch to tree view"}
           className="shrink-0 px-2 py-1 rounded-full text-xs bg-white/5 text-white/40 hover:text-white/60">{viewMode === "tree" ? "☰" : "🌳"}</button>
       </div>
       {savedFilters.length > 0 && (
@@ -186,7 +186,7 @@ export default function TaskList({ selectMode, onSelect, selectedTaskId, votedTa
               className="text-[10px] px-2 py-0.5 rounded-full bg-white/5 text-white/40 hover:text-white/60 flex items-center gap-1">
               {sf.name}
               <span onClick={e => { e.stopPropagation(); const next = savedFilters.filter((_, j) => j !== i); setSavedFilters(next); localStorage.setItem("pomo_saved_filters", JSON.stringify(next)); }}
-                className="hover:text-red-400">✕</span>
+                className="hover:text-red-400" role="button" aria-label={`Remove ${sf.name} filter`} tabIndex={0} onKeyDown={e => { if (e.key === "Enter") { e.stopPropagation(); const next = savedFilters.filter((_, j) => j !== i); setSavedFilters(next); localStorage.setItem("pomo_saved_filters", JSON.stringify(next)); } }}>✕</span>
             </button>
           ))}
         </div>
@@ -324,7 +324,7 @@ export default function TaskList({ selectMode, onSelect, selectedTaskId, votedTa
           </div>
         )}
         {sorted.length === 0 && loading && (
-          <div className="space-y-2 py-4">
+          <div className="space-y-2 py-4" role="status" aria-label="Loading tasks">
             {[1,2,3].map(i => <div key={i} className="h-10 rounded-lg bg-white/5 animate-pulse" />)}
           </div>
         )}

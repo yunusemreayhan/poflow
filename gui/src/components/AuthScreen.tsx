@@ -67,9 +67,9 @@ export default function AuthScreen() {
                   className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white outline-none focus:border-[var(--color-accent)] font-mono"
                   autoFocus />
                 <button type="button" onClick={() => { try { new URL(serverDraft); setServerUrl(serverDraft); setEditingServer(false); } catch { setError("Invalid URL format"); } }}
-                  className="text-xs px-2 py-1 rounded bg-[var(--color-accent)] text-white">✓</button>
+                  className="text-xs px-2 py-1 rounded bg-[var(--color-accent)] text-white" aria-label="Confirm server URL">✓</button>
                 <button type="button" onClick={() => { setServerDraft(serverUrl); setEditingServer(false); }}
-                  className="text-xs px-2 py-1 rounded bg-white/10 text-white/60">✕</button>
+                  className="text-xs px-2 py-1 rounded bg-white/10 text-white/60" aria-label="Cancel editing">✕</button>
               </div>
             ) : (
               <button onClick={() => setEditingServer(true)}
@@ -150,7 +150,7 @@ export default function AuthScreen() {
                     <span className={`text-[10px] px-1 rounded ${s.role === "root" ? "text-[var(--color-accent)] bg-[var(--color-accent)]/10" : "text-white/20 bg-white/5"}`}>{s.role}</span>
                   </button>
                   <button onClick={() => removeServer(s.url, s.username)}
-                    className="opacity-0 group-hover:opacity-100 w-6 h-6 flex items-center justify-center text-white/30 hover:text-[var(--color-danger)] transition-all shrink-0">
+                    className="opacity-0 group-hover:opacity-100 w-6 h-6 flex items-center justify-center text-white/30 hover:text-[var(--color-danger)] transition-all shrink-0" aria-label={`Remove ${s.username} server`}>
                     <Trash2 size={12} />
                   </button>
                 </div>

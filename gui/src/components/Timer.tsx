@@ -16,7 +16,7 @@ const PHASE_COLORS: Record<string, string> = {
 };
 
 function playSound(file: string) {
-  try { new Audio(`/${file}`).play().catch(() => {}); } catch { /* ignore */ }
+  try { new Audio(`/${file}`).play().catch(e => console.debug("Audio play failed:", e)); } catch { /* ignore */ }
 }
 
 function sendNotification(title: string, body: string) {
@@ -92,7 +92,7 @@ export default function Timer() {
   // Request notification permission when enabled
   useEffect(() => {
     if (config?.notification_enabled && typeof Notification !== "undefined" && Notification.permission === "default") {
-      Notification.requestPermission().catch(() => {});
+      Notification.requestPermission().catch(e => console.debug("Notification permission:", e));
     }
   }, [config?.notification_enabled]);
 
@@ -329,7 +329,7 @@ export default function Timer() {
             </motion.button>
             <motion.button
               whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-              onClick={stop}
+              onClick={stop} aria-label="Stop"
               className="glass glass-hover w-12 h-12 flex items-center justify-center rounded-full text-white/70 hover:text-white"
             >
               <Square size={22} />
