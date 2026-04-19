@@ -15,7 +15,7 @@ export default function RoadmapView() {
     apiCall<EpicGroup[]>("GET", "/api/epics").then(async (groups) => {
       const details = await Promise.all(groups.map(g => apiCall<EpicDetail>("GET", `/api/epics/${g.id}`)));
       setEpics(details);
-    }).catch(() => {});
+    }).catch(e => console.error(e));
   }, []);
 
   // For each epic, compute progress and date range from its tasks

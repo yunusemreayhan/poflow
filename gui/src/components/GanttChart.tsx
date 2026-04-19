@@ -20,7 +20,7 @@ export default function GanttChart() {
   const [zoomIdx, setZoomIdx] = useState(1);
   const [offsetWeeks, setOffsetWeeks] = useState(0);
 
-  useEffect(() => { apiCall<Dep[]>("GET", "/api/dependencies").then(setDeps).catch(() => {}); }, []);
+  useEffect(() => { apiCall<Dep[]>("GET", "/api/dependencies").then(setDeps).catch(e => console.error(e)); }, []);
 
   const dayW = DAY_W_OPTIONS[zoomIdx] ?? 20;
 

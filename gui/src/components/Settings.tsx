@@ -16,7 +16,7 @@ function PanelIndicatorToggle() {
   const [running, setRunning] = useState(false);
   const [loading, setLoading] = useState(false);
   const check = useCallback(() => {
-    platformIndicatorStatus().then(setRunning).catch(() => {});
+    platformIndicatorStatus().then(setRunning).catch(e => console.error(e));
   }, []);
   useEffect(() => { check(); const id = setInterval(check, 5000); return () => clearInterval(id); }, [check]);
   const toggle = async () => {
@@ -82,7 +82,7 @@ function Toggle({ value, onChange, label }: { value: boolean; onChange: (v: bool
 function AdminPanel() {
   const [users, setUsers] = useState<User[]>([]);
 
-  const load = () => { apiCall<User[]>("GET", "/api/admin/users").then(u => u && setUsers(u)).catch(() => {}); };
+  const load = () => { apiCall<User[]>("GET", "/api/admin/users").then(u => u && setUsers(u)).catch(e => console.error(e)); };
   useEffect(load, []);
 
   const toggleRole = async (u: User) => {

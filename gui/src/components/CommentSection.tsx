@@ -43,7 +43,7 @@ export default function CommentSection({ taskId, sessionId }: { taskId: number; 
           <div key={c.id} className="flex gap-2">
             <input value={editText} onChange={e => setEditText(e.target.value)} autoFocus
               onKeyDown={e => {
-                if (e.key === "Enter" && editText.trim()) { apiCall("PUT", `/api/comments/${c.id}`, { content: editText.trim() }).then(() => { setEditingId(null); load(); }).catch(() => {}); }
+                if (e.key === "Enter" && editText.trim()) { apiCall("PUT", `/api/comments/${c.id}`, { content: editText.trim() }).then(() => { setEditingId(null); load(); }).catch(e => console.error(e)); }
                 if (e.key === "Escape") setEditingId(null);
               }}
               className="flex-1 bg-white/5 border border-[var(--color-accent)] rounded text-xs text-white px-2 py-1 outline-none" />

@@ -179,7 +179,7 @@ export function VelocityChart() {
     apiCall<{ sprint: string; points: number; hours: number }[]>("GET", "/api/sprints/velocity")
       .then(v => {
         if (v) setData(v.map(d => ({ sprint: d.sprint, points: d.points, hours: d.hours })));
-      }).catch(() => {});
+      }).catch(e => console.error(e));
   }, []);
 
   if (data.length < 2) return null;

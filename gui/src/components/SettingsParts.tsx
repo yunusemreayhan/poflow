@@ -12,7 +12,7 @@ export function TemplateManager() {
   const [priority, setPriority] = useState(3);
   const [estimated, setEstimated] = useState(1);
 
-  const load = () => apiCall<Template[]>("GET", "/api/templates").then(setTemplates).catch(() => {});
+  const load = () => apiCall<Template[]>("GET", "/api/templates").then(setTemplates).catch(e => console.error(e));
   useEffect(() => { void load(); }, []);
 
   const create = async () => {
@@ -75,7 +75,7 @@ export function WebhookManager() {
   const [url, setUrl] = useState("");
   const [events, setEvents] = useState("*");
 
-  const load = () => apiCall<Webhook[]>("GET", "/api/webhooks").then(setHooks).catch(() => {});
+  const load = () => apiCall<Webhook[]>("GET", "/api/webhooks").then(setHooks).catch(e => console.error(e));
   useEffect(() => { void load(); }, []);
 
   const create = async () => {
@@ -159,7 +159,7 @@ import type { Task } from "../store/api";
 export function TrashView() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
-  const load = () => { apiCall<Task[]>("GET", "/api/tasks/trash").then(setTasks).catch(() => {}).finally(() => setLoading(false)); };
+  const load = () => { apiCall<Task[]>("GET", "/api/tasks/trash").then(setTasks).catch(e => console.error(e)).finally(() => setLoading(false)); };
   useEffect(() => { void load(); }, []);
 
   const restore = async (id: number) => {
@@ -208,7 +208,7 @@ const EVENT_LABELS: Record<string, string> = {
 
 export function NotificationPrefs() {
   const [prefs, setPrefs] = useState<NotifPref[]>([]);
-  useEffect(() => { apiCall<NotifPref[]>("GET", "/api/profile/notifications").then(p => p && setPrefs(p)).catch(() => {}); }, []);
+  useEffect(() => { apiCall<NotifPref[]>("GET", "/api/profile/notifications").then(p => p && setPrefs(p)).catch(e => console.error(e)); }, []);
 
   const toggle = async (eventType: string) => {
     const updated = prefs.map(p => p.event_type === eventType ? { ...p, enabled: !p.enabled } : p);

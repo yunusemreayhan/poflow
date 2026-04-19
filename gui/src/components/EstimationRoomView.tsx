@@ -46,7 +46,7 @@ export default function EstimationRoomView({ roomId, onBack }: { roomId: number;
   const [submitting, setSubmitting] = useState(false);
 
   const load = useCallback(() => {
-    apiCall<RoomState>("GET", `/api/rooms/${roomId}`).then(setState).catch(() => {});
+    apiCall<RoomState>("GET", `/api/rooms/${roomId}`).then(setState).catch(e => console.error(e));
   }, [roomId]);
 
   // F5: Use WebSocket for real-time room state (auto-reconnect)

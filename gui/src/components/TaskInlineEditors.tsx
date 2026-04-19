@@ -18,7 +18,7 @@ export function InlineTimeReport({ taskId, depth, show, onClose, onLogged }: Pro
 
   const loadHistory = () => {
     apiCall<{ id: number; hours: number; username: string; created_at: string; note: string | null }[]>("GET", `/api/tasks/${taskId}/time`)
-      .then(h => h && setHistory(h)).catch(() => {});
+      .then(h => h && setHistory(h)).catch(e => console.error(e));
   };
 
   const submit = async () => {

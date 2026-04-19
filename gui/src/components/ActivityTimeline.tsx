@@ -60,7 +60,7 @@ export default function ActivityTimeline() {
   const load = useCallback(() => {
     setLoading(true);
     const params = filter === "all" ? "" : `&types=${filter}`;
-    apiCall<FeedItem[]>("GET", `/api/feed?limit=100${params}`).then(setItems).catch(() => {}).finally(() => setLoading(false));
+    apiCall<FeedItem[]>("GET", `/api/feed?limit=100${params}`).then(setItems).catch(e => console.error(e)).finally(() => setLoading(false));
   }, [filter]);
 
   useEffect(() => { load(); }, [load]);

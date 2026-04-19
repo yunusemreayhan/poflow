@@ -7,7 +7,7 @@ export function TaskDependencies({ taskId, allTasks }: { taskId: number; allTask
   const t = useT();
   const [deps, setDeps] = useState<number[]>([]);
 
-  const load = () => apiCall<number[]>("GET", `/api/tasks/${taskId}/dependencies`).then(setDeps).catch(() => {});
+  const load = () => apiCall<number[]>("GET", `/api/tasks/${taskId}/dependencies`).then(setDeps).catch(e => console.error(e));
   useEffect(() => { void load(); }, [taskId]);
 
   const add = async (depId: number) => {

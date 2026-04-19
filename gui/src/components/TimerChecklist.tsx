@@ -3,10 +3,10 @@ import { apiCall } from "../store/api";
 
 export default function TimerChecklist({ taskId }: { taskId: number }) {
   const [items, setItems] = useState<{ id: number; title: string; checked: boolean }[]>([]);
-  useEffect(() => { apiCall<typeof items>("GET", `/api/tasks/${taskId}/checklist`).then(setItems).catch(() => {}); }, [taskId]);
+  useEffect(() => { apiCall<typeof items>("GET", `/api/tasks/${taskId}/checklist`).then(setItems).catch(e => console.error(e)); }, [taskId]);
   if (items.length === 0) return null;
   const toggle = async (id: number, checked: boolean) => {
-    await apiCall("PUT", `/api/checklist/${id}`, { checked: !checked }).catch(() => {});
+    await apiCall("PUT", `/api/checklist/${id}`, { checked: !checked }).catch(e => console.error(e));
     setItems(prev => prev.map(i => i.id === id ? { ...i, checked: !checked } : i));
   };
   const done = items.filter(i => i.checked).length;

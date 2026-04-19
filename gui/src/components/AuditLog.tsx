@@ -23,7 +23,7 @@ export default function AuditLog() {
 
   useEffect(() => {
     const q = filter ? `&entity_type=${filter}` : "";
-    apiCall<AuditEntry[]>("GET", `/api/audit?page=${page}&per_page=${perPage}${q}`).then(setEntries).catch(() => {});
+    apiCall<AuditEntry[]>("GET", `/api/audit?page=${page}&per_page=${perPage}${q}`).then(setEntries).catch(e => console.error(e));
   }, [filter, page]);
 
   const actionColor: Record<string, string> = {

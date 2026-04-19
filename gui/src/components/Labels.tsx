@@ -15,7 +15,7 @@ export function LabelManager() {
   const [name, setName] = useState("");
   const [color, setColor] = useState("#6366f1");
 
-  const load = () => apiCall<Label[]>("GET", "/api/labels").then(setLabels).catch(() => {});
+  const load = () => apiCall<Label[]>("GET", "/api/labels").then(setLabels).catch(e => console.error(e));
   useEffect(() => { load(); }, []);
 
   const create = async () => {
@@ -63,8 +63,8 @@ export function TaskLabelPicker({ taskId }: { taskId: number }) {
   const [taskLabels, setTaskLabels] = useState<Label[]>([]);
 
   const load = useCallback(() => {
-    apiCall<Label[]>("GET", "/api/labels").then(setAllLabels).catch(() => {});
-    apiCall<Label[]>("GET", `/api/tasks/${taskId}/labels`).then(setTaskLabels).catch(() => {});
+    apiCall<Label[]>("GET", "/api/labels").then(setAllLabels).catch(e => console.error(e));
+    apiCall<Label[]>("GET", `/api/tasks/${taskId}/labels`).then(setTaskLabels).catch(e => console.error(e));
   }, [taskId]);
   useEffect(load, [load]);
 

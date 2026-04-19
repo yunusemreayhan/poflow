@@ -21,7 +21,7 @@ export default function TeamManager() {
   const load = async () => { const t = await apiCall<Team[]>("GET", "/api/me/teams"); if (t) setTeams(t); };
   const loadDetail = async (id: number) => { const d = await apiCall<TeamDetail>("GET", `/api/teams/${id}`); if (d) setSelected(d); };
   useEffect(() => { load(); }, []);
-  useEffect(() => { apiCall<{ id: number; username: string }[]>("GET", "/api/users").then(u => u && setAllUsers(u)).catch(() => {}); }, []);
+  useEffect(() => { apiCall<{ id: number; username: string }[]>("GET", "/api/users").then(u => u && setAllUsers(u)).catch(e => console.error(e)); }, []);
 
   const create = async () => { if (!name.trim()) return; await apiCall("POST", "/api/teams", { name: name.trim() }); setName(""); setCreating(false); load(); };
   const addMember = async (userId: number) => { if (!selected) return; await apiCall("POST", `/api/teams/${selected.team.id}/members`, { user_id: userId }); loadDetail(selected.team.id); };

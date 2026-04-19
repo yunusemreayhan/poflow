@@ -35,7 +35,7 @@ export function BoardView({ board, reload, wipLimit: wipLimitProp }: { board: Sp
         }
       }
       setBlockedBy(result);
-    }).catch(() => {});
+    }).catch(e => console.error(e));
   }, [board]);
 
   const WIP_LIMIT = wipLimitProp ?? 5;

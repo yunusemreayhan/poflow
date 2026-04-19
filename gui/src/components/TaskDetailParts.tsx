@@ -10,7 +10,7 @@ export function TaskActivityFeed({ taskId }: { taskId: number }) {
   const [show, setShow] = useState(false);
 
   useEffect(() => {
-    if (show) apiCall<AuditEntry[]>("GET", `/api/audit?entity_type=task&entity_id=${taskId}&per_page=50`).then(e => setEntries(e || [])).catch(() => {});
+    if (show) apiCall<AuditEntry[]>("GET", `/api/audit?entity_type=task&entity_id=${taskId}&per_page=50`).then(e => setEntries(e || [])).catch(e => console.error(e));
   }, [show, taskId]);
 
   const icon = (a: string) => a === "create" ? "🆕" : a === "update" ? "✏️" : a === "delete" ? "🗑" : "📋";
@@ -59,7 +59,7 @@ function AuthImage({ id, alt }: { id: number; alt: string }) {
         headers: { "authorization": `Bearer ${token}`, "x-requested-with": "PomodoroGUI" },
       });
       if (r.ok) { const b = await r.blob(); url = URL.createObjectURL(b); setSrc(url); }
-    })().catch(() => {});
+    })().catch(e => console.error(e));
     return () => { if (url) URL.revokeObjectURL(url); };
   }, [id]);
   if (!src) return null;
@@ -70,7 +70,7 @@ export function TaskAttachments({ taskId }: { taskId: number }) {
   const [atts, setAtts] = useState<Attachment[]>([]);
   const [uploading, setUploading] = useState(false);
 
-  const load = () => apiCall<Attachment[]>("GET", `/api/tasks/${taskId}/attachments`).then(setAtts).catch(() => {});
+  const load = () => apiCall<Attachment[]>("GET", `/api/tasks/${taskId}/attachments`).then(setAtts).catch(e => console.error(e));
   useEffect(() => { void load(); }, [taskId]);
 
   const upload = async (file: File) => {
@@ -158,7 +158,7 @@ import type { Session } from "../store/api";
 export function TaskTimeChart({ taskId }: { taskId: number }) {
   const [sessions, setSessions] = useState<Session[]>([]);
   useEffect(() => {
-    apiCall<Session[]>("GET", `/api/tasks/${taskId}/sessions`).then(s => s && setSessions(s)).catch(() => {});
+    apiCall<Session[]>("GET", `/api/tasks/${taskId}/sessions`).then(s => s && setSessions(s)).catch(e => console.error(e));
   }, [taskId]);
 
   if (sessions.length === 0) return null;

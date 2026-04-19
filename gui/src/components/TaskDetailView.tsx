@@ -15,7 +15,7 @@ import { computeRollup } from "../rollup";
 function TaskChecklist({ taskId, canEdit }: { taskId: number; canEdit: boolean }) {
   const [items, setItems] = useState<{ id: number; title: string; checked: boolean; sort_order: number }[]>([]);
   const [newTitle, setNewTitle] = useState("");
-  useEffect(() => { apiCall<typeof items>("GET", `/api/tasks/${taskId}/checklist`).then(setItems).catch(() => {}); }, [taskId]);
+  useEffect(() => { apiCall<typeof items>("GET", `/api/tasks/${taskId}/checklist`).then(setItems).catch(e => console.error(e)); }, [taskId]);
   const toggle = async (id: number, checked: boolean) => {
     await apiCall("PUT", `/api/checklist/${id}`, { checked: !checked });
     setItems(prev => prev.map(i => i.id === id ? { ...i, checked: !checked } : i));
@@ -148,8 +148,8 @@ function DetailNode({ detail, depth, onRefresh, hoursMap }: { detail: TaskDetail
       apiCall<string[]>("GET", `/api/tasks/${t.id}/assignees`).catch(() => [] as string[]),
       allUsers.length ? Promise.resolve(allUsers) : apiCall<string[]>("GET", "/api/users").catch(() => [] as string[]),
       apiCall<string[]>("GET", `/api/tasks/${t.id}/burn-users`).catch(() => [] as string[]),
-    ]).then(([tr, a, u, bu]) => { setTimeReports(tr); setAssignees(a); setAllUsers(u); setBurnUsers(bu); }).catch(() => {});
-    apiCall<number[]>("GET", `/api/tasks/${t.id}/dependencies`).then(d => d && setDeps(d)).catch(() => {});
+    ]).then(([tr, a, u, bu]) => { setTimeReports(tr); setAssignees(a); setAllUsers(u); setBurnUsers(bu); }).catch(e => console.error(e));
+    apiCall<number[]>("GET", `/api/tasks/${t.id}/dependencies`).then(d => d && setDeps(d)).catch(e => console.error(e));
   }, [t.id]);
 
   const saveField = (field: string, value: string) => {
@@ -165,19 +165,19 @@ function DetailNode({ detail, depth, onRefresh, hoursMap }: { detail: TaskDetail
     if (!h || h <= 0) return;
     await apiCall("POST", `/api/tasks/${t.id}/time`, { hours: h, description: reportDesc || null });
     setReportHours(""); setReportDesc("");
-    apiCall<TimeReport[]>("GET", `/api/tasks/${t.id}/time`).then(setTimeReports).catch(() => {});
-    apiCall<string[]>("GET", `/api/tasks/${t.id}/assignees`).then(setAssignees).catch(() => {});
+    apiCall<TimeReport[]>("GET", `/api/tasks/${t.id}/time`).then(setTimeReports).catch(e => console.error(e));
+    apiCall<string[]>("GET", `/api/tasks/${t.id}/assignees`).then(setAssignees).catch(e => console.error(e));
   };
 
   const addAssignee = async (username: string) => {
     if (!username) return;
     await apiCall("POST", `/api/tasks/${t.id}/assignees`, { username });
-    apiCall<string[]>("GET", `/api/tasks/${t.id}/assignees`).then(setAssignees).catch(() => {});
+    apiCall<string[]>("GET", `/api/tasks/${t.id}/assignees`).then(setAssignees).catch(e => console.error(e));
   };
 
   const removeAssignee = async (u: string) => {
     await apiCall("DELETE", `/api/tasks/${t.id}/assignees/${u}`);
-    apiCall<string[]>("GET", `/api/tasks/${t.id}/assignees`).then(setAssignees).catch(() => {});
+    apiCall<string[]>("GET", `/api/tasks/${t.id}/assignees`).then(setAssignees).catch(e => console.error(e));
   };
 
   return (
@@ -458,7 +458,7 @@ function DetailNode({ detail, depth, onRefresh, hoursMap }: { detail: TaskDetail
         <button onClick={() => {
             setShowVotes(!showVotes);
             if (!showVotes && taskVotes.length === 0) {
-              apiCall<{ username: string; value: number | null; room_id: number }[]>("GET", `/api/tasks/${t.id}/votes`).then(setTaskVotes).catch(() => {});
+              apiCall<{ username: string; value: number | null; room_id: number }[]>("GET", `/api/tasks/${t.id}/votes`).then(setTaskVotes).catch(e => console.error(e));
             }
           }}
           className="flex items-center gap-1 text-xs text-white/40 hover:text-white/70 transition-colors mb-2">
@@ -525,7 +525,7 @@ export default function TaskDetailView({ taskId, onBack, onNavigate }: { taskId:
   }, []);
 
   const load = useCallback(() => {
-    getTaskDetail(taskId).then((d) => { setDetail(d); loadHoursMap(d); }).catch(() => {});
+    getTaskDetail(taskId).then((d) => { setDetail(d); loadHoursMap(d); }).catch(e => console.error(e));
   }, [taskId, getTaskDetail, loadHoursMap]);
 
   useEffect(load, [load]);

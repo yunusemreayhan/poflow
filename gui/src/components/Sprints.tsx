@@ -276,7 +276,7 @@ function SprintView({ id, onBack }: { id: number; onBack: () => void }) {
                   const marker = "[GOAL MET]";
                   const notes = s.retro_notes || "";
                   const updated = e.target.checked ? `${marker}\n${notes}` : notes.replace(`${marker}\n`, "").replace(marker, "");
-                  apiCall("PUT", `/api/sprints/${id}`, { retro_notes: updated || null }).then(() => load()).catch(() => {});
+                  apiCall("PUT", `/api/sprints/${id}`, { retro_notes: updated || null }).then(() => load()).catch(e => console.error(e));
                 }}
                 className="accent-[var(--color-accent)]" />
               Goal met: {s.goal}
@@ -287,7 +287,7 @@ function SprintView({ id, onBack }: { id: number; onBack: () => void }) {
             {!s.retro_notes && (
               <button onClick={() => {
                 const template = "## What went well\n- \n\n## What to improve\n- \n\n## Action items\n- [ ] ";
-                apiCall("PUT", `/api/sprints/${id}`, { retro_notes: template }).then(() => load()).catch(() => {});
+                apiCall("PUT", `/api/sprints/${id}`, { retro_notes: template }).then(() => load()).catch(e => console.error(e));
               }} className="text-[10px] text-[var(--color-accent)] hover:underline">Use template</button>
             )}
           </div>
@@ -296,7 +296,7 @@ function SprintView({ id, onBack }: { id: number; onBack: () => void }) {
             onBlur={e => {
               const val = e.target.value.trim() || null;
               if (val !== (s.retro_notes || null)) {
-                apiCall("PUT", `/api/sprints/${id}`, { retro_notes: val }).then(() => load()).catch(() => {});
+                apiCall("PUT", `/api/sprints/${id}`, { retro_notes: val }).then(() => load()).catch(e => console.error(e));
               }
             }}
             placeholder="Add retrospective notes..."

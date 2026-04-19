@@ -36,7 +36,7 @@ export default function CommandPalette() {
   useEffect(() => {
     if (!query.trim() || !open) { setResults({ tasks: [], comments: [], sprints: [] }); return; }
     const timer = setTimeout(() => {
-      apiCall<typeof results>("GET", `/api/search?q=${encodeURIComponent(query)}&limit=8`).then(r => { setResults(r); setSelected(0); }).catch(() => {});
+      apiCall<typeof results>("GET", `/api/search?q=${encodeURIComponent(query)}&limit=8`).then(r => { setResults(r); setSelected(0); }).catch(e => console.error(e));
     }, 200);
     return () => clearTimeout(timer);
   }, [query, open]);
