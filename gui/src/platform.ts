@@ -5,7 +5,12 @@
  * In Web mode, API calls go through fetch() directly to the server.
  */
 
-export const isTauri = typeof window !== "undefined" && typeof (window as any).__TAURI_INTERNALS__ !== "undefined";
+export const isTauri = typeof window !== "undefined" && (
+  typeof (window as any).__TAURI_INTERNALS__ !== "undefined" ||
+  window.location.protocol === "tauri:" ||
+  (window.location.protocol === "https:" && window.location.hostname === "tauri.localhost") ||
+  typeof (window as any).__TAURI__ !== "undefined"
+);
 
 // Current auth token (web mode keeps it in memory; Tauri mode uses Rust-side state)
 let _webToken = "";
@@ -13,17 +18,22 @@ let _webBaseUrl = "";
 
 function webBaseUrl(): string {
   if (_webBaseUrl) return _webBaseUrl;
-  // Default: same origin (daemon serves the GUI)
+  // In Tauri, webview origin (tauri://localhost) can't serve API — use daemon URL
+  if (isTauri) return "http://127.0.0.1:9090";
   return window.location.origin;
 }
 
 // ── Core API call ──────────────────────────────────────────────
 
 export async function platformApiCall<T = unknown>(method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
-  if (isTauri) {
-    const { invoke } = await import("@tauri-apps/api/core");
-    return invoke<T>("api_call", { method, path, body: body ?? null });
+  // Try Tauri invoke if IPC bridge is available
+  if ((window as any).__TAURI_INTERNALS__) {
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      return await invoke<T>("api_call", { method, path, body: body ?? null });
+    } catch { /* invoke failed — fall through to fetch */ }
   }
+  // Fallback: direct HTTP to daemon
   const url = `${webBaseUrl()}${path}`;
   const headers: Record<string, string> = { "x-requested-with": "web-gui" };
   if (_webToken) headers["authorization"] = `Bearer ${_webToken}`;
