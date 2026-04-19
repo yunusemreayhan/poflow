@@ -66,7 +66,7 @@ pub async fn instantiate_template(State(engine): State<AppState>, claims: Claims
     let estimated_hours = data["estimated_hours"].as_f64().unwrap_or(0.0).max(0.0);
     let t = db::create_task(&engine.pool, db::CreateTaskOpts {
         user_id: claims.user_id, parent_id: None, title: &title, description: desc.as_deref(),
-        project: project.as_deref(), tags: tags.as_deref(), priority, estimated,
+        project: project.as_deref(), project_id: None, tags: tags.as_deref(), priority, estimated,
         estimated_hours, remaining_points: 0.0, due_date: due_date.as_deref(),
     }).await.map_err(internal)?;
 

@@ -29,7 +29,7 @@ pub async fn duplicate_task(State(engine): State<AppState>, claims: Claims, Path
     let t = db::create_task(&engine.pool, db::CreateTaskOpts {
         user_id: claims.user_id, parent_id: task.parent_id,
         title: &format!("{} (copy)", task.title), description: task.description.as_deref(),
-        project: task.project.as_deref(), tags: task.tags.as_deref(),
+        project: task.project.as_deref(), project_id: task.project_id, tags: task.tags.as_deref(),
         priority: task.priority as i64, estimated: task.estimated as i64,
         estimated_hours: task.estimated_hours, remaining_points: task.remaining_points, due_date: task.due_date.as_deref(),
     }).await.map_err(internal)?;
@@ -352,7 +352,7 @@ pub async fn create_task(State(engine): State<AppState>, claims: Claims, Json(re
     }
     let t = db::create_task(&engine.pool, db::CreateTaskOpts {
         user_id: claims.user_id, parent_id: req.parent_id, title: req.title.trim(), description: req.description.as_deref(),
-        project: req.project.as_deref(), tags: req.tags.as_deref(), priority, estimated,
+        project: req.project.as_deref(), project_id: req.project_id, tags: req.tags.as_deref(), priority, estimated,
         estimated_hours: req.estimated_hours.unwrap_or(0.0), remaining_points: req.remaining_points.unwrap_or(0.0), due_date: req.due_date.as_deref(),
     })
         .await.map_err(internal)?;
@@ -428,6 +428,7 @@ pub async fn update_task(State(engine): State<AppState>, claims: Claims, Path(id
         title: req.title.as_deref(),
         description: req.description.as_ref().map(|o| o.as_deref()),
         project: req.project.as_ref().map(|o| o.as_deref()),
+        project_id: req.project_id,
         tags: req.tags.as_ref().map(|o| o.as_deref()),
         priority: req.priority, estimated: req.estimated, estimated_hours: req.estimated_hours, remaining_points: req.remaining_points,
         due_date: req.due_date.as_ref().map(|o| o.as_deref()),

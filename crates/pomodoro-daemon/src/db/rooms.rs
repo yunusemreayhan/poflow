@@ -1,12 +1,12 @@
 use super::*;
 
 
-const ROOM_SELECT: &str = "SELECT r.id, r.name, r.room_type, r.estimation_unit, r.project, r.creator_id, u.username as creator, r.status, r.current_task_id, r.created_at FROM rooms r JOIN users u ON r.creator_id = u.id";
+const ROOM_SELECT: &str = "SELECT r.id, r.name, r.room_type, r.estimation_unit, r.project, r.project_id, p.name as project_name, r.creator_id, u.username as creator, r.status, r.current_task_id, r.created_at FROM rooms r JOIN users u ON r.creator_id = u.id LEFT JOIN projects p ON r.project_id = p.id";
 
-pub async fn create_room(pool: &Pool, name: &str, room_type: &str, estimation_unit: &str, project: Option<&str>, creator_id: i64) -> Result<Room> {
+pub async fn create_room(pool: &Pool, name: &str, room_type: &str, estimation_unit: &str, project: Option<&str>, project_id: Option<i64>, creator_id: i64) -> Result<Room> {
     let now = now_str();
-    let id = sqlx::query("INSERT INTO rooms (name, room_type, estimation_unit, project, creator_id, status, created_at) VALUES (?, ?, ?, ?, ?, 'lobby', ?)")
-        .bind(name).bind(room_type).bind(estimation_unit).bind(project).bind(creator_id).bind(&now)
+    let id = sqlx::query("INSERT INTO rooms (name, room_type, estimation_unit, project, project_id, creator_id, status, created_at) VALUES (?, ?, ?, ?, ?, ?, 'lobby', ?)")
+        .bind(name).bind(room_type).bind(estimation_unit).bind(project).bind(project_id).bind(creator_id).bind(&now)
         .execute(pool).await?.last_insert_rowid();
     sqlx::query("INSERT INTO room_members (room_id, user_id, role, joined_at) VALUES (?, ?, 'admin', ?)")
         .bind(id).bind(creator_id).bind(&now).execute(pool).await?;

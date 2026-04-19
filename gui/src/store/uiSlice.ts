@@ -1,6 +1,6 @@
 import type { StateCreator } from "zustand";
 import { apiCall } from "./api";
-import type { DayStat, Session, Config, Sprint } from "./api";
+import type { DayStat, Session, Config, Sprint, Project } from "./api";
 import { processSyncQueue } from "../offlineStore";
 
 let toastCounter = 0;
@@ -15,6 +15,7 @@ export interface UiSlice {
   stats: DayStat[];
   history: Session[];
   sprints: Sprint[];
+  projects: Project[];
   config: Config | null;
   toasts: { id: number; msg: string; type: "success" | "error" | "info"; onUndo?: () => void }[];
   toast: (msg: string, type?: "success" | "error" | "info", onUndo?: () => void) => void;
@@ -29,6 +30,7 @@ export interface UiSlice {
   loadStats: () => Promise<void>;
   loadHistory: () => Promise<void>;
   loadSprints: () => Promise<void>;
+  loadProjects: () => Promise<void>;
   loadConfig: () => Promise<void>;
   updateConfig: (cfg: Config) => Promise<void>;
 }
@@ -43,6 +45,7 @@ export const createUiSlice: StateCreator<UiSlice & { token: string | null; loadT
   stats: [],
   history: [],
   sprints: [],
+  projects: [],
   config: null,
   toasts: [],
   toast: (msg, type = "success", onUndo) => {
@@ -88,6 +91,12 @@ export const createUiSlice: StateCreator<UiSlice & { token: string | null; loadT
     if (!get().token) return;
     const sprints = await apiCall<Sprint[]>("GET", "/api/sprints").catch(e => { console.error("Load sprints:", e); return [] as Sprint[]; });
     set({ sprints });
+  },
+
+  loadProjects: async () => {
+    if (!get().token) return;
+    const projects = await apiCall<Project[]>("GET", "/api/projects").catch(e => { console.error("Load projects:", e); return [] as Project[]; });
+    set({ projects });
   },
 
   loadConfig: async () => {

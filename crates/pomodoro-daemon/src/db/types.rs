@@ -6,6 +6,7 @@ pub type Pool = SqlitePool;
 pub struct Task {
     pub id: i64, pub parent_id: Option<i64>, pub user_id: i64, pub user: String,
     pub title: String, pub description: Option<String>, pub project: Option<String>,
+    pub project_id: Option<i64>, pub project_name: Option<String>,
     pub tags: Option<String>, pub priority: i64, pub estimated: i64, pub actual: i64,
     pub estimated_hours: f64, pub remaining_points: f64, pub due_date: Option<String>,
     pub status: String, pub sort_order: i64, pub created_at: String, pub updated_at: String,
@@ -44,7 +45,8 @@ pub struct User {
 #[derive(Debug, Clone, FromRow, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 pub struct Room {
     pub id: i64, pub name: String, pub room_type: String, pub estimation_unit: String,
-    pub project: Option<String>, pub creator_id: i64, pub creator: String,
+    pub project: Option<String>, pub project_id: Option<i64>, pub project_name: Option<String>,
+    pub creator_id: i64, pub creator: String,
     pub status: String, pub current_task_id: Option<i64>, pub created_at: String,
 }
 
@@ -94,7 +96,9 @@ pub struct DayStat { pub date: String, pub completed: i64, pub interrupted: i64,
 
 #[derive(Debug, Clone, FromRow, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 pub struct Sprint {
-    pub id: i64, pub name: String, pub project: Option<String>, pub goal: Option<String>,
+    pub id: i64, pub name: String, pub project: Option<String>,
+    pub project_id: Option<i64>, pub project_name: Option<String>,
+    pub goal: Option<String>,
     pub status: String, pub start_date: Option<String>, pub end_date: Option<String>,
     pub retro_notes: Option<String>, pub capacity_hours: Option<f64>,
     pub created_by_id: i64, pub created_by: String, pub created_at: String, pub updated_at: String,

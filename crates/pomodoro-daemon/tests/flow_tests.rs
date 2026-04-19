@@ -2596,7 +2596,7 @@ async fn test_recurrence_auto_creates_task_via_db() {
     let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
     // Create template task
     let task = pomodoro_daemon::db::create_task(&pool, pomodoro_daemon::db::CreateTaskOpts {
-        user_id: 1, parent_id: None, title: "Daily standup", description: None, project: Some("Team"), tags: None, priority: 4, estimated: 1, estimated_hours: 0.0, remaining_points: 0.0, due_date: None,
+        user_id: 1, parent_id: None, title: "Daily standup", description: None, project: Some("Team"), project_id: None, tags: None, priority: 4, estimated: 1, estimated_hours: 0.0, remaining_points: 0.0, due_date: None,
     }).await.unwrap();
     // Set recurrence with yesterday's due date
     pomodoro_daemon::db::set_recurrence(&pool, task.id, "daily", &yesterday).await.unwrap();
@@ -2608,7 +2608,7 @@ async fn test_recurrence_auto_creates_task_via_db() {
     let title = format!("{} ({})", task.title, today);
     let new_task = pomodoro_daemon::db::create_task(&pool, pomodoro_daemon::db::CreateTaskOpts {
         user_id: task.user_id, parent_id: task.parent_id, title: &title,
-        description: task.description.as_deref(), project: task.project.as_deref(), tags: task.tags.as_deref(),
+        description: task.description.as_deref(), project: task.project.as_deref(), project_id: task.project_id, tags: task.tags.as_deref(),
         priority: task.priority, estimated: task.estimated, estimated_hours: task.estimated_hours,
         remaining_points: task.remaining_points, due_date: task.due_date.as_deref(),
     }).await.unwrap();
@@ -2630,7 +2630,7 @@ async fn test_recurrence_monthly_advances_correctly() {
     std::env::set_var("POMODORO_ROOT_PASSWORD", "root");
     let pool = pomodoro_daemon::db::connect_memory().await.unwrap();
     let task = pomodoro_daemon::db::create_task(&pool, pomodoro_daemon::db::CreateTaskOpts {
-        user_id: 1, parent_id: None, title: "Monthly report", description: None, project: None, tags: None, priority: 3, estimated: 1, estimated_hours: 0.0, remaining_points: 0.0, due_date: Some("2026-01-31"),
+        user_id: 1, parent_id: None, title: "Monthly report", description: None, project: None, project_id: None, tags: None, priority: 3, estimated: 1, estimated_hours: 0.0, remaining_points: 0.0, due_date: Some("2026-01-31"),
     }).await.unwrap();
     pomodoro_daemon::db::set_recurrence(&pool, task.id, "monthly", "2026-01-31").await.unwrap();
     // Advance from Jan 31 → should go to Feb 28 (not Feb 31)

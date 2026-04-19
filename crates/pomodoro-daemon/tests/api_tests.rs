@@ -5524,3 +5524,98 @@ async fn test_webhook_deliveries_not_owner_rejected() {
     let resp = app.clone().oneshot(auth_req("GET", &format!("/api/webhooks/{}/deliveries", wid), &user_tok, None)).await.unwrap();
     assert_eq!(resp.status(), 403);
 }
+
+#[tokio::test]
+async fn test_projects_crud() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    // Create project
+    let resp = app.clone().oneshot(auth_req("POST", "/api/projects", &tok, Some(json!({"name":"Alpha Project","description":"Test project","key":"ALPHA"})))).await.unwrap();
+    assert_eq!(resp.status(), 201);
+    let project = body_json(resp).await;
+    let pid = project["id"].as_i64().unwrap();
+    assert_eq!(project["name"], "Alpha Project");
+    assert_eq!(project["key"], "ALPHA");
+    assert_eq!(project["status"], "active");
+    // List projects
+    let resp = app.clone().oneshot(auth_req("GET", "/api/projects", &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let projects = body_json(resp).await;
+    assert!(projects.as_array().unwrap().iter().any(|p| p["key"] == "ALPHA"));
+    // Get project
+    let resp = app.clone().oneshot(auth_req("GET", &format!("/api/projects/{}", pid), &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    assert_eq!(body_json(resp).await["name"], "Alpha Project");
+    // Update project
+    let resp = app.clone().oneshot(auth_req("PUT", &format!("/api/projects/{}", pid), &tok, Some(json!({"name":"Alpha v2","status":"archived"})))).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let updated = body_json(resp).await;
+    assert_eq!(updated["name"], "Alpha v2");
+    assert_eq!(updated["status"], "archived");
+    // Delete project
+    let resp = app.clone().oneshot(auth_req("DELETE", &format!("/api/projects/{}", pid), &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 204);
+    // Verify deleted
+    let resp = app.clone().oneshot(auth_req("GET", &format!("/api/projects/{}", pid), &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 404);
+}
+
+#[tokio::test]
+async fn test_projects_duplicate_key_rejected() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("POST", "/api/projects", &tok, Some(json!({"name":"P1","key":"DUP"})))).await.unwrap();
+    assert_eq!(resp.status(), 201);
+    let resp = app.clone().oneshot(auth_req("POST", "/api/projects", &tok, Some(json!({"name":"P2","key":"DUP"})))).await.unwrap();
+    assert_eq!(resp.status(), 409);
+}
+
+#[tokio::test]
+async fn test_projects_non_admin_rejected() {
+    let app = app().await;
+    let user_tok = register_user(&app, "projuser").await;
+    let resp = app.clone().oneshot(auth_req("POST", "/api/projects", &user_tok, Some(json!({"name":"Nope","key":"NOPE"})))).await.unwrap();
+    assert_eq!(resp.status(), 403);
+    // But can list
+    let resp = app.clone().oneshot(auth_req("GET", "/api/projects", &user_tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+}
+
+#[tokio::test]
+async fn test_task_with_project_id() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    // Create project
+    let resp = app.clone().oneshot(auth_req("POST", "/api/projects", &tok, Some(json!({"name":"TaskProj","key":"TP"})))).await.unwrap();
+    let pid = body_json(resp).await["id"].as_i64().unwrap();
+    // Create task with project_id
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"Proj Task","project_id":pid})))).await.unwrap();
+    assert_eq!(resp.status(), 201);
+    let task = body_json(resp).await;
+    assert_eq!(task["project_id"], pid);
+    assert_eq!(task["project_name"], "TaskProj");
+    // Update task to remove project_id
+    let tid = task["id"].as_i64().unwrap();
+    let resp = app.clone().oneshot(auth_req("PUT", &format!("/api/tasks/{}", tid), &tok, Some(json!({"project_id":null})))).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let updated = body_json(resp).await;
+    assert!(updated["project_id"].is_null());
+    assert!(updated["project_name"].is_null());
+}
+
+#[tokio::test]
+async fn test_project_delete_unlinks_tasks() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("POST", "/api/projects", &tok, Some(json!({"name":"DelProj","key":"DEL"})))).await.unwrap();
+    let pid = body_json(resp).await["id"].as_i64().unwrap();
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"Linked","project_id":pid})))).await.unwrap();
+    let tid = body_json(resp).await["id"].as_i64().unwrap();
+    // Delete project
+    let resp = app.clone().oneshot(auth_req("DELETE", &format!("/api/projects/{}", pid), &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 204);
+    // Task should still exist but project_id should be null
+    let resp = app.clone().oneshot(auth_req("GET", &format!("/api/tasks/{}", tid), &tok, None)).await.unwrap();
+    let task = body_json(resp).await;
+    assert!(task["task"]["project_id"].is_null());
+}

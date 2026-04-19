@@ -242,6 +242,9 @@ pub async fn build_router(engine: Arc<engine::Engine>) -> Router {
         // Saved views
         .route("/api/views", get(routes::list_saved_views).post(routes::create_saved_view))
         .route("/api/views/{id}", put(routes::update_saved_view).delete(routes::delete_saved_view))
+        // Projects
+        .route("/api/projects", get(routes::list_projects).post(routes::create_project))
+        .route("/api/projects/{id}", get(routes::get_project).put(routes::update_project).delete(routes::delete_project))
         .layer(axum::extract::DefaultBodyLimit::max(2 * 1024 * 1024)) // 2MB max request body
         .layer(cors)
         .layer(axum::middleware::from_fn(security_headers))

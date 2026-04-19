@@ -1,12 +1,13 @@
 use super::*;
 
 
-const SPRINT_SELECT: &str = "SELECT sp.id, sp.name, sp.project, sp.goal, sp.status, sp.start_date, sp.end_date, sp.retro_notes, sp.capacity_hours, sp.created_by_id, u.username as created_by, sp.created_at, sp.updated_at FROM sprints sp JOIN users u ON sp.created_by_id = u.id";
+const SPRINT_SELECT: &str = "SELECT sp.id, sp.name, sp.project, sp.project_id, p.name as project_name, sp.goal, sp.status, sp.start_date, sp.end_date, sp.retro_notes, sp.capacity_hours, sp.created_by_id, u.username as created_by, sp.created_at, sp.updated_at FROM sprints sp JOIN users u ON sp.created_by_id = u.id LEFT JOIN projects p ON sp.project_id = p.id";
 
 pub struct CreateSprintOpts<'a> {
     pub user_id: i64,
     pub name: &'a str,
     pub project: Option<&'a str>,
+    pub project_id: Option<i64>,
     pub goal: Option<&'a str>,
     pub start_date: Option<&'a str>,
     pub end_date: Option<&'a str>,
@@ -15,8 +16,8 @@ pub struct CreateSprintOpts<'a> {
 
 pub async fn create_sprint(pool: &Pool, opts: CreateSprintOpts<'_>) -> Result<Sprint> {
     let now = now_str();
-    let id = sqlx::query("INSERT INTO sprints (name, project, goal, start_date, end_date, capacity_hours, created_by_id, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?)")
-        .bind(opts.name).bind(opts.project).bind(opts.goal).bind(opts.start_date).bind(opts.end_date).bind(opts.capacity_hours).bind(opts.user_id).bind(&now).bind(&now)
+    let id = sqlx::query("INSERT INTO sprints (name, project, project_id, goal, start_date, end_date, capacity_hours, created_by_id, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)")
+        .bind(opts.name).bind(opts.project).bind(opts.project_id).bind(opts.goal).bind(opts.start_date).bind(opts.end_date).bind(opts.capacity_hours).bind(opts.user_id).bind(&now).bind(&now)
         .execute(pool).await?.last_insert_rowid();
     get_sprint(pool, id).await
 }
@@ -40,6 +41,7 @@ pub async fn list_sprints(pool: &Pool, status: Option<&str>, project: Option<&st
 pub struct UpdateSprintOpts<'a> {
     pub name: Option<&'a str>,
     pub project: Option<Option<&'a str>>,
+    pub project_id: Option<Option<i64>>,
     pub goal: Option<Option<&'a str>>,
     pub status: Option<&'a str>,
     pub start_date: Option<Option<&'a str>>,
@@ -52,13 +54,14 @@ pub async fn update_sprint(pool: &Pool, id: i64, opts: UpdateSprintOpts<'_>) -> 
     let now = now_str();
     let current = get_sprint(pool, id).await?;
     let new_project = match opts.project { Some(v) => v.map(|s| s.to_string()), None => current.project };
+    let new_project_id = match opts.project_id { Some(v) => v, None => current.project_id };
     let new_goal = match opts.goal { Some(v) => v.map(|s| s.to_string()), None => current.goal };
     let new_start = match opts.start_date { Some(v) => v.map(|s| s.to_string()), None => current.start_date };
     let new_end = match opts.end_date { Some(v) => v.map(|s| s.to_string()), None => current.end_date };
     let new_retro = match opts.retro_notes { Some(v) => v.map(|s| s.to_string()), None => current.retro_notes };
     let new_cap = match opts.capacity_hours { Some(v) => v, None => current.capacity_hours };
-    sqlx::query("UPDATE sprints SET name=?, project=?, goal=?, status=?, start_date=?, end_date=?, retro_notes=?, capacity_hours=?, updated_at=? WHERE id=?")
-        .bind(opts.name.unwrap_or(&current.name)).bind(&new_project)
+    sqlx::query("UPDATE sprints SET name=?, project=?, project_id=?, goal=?, status=?, start_date=?, end_date=?, retro_notes=?, capacity_hours=?, updated_at=? WHERE id=?")
+        .bind(opts.name.unwrap_or(&current.name)).bind(&new_project).bind(new_project_id)
         .bind(&new_goal).bind(opts.status.unwrap_or(&current.status))
         .bind(&new_start).bind(&new_end).bind(&new_retro).bind(new_cap)
         .bind(&now).bind(id).execute(pool).await?;

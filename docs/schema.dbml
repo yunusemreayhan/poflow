@@ -30,6 +30,7 @@ Table tasks {
   title            text    [not null]
   description      text
   project          text
+  project_id       integer [ref: > projects.id, note: 'FK to projects table']
   tags             text    [note: 'Comma-separated']
   priority         integer [not null, default: 3, note: '1-5']
   estimated        integer [not null, default: 1, note: 'Story points']
@@ -79,6 +80,7 @@ Table rooms {
   room_type        text    [not null, default: 'estimation']
   estimation_unit  text    [not null, default: 'points', note: 'points | hours | mandays']
   project          text
+  project_id       integer [ref: > projects.id]
   creator_id       integer [not null, ref: > users.id]
   status           text    [not null, default: 'lobby', note: 'lobby | voting | revealed | closed']
   current_task_id  integer [ref: > tasks.id]
@@ -113,6 +115,7 @@ Table sprints {
   id            integer [pk, increment]
   name          text    [not null]
   project       text
+  project_id    integer [ref: > projects.id]
   goal          text
   status        text    [not null, default: 'planning', note: 'planning | active | completed']
   start_date    text
@@ -293,4 +296,15 @@ Table webhooks {
 Table token_blocklist {
   token_hash text [pk, note: 'Hash of revoked JWT']
   expires_at text [not null]
+}
+
+Table projects {
+  id          integer [pk, increment]
+  name        text    [not null]
+  description text
+  key         text    [not null, unique, note: 'Short uppercase key, e.g. ALPHA']
+  lead_user_id integer [ref: > users.id]
+  status      text    [not null, default: 'active', note: 'active | archived']
+  created_at  text    [not null]
+  updated_at  text    [not null]
 }

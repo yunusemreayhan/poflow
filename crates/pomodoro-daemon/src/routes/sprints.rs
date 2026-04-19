@@ -25,7 +25,7 @@ pub async fn create_sprint(State(engine): State<AppState>, claims: Claims, Json(
     if let (Some(ref s), Some(ref e)) = (&req.start_date, &req.end_date) { if e < s { return Err(err(StatusCode::BAD_REQUEST, "end_date must be on or after start_date")); } }
     if let Some(ch) = req.capacity_hours { if !(0.0..=10000.0).contains(&ch) { return Err(err(StatusCode::BAD_REQUEST, "capacity_hours must be 0-10000")); } }
     let s = db::create_sprint(&engine.pool, db::CreateSprintOpts {
-        user_id: claims.user_id, name: &req.name, project: req.project.as_deref(), goal: req.goal.as_deref(),
+        user_id: claims.user_id, name: &req.name, project: req.project.as_deref(), project_id: req.project_id, goal: req.goal.as_deref(),
         start_date: req.start_date.as_deref(), end_date: req.end_date.as_deref(), capacity_hours: req.capacity_hours,
     }).await.map_err(internal)?;
     db::audit(&engine.pool, claims.user_id, "create", "sprint", Some(s.id), Some(&s.name)).await.ok();
@@ -66,6 +66,7 @@ pub async fn update_sprint(State(engine): State<AppState>, claims: Claims, Path(
     let s = db::update_sprint(&engine.pool, id, db::UpdateSprintOpts {
         name: req.name.as_deref(),
         project: req.project.as_ref().map(|o| o.as_deref()),
+        project_id: req.project_id,
         goal: req.goal.as_ref().map(|o| o.as_deref()),
         status: None, // B4: Never pass status through update — use /start or /complete
         start_date: req.start_date.as_ref().map(|o| o.as_deref()),
@@ -139,7 +140,7 @@ pub async fn carryover_sprint(State(engine): State<AppState>, claims: Claims, Pa
     let base_name = sprint.name.trim_end_matches(" (carry-over)");
     let new_name = format!("{} (carry-over)", base_name);
     let new_sprint = db::create_sprint(&engine.pool, db::CreateSprintOpts {
-        user_id: claims.user_id, name: &new_name, project: sprint.project.as_deref(), goal: sprint.goal.as_deref(),
+        user_id: claims.user_id, name: &new_name, project: sprint.project.as_deref(), project_id: sprint.project_id, goal: sprint.goal.as_deref(),
         start_date: None, end_date: None, capacity_hours: sprint.capacity_hours,
     }).await.map_err(internal)?;
     // BL6: Filter out tasks already in an active sprint

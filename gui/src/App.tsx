@@ -226,6 +226,7 @@ export default function App() {
     poll();
     loadTasks();
     useStore.getState().loadConfig();
+    useStore.getState().loadProjects();
   }, [token]);
 
   // Global keyboard shortcuts (#37)

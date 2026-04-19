@@ -9,6 +9,8 @@ export interface Task {
   title: string;
   description: string | null;
   project: string | null;
+  project_id: number | null;
+  project_name: string | null;
   tags: string | null;
   priority: number;
   estimated: number;
@@ -100,6 +102,7 @@ export interface EpicGroup { id: number; name: string; created_by: number; creat
 export interface EpicSnapshot { id: number; group_id: number; date: string; total_tasks: number; done_tasks: number; total_points: number; done_points: number; total_hours: number; done_hours: number; }
 export interface EpicGroupDetail { group: EpicGroup; task_ids: number[]; snapshots: EpicSnapshot[]; }
 export interface Team { id: number; name: string; created_at: string; }
+export interface Project { id: number; name: string; description: string | null; key: string; lead_user_id: number | null; status: string; created_at: string; updated_at: string; }
 export interface TeamMember { team_id: number; user_id: number; username: string; role: string; }
 export interface TeamDetail { team: Team; members: TeamMember[]; root_task_ids: number[]; }
 
@@ -108,14 +111,14 @@ export type TimeReport = BurnEntry;
 export interface AuthResponse { token: string; refresh_token: string; user_id: number; username: string; role: string; }
 export interface User { id: number; username: string; role: string; created_at: string; }
 
-export interface Room { id: number; name: string; room_type: string; estimation_unit: string; project: string | null; creator: string; status: string; current_task_id: number | null; created_at: string; }
+export interface Room { id: number; name: string; room_type: string; estimation_unit: string; project: string | null; project_id: number | null; project_name: string | null; creator: string; status: string; current_task_id: number | null; created_at: string; }
 export interface RoomMember { room_id: number; user_id: number; username: string; role: string; joined_at: string; }
 export interface RoomVoteView { username: string; voted: boolean; value: number | null; }
 export interface RoomVote { id: number; room_id: number; task_id: number; username: string; value: number | null; created_at: string; }
 export interface VoteResult { task_id: number; task_title: string; votes: { id: number; room_id: number; task_id: number; user_id: number; username: string; value: number | null; created_at: string }[]; average: number; consensus: boolean; }
 export interface RoomState { room: Room; members: RoomMember[]; current_task: Task | null; votes: RoomVoteView[]; tasks: Task[]; vote_history: VoteResult[]; }
 
-export interface Sprint { id: number; name: string; project: string | null; goal: string | null; status: string; start_date: string | null; end_date: string | null; retro_notes: string | null; capacity_hours: number | null; created_by: string; created_at: string; updated_at: string; }
+export interface Sprint { id: number; name: string; project: string | null; project_id: number | null; project_name: string | null; goal: string | null; status: string; start_date: string | null; end_date: string | null; retro_notes: string | null; capacity_hours: number | null; created_by: string; created_at: string; updated_at: string; }
 export interface SprintTask { sprint_id: number; task_id: number; added_by: string; added_at: string; }
 export interface SprintDailyStat { id: number; sprint_id: number; date: string; total_points: number; done_points: number; total_hours: number; done_hours: number; total_tasks: number; done_tasks: number; }
 export interface SprintDetail { sprint: Sprint; tasks: Task[]; stats: SprintDailyStat[]; }

@@ -86,7 +86,7 @@ export async function getFreshToken(): Promise<string> {
 // --- Types (re-exported from types.ts) ---
 export type {
   Task, Session, EngineState, Comment, TaskDetail, DayStat, Config,
-  EpicGroup, EpicSnapshot, EpicGroupDetail, Team, TeamMember, TeamDetail,
+  EpicGroup, EpicSnapshot, EpicGroupDetail, Team, TeamMember, TeamDetail, Project,
   TimeReport, AuthResponse, User,
   Room, RoomMember, RoomVoteView, RoomVote, VoteResult, RoomState,
   Sprint, SprintTask, SprintDailyStat, SprintDetail, SprintBoard, TaskSprintInfo,

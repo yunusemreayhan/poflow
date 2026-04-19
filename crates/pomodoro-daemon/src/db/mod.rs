@@ -644,6 +644,46 @@ async fn migrate(pool: &Pool) -> Result<()> {
         sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (25, ?)").bind(now_str()).execute(pool).await.ok();
     }
 
+    // Migration 26: Projects table + project_id FK on tasks/sprints/rooms
+    if !applied_set.contains(&26) {
+        sqlx::query("CREATE TABLE IF NOT EXISTS projects (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            name        TEXT NOT NULL,
+            description TEXT,
+            key         TEXT NOT NULL,
+            lead_user_id INTEGER REFERENCES users(id),
+            status      TEXT NOT NULL DEFAULT 'active',
+            created_at  TEXT NOT NULL,
+            updated_at  TEXT NOT NULL
+        )").execute(pool).await.ok();
+        sqlx::query("CREATE UNIQUE INDEX IF NOT EXISTS idx_projects_key ON projects(key)").execute(pool).await.ok();
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_projects_status ON projects(status)").execute(pool).await.ok();
+        // Add project_id FK columns
+        if let Err(e) = sqlx::query("ALTER TABLE tasks ADD COLUMN project_id INTEGER REFERENCES projects(id)").execute(pool).await { log_migration_err("ALTER TABLE tasks ADD COLUMN project_id", e); }
+        if let Err(e) = sqlx::query("ALTER TABLE sprints ADD COLUMN project_id INTEGER REFERENCES projects(id)").execute(pool).await { log_migration_err("ALTER TABLE sprints ADD COLUMN project_id", e); }
+        if let Err(e) = sqlx::query("ALTER TABLE rooms ADD COLUMN project_id INTEGER REFERENCES projects(id)").execute(pool).await { log_migration_err("ALTER TABLE rooms ADD COLUMN project_id", e); }
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_tasks_project_id ON tasks(project_id)").execute(pool).await.ok();
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_sprints_project_id ON sprints(project_id)").execute(pool).await.ok();
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_rooms_project_id ON rooms(project_id)").execute(pool).await.ok();
+        // Migrate existing project text values to projects table
+        let now = now_str();
+        let distinct_projects: Vec<(String,)> = sqlx::query_as(
+            "SELECT DISTINCT project FROM (SELECT project FROM tasks WHERE project IS NOT NULL AND project != '' UNION SELECT project FROM sprints WHERE project IS NOT NULL AND project != '' UNION SELECT project FROM rooms WHERE project IS NOT NULL AND project != '')"
+        ).fetch_all(pool).await.unwrap_or_default();
+        for (name,) in &distinct_projects {
+            let key = name.trim().to_lowercase().replace(|c: char| !c.is_alphanumeric(), "-");
+            let key = key.trim_matches('-').to_string();
+            let key = if key.is_empty() { format!("project-{}", name.len()) } else { key };
+            sqlx::query("INSERT OR IGNORE INTO projects (name, description, key, status, created_at, updated_at) VALUES (?, '', ?, 'active', ?, ?)")
+                .bind(name.trim()).bind(&key).bind(&now).bind(&now).execute(pool).await.ok();
+        }
+        // Link existing records to their projects
+        sqlx::query("UPDATE tasks SET project_id = (SELECT p.id FROM projects p WHERE p.name = tasks.project) WHERE project IS NOT NULL AND project != ''").execute(pool).await.ok();
+        sqlx::query("UPDATE sprints SET project_id = (SELECT p.id FROM projects p WHERE p.name = sprints.project) WHERE project IS NOT NULL AND project != ''").execute(pool).await.ok();
+        sqlx::query("UPDATE rooms SET project_id = (SELECT p.id FROM projects p WHERE p.name = rooms.project) WHERE project IS NOT NULL AND project != ''").execute(pool).await.ok();
+        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (26, ?)").bind(now_str()).execute(pool).await.ok();
+    }
+
     Ok(())
 }
 
@@ -697,3 +737,5 @@ mod saved_views;
 pub use saved_views::*;
 mod webhook_deliveries;
 pub use webhook_deliveries::*;
+mod projects;
+pub use projects::*;

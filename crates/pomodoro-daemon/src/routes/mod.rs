@@ -166,3 +166,5 @@ mod checklists;
 pub use checklists::*;
 mod saved_views;
 pub use saved_views::*;
+mod projects;
+pub use projects::*;

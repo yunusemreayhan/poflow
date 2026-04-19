@@ -130,7 +130,7 @@ Pool set to `max_connections(8)` with 10s busy timeout. No pool metrics, no moni
 
 | # | Item | Effort | Impact |
 |---|---|---|---|
-| 1 | Create `projects` table, migrate text fields to FK | High | Critical — unlocks project permissions, dashboards, consistency |
+| 1 | ~~Create `projects` table, migrate text fields to FK~~ | ~~High~~ | ~~Critical~~ — **DONE (Sprint 14)** |
 | 2 | Add workflow transition rules (`status_transitions` table) | Medium | High — enforces process, differentiates from toy tools |
 | 3 | Wire watcher notifications into comment/status-change flows | Low | High — basic collaboration expectation |
 | 4 | Add `updated_by` to tasks | Low | Medium — traceability |

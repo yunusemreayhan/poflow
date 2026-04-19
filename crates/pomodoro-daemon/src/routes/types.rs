@@ -17,6 +17,7 @@ pub struct CreateTaskRequest {
     pub parent_id: Option<i64>,
     pub description: Option<String>,
     pub project: Option<String>,
+    pub project_id: Option<i64>,
     pub tags: Option<String>,
     pub priority: Option<i64>,
     pub estimated: Option<i64>,
@@ -31,6 +32,8 @@ pub struct UpdateTaskRequest {
     pub description: Option<Option<String>>,
     #[serde(default, deserialize_with = "deserialize_optional_nullable")]
     pub project: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_nullable_i64")]
+    pub project_id: Option<Option<i64>>,
     #[serde(default, deserialize_with = "deserialize_optional_nullable")]
     pub tags: Option<Option<String>>,
     pub priority: Option<i64>,
@@ -67,7 +70,7 @@ pub struct AddTimeReportRequest { pub hours: f64, pub points: Option<f64>, pub d
 #[derive(Deserialize, utoipa::ToSchema)]
 pub struct AssignRequest { pub username: String }
 #[derive(Deserialize, utoipa::ToSchema)]
-pub struct CreateRoomRequest { pub name: String, pub room_type: Option<String>, pub estimation_unit: Option<String>, pub project: Option<String> }
+pub struct CreateRoomRequest { pub name: String, pub room_type: Option<String>, pub estimation_unit: Option<String>, pub project: Option<String>, pub project_id: Option<i64> }
 #[derive(Deserialize, utoipa::ToSchema)]
 pub struct RoomRoleRequest { pub username: String, pub role: String }
 #[derive(Deserialize, utoipa::ToSchema)]
@@ -77,12 +80,14 @@ pub struct CastVoteRequest { pub value: f64 }
 #[derive(Deserialize, utoipa::ToSchema)]
 pub struct AcceptEstimateRequest { pub value: f64 }
 #[derive(Deserialize, utoipa::ToSchema)]
-pub struct CreateSprintRequest { pub name: String, pub project: Option<String>, pub goal: Option<String>, pub start_date: Option<String>, pub end_date: Option<String>, pub capacity_hours: Option<f64> }
+pub struct CreateSprintRequest { pub name: String, pub project: Option<String>, pub project_id: Option<i64>, pub goal: Option<String>, pub start_date: Option<String>, pub end_date: Option<String>, pub capacity_hours: Option<f64> }
 #[derive(Deserialize, utoipa::ToSchema)]
 pub struct UpdateSprintRequest {
     pub name: Option<String>,
     #[serde(default, deserialize_with = "deserialize_optional_nullable")]
     pub project: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_nullable_i64")]
+    pub project_id: Option<Option<i64>>,
     #[serde(default, deserialize_with = "deserialize_optional_nullable")]
     pub goal: Option<Option<String>>,
     /// Rejected with error — use /start or /complete endpoints instead
@@ -161,6 +166,11 @@ where D: serde::Deserializer<'de> {
 }
 
 pub fn deserialize_optional_nullable_f64<'de, D>(deserializer: D) -> Result<Option<Option<f64>>, D::Error>
+where D: serde::Deserializer<'de> {
+    Ok(Some(Option::deserialize(deserializer)?))
+}
+
+pub fn deserialize_optional_nullable_i64<'de, D>(deserializer: D) -> Result<Option<Option<i64>>, D::Error>
 where D: serde::Deserializer<'de> {
     Ok(Some(Option::deserialize(deserializer)?))
 }

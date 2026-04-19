@@ -391,6 +391,7 @@ pub async fn import_project(State(engine): State<AppState>, claims: Claims, Json
             title,
             description: t["description"].as_str(),
             project: t["project"].as_str(),
+            project_id: t["project_id"].as_i64(),
             tags: t["tags"].as_str(),
             priority: t["priority"].as_i64().unwrap_or(3),
             estimated: t["estimated"].as_i64().unwrap_or(0),

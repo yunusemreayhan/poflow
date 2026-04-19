@@ -280,7 +280,7 @@ async fn main() -> Result<()> {
                     let title = format!("{} ({})", task.title, today);
                     if let Ok(_new) = db::create_task(&engine_recur.pool, db::CreateTaskOpts {
                         user_id: task.user_id, parent_id: task.parent_id, title: &title,
-                        description: task.description.as_deref(), project: task.project.as_deref(), tags: task.tags.as_deref(),
+                        description: task.description.as_deref(), project: task.project.as_deref(), project_id: task.project_id, tags: task.tags.as_deref(),
                         priority: task.priority, estimated: task.estimated, estimated_hours: task.estimated_hours,
                         remaining_points: task.remaining_points, due_date: task.due_date.as_deref(),
                     }).await {
