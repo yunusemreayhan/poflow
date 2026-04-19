@@ -11,6 +11,7 @@ pub struct Task {
     pub status: String, pub sort_order: i64, pub created_at: String, pub updated_at: String,
     pub attachment_count: i64, pub deleted_at: Option<String>, pub work_duration_minutes: Option<i64>,
     pub estimate_optimistic: Option<f64>, pub estimate_pessimistic: Option<f64>,
+    pub updated_by: Option<i64>,
 }
 
 #[derive(Debug, Clone, FromRow, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
@@ -37,6 +38,7 @@ pub struct TaskAssignee { pub task_id: i64, pub user_id: i64, pub username: Stri
 pub struct User {
     pub id: i64, pub username: String, #[serde(skip_serializing)] pub password_hash: String,
     pub role: String, pub created_at: String, pub email: Option<String>,
+    pub timezone: Option<String>,
 }
 
 #[derive(Debug, Clone, FromRow, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]

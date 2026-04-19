@@ -35,6 +35,11 @@ pub async fn update_profile(State(engine): State<AppState>, claims: Claims, Json
         let val = if email_trimmed.is_empty() { None } else { Some(email_trimmed) };
         sqlx::query("UPDATE users SET email = ? WHERE id = ?").bind(val).bind(claims.user_id).execute(&engine.pool).await.map_err(internal)?;
     }
+    if let Some(ref tz) = req.timezone {
+        let tz_trimmed = tz.trim();
+        let val = if tz_trimmed.is_empty() { None } else { Some(tz_trimmed) };
+        sqlx::query("UPDATE users SET timezone = ? WHERE id = ?").bind(val).bind(claims.user_id).execute(&engine.pool).await.map_err(internal)?;
+    }
     let user = db::get_user(&engine.pool, claims.user_id).await.map_err(internal)?;
     let token = auth::create_token(user.id, &user.username, &user.role).map_err(internal)?;
     let refresh_token = auth::create_refresh_token(user.id, &user.username, &user.role).map_err(internal)?;
@@ -44,7 +49,7 @@ pub async fn update_profile(State(engine): State<AppState>, claims: Claims, Json
 // --- Admin ---
 
 // F12: Notification preferences per event type
-const EVENT_TYPES: &[&str] = &["task_assigned", "task_completed", "comment_added", "sprint_started", "sprint_completed", "time_logged", "task_added_to_sprint"];
+const EVENT_TYPES: &[&str] = &["task_assigned", "task_completed", "comment_added", "sprint_started", "sprint_completed", "time_logged", "task_added_to_sprint", "task_status_changed", "mention"];
 
 #[derive(Serialize, Deserialize, utoipa::ToSchema)]
 pub struct NotifPref { pub event_type: String, pub enabled: bool }

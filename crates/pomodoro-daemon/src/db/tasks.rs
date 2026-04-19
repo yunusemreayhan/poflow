@@ -54,7 +54,7 @@ fn append_team_scope_filter(q: &mut String, ids: &[i64]) -> bool {
     }
 }
 
-pub const TASK_SELECT: &str = "SELECT t.id, t.parent_id, t.user_id, u.username as user, t.title, t.description, t.project, t.tags, t.priority, t.estimated, t.actual, t.estimated_hours, t.remaining_points, t.due_date, t.status, t.sort_order, t.created_at, t.updated_at, COALESCE(ac.cnt, 0) as attachment_count, t.deleted_at, t.work_duration_minutes, t.estimate_optimistic, t.estimate_pessimistic FROM tasks t JOIN users u ON t.user_id = u.id LEFT JOIN (SELECT task_id, COUNT(*) as cnt FROM task_attachments GROUP BY task_id) ac ON ac.task_id = t.id";
+pub const TASK_SELECT: &str = "SELECT t.id, t.parent_id, t.user_id, u.username as user, t.title, t.description, t.project, t.tags, t.priority, t.estimated, t.actual, t.estimated_hours, t.remaining_points, t.due_date, t.status, t.sort_order, t.created_at, t.updated_at, COALESCE(ac.cnt, 0) as attachment_count, t.deleted_at, t.work_duration_minutes, t.estimate_optimistic, t.estimate_pessimistic, t.updated_by FROM tasks t JOIN users u ON t.user_id = u.id LEFT JOIN (SELECT task_id, COUNT(*) as cnt FROM task_attachments GROUP BY task_id) ac ON ac.task_id = t.id";
 
 pub struct CreateTaskOpts<'a> {
     pub user_id: i64,
@@ -175,6 +175,7 @@ pub struct UpdateTaskOpts<'a> {
     pub work_duration_minutes: Option<Option<i64>>,
     pub estimate_optimistic: Option<Option<f64>>,
     pub estimate_pessimistic: Option<Option<f64>>,
+    pub updated_by: Option<i64>,
 }
 
 pub async fn update_task(pool: &Pool, id: i64, opts: UpdateTaskOpts<'_>) -> Result<Task> {
@@ -188,13 +189,13 @@ pub async fn update_task(pool: &Pool, id: i64, opts: UpdateTaskOpts<'_>) -> Resu
     let new_wdm = match opts.work_duration_minutes { Some(v) => v, None => existing.work_duration_minutes };
     let new_eo = match opts.estimate_optimistic { Some(v) => v, None => existing.estimate_optimistic };
     let new_ep = match opts.estimate_pessimistic { Some(v) => v, None => existing.estimate_pessimistic };
-    sqlx::query("UPDATE tasks SET parent_id=?, title=?, description=?, project=?, tags=?, priority=?, estimated=?, estimated_hours=?, remaining_points=?, due_date=?, status=?, sort_order=?, work_duration_minutes=?, estimate_optimistic=?, estimate_pessimistic=?, updated_at=? WHERE id=?")
+    sqlx::query("UPDATE tasks SET parent_id=?, title=?, description=?, project=?, tags=?, priority=?, estimated=?, estimated_hours=?, remaining_points=?, due_date=?, status=?, sort_order=?, work_duration_minutes=?, estimate_optimistic=?, estimate_pessimistic=?, updated_at=?, updated_by=? WHERE id=?")
         .bind(new_parent).bind(opts.title.unwrap_or(&existing.title)).bind(&new_desc)
         .bind(&new_project).bind(&new_tags)
         .bind(opts.priority.unwrap_or(existing.priority)).bind(opts.estimated.unwrap_or(existing.estimated))
         .bind(opts.estimated_hours.unwrap_or(existing.estimated_hours)).bind(opts.remaining_points.unwrap_or(existing.remaining_points))
         .bind(&new_due).bind(opts.status.unwrap_or(&existing.status))
-        .bind(opts.sort_order.unwrap_or(existing.sort_order)).bind(new_wdm).bind(new_eo).bind(new_ep).bind(&now).bind(id)
+        .bind(opts.sort_order.unwrap_or(existing.sort_order)).bind(new_wdm).bind(new_eo).bind(new_ep).bind(&now).bind(opts.updated_by).bind(id)
         .execute(pool).await?;
     get_task(pool, id).await
 }

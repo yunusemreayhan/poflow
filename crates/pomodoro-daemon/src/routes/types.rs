@@ -61,7 +61,7 @@ pub struct StatsQuery { pub days: Option<i64> }
 #[derive(Deserialize, utoipa::ToSchema)]
 pub struct UpdateRoleRequest { pub role: String }
 #[derive(Deserialize, utoipa::ToSchema)]
-pub struct UpdateProfileRequest { pub username: Option<String>, pub password: Option<String>, pub current_password: Option<String>, pub email: Option<String> }
+pub struct UpdateProfileRequest { pub username: Option<String>, pub password: Option<String>, pub current_password: Option<String>, pub email: Option<String>, pub timezone: Option<String> }
 #[derive(Deserialize, utoipa::ToSchema)]
 pub struct AddTimeReportRequest { pub hours: f64, pub points: Option<f64>, pub description: Option<String> }
 #[derive(Deserialize, utoipa::ToSchema)]

@@ -434,6 +434,7 @@ pub async fn update_task(State(engine): State<AppState>, claims: Claims, Path(id
         status: req.status.as_deref(), sort_order: req.sort_order, parent_id: req.parent_id,
         work_duration_minutes: req.work_duration_minutes.as_ref().map(|o| *o),
         estimate_optimistic: req.estimate_optimistic, estimate_pessimistic: req.estimate_pessimistic,
+        updated_by: Some(claims.user_id),
     }).await.map_err(internal)?;
     if let Err(e) = db::audit(&engine.pool, claims.user_id, "update", "task", Some(id), None).await { tracing::warn!("Audit log failed: {}", e); }
     // BL3: Auto-unblock dependents when task is completed or done
@@ -448,7 +449,21 @@ pub async fn update_task(State(engine): State<AppState>, claims: Claims, Path(id
             let pool = engine.pool.clone();
             let old = task.status.clone();
             let new_s = new_status.clone();
-            tokio::spawn(async move { crate::automation::run_status_changed(&pool, id, &old, &new_s).await; });
+            let updater_id = claims.user_id;
+            let updater_name = claims.username.clone();
+            tokio::spawn(async move {
+                crate::automation::run_status_changed(&pool, id, &old, &new_s).await;
+                // Notify watchers of status change
+                if let Ok(watcher_ids) = db::get_task_watcher_ids(&pool, id).await {
+                    for wid in watcher_ids {
+                        if wid != updater_id {
+                            if let Err(e) = db::create_notification(&pool, wid, "task_status_changed", &format!("{} changed task #{} from {} to {}", updater_name, id, old, new_s), Some("task"), Some(id)).await {
+                                tracing::warn!("Failed to create watcher status notification: {}", e);
+                            }
+                        }
+                    }
+                }
+            });
         }
     }
     crate::webhook::dispatch(engine.pool.clone(), "task.updated", serde_json::json!({"id": id}));

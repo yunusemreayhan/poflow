@@ -32,13 +32,28 @@ pub async fn add_comment(State(engine): State<AppState>, claims: Claims, Path(id
             let pool = engine.pool.clone();
             let content = req.content.clone();
             let task_id = id;
+            let commenter_id = claims.user_id;
+            let commenter_name = claims.username.clone();
             tokio::spawn(async move {
+                // Collect @mentioned user IDs to avoid double-notifying
+                let mut mentioned_ids = std::collections::HashSet::new();
                 for word in content.split_whitespace() {
                     if let Some(username) = word.strip_prefix('@') {
                         let username = username.trim_matches(|c: char| !c.is_alphanumeric() && c != '_' && c != '-');
                         if let Ok(Some(uid)) = db::get_user_id_by_username(&pool, username).await {
+                            mentioned_ids.insert(uid);
                             if let Err(e) = db::create_notification(&pool, uid, "mention", &format!("You were mentioned in a comment on task #{}", task_id), Some("task"), Some(task_id)).await {
                                 tracing::warn!("Failed to create @mention notification for {}: {}", username, e);
+                            }
+                        }
+                    }
+                }
+                // Notify watchers (skip commenter and already-mentioned users)
+                if let Ok(watcher_ids) = db::get_task_watcher_ids(&pool, task_id).await {
+                    for wid in watcher_ids {
+                        if wid != commenter_id && !mentioned_ids.contains(&wid) {
+                            if let Err(e) = db::create_notification(&pool, wid, "comment_added", &format!("{} commented on task #{}", commenter_name, task_id), Some("task"), Some(task_id)).await {
+                                tracing::warn!("Failed to create watcher comment notification: {}", e);
                             }
                         }
                     }

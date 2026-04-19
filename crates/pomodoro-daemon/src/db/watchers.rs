@@ -19,6 +19,12 @@ pub async fn get_task_watchers(pool: &Pool, task_id: i64) -> Result<Vec<String>>
     Ok(rows.into_iter().map(|r| r.0).collect())
 }
 
+pub async fn get_task_watcher_ids(pool: &Pool, task_id: i64) -> Result<Vec<i64>> {
+    let rows: Vec<(i64,)> = sqlx::query_as("SELECT user_id FROM task_watchers WHERE task_id = ?")
+        .bind(task_id).fetch_all(pool).await?;
+    Ok(rows.into_iter().map(|r| r.0).collect())
+}
+
 pub async fn get_watched_tasks(pool: &Pool, user_id: i64) -> Result<Vec<i64>> {
     let rows: Vec<(i64,)> = sqlx::query_as("SELECT task_id FROM task_watchers WHERE user_id = ?")
         .bind(user_id).fetch_all(pool).await?;

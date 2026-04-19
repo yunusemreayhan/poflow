@@ -614,6 +614,13 @@ async fn migrate(pool: &Pool) -> Result<()> {
         sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (23, ?)").bind(now_str()).execute(pool).await.ok();
     }
 
+    // Migration 24: Add updated_by to tasks, timezone to users
+    if !applied_set.contains(&24) {
+        if let Err(e) = sqlx::query("ALTER TABLE tasks ADD COLUMN updated_by INTEGER REFERENCES users(id)").execute(pool).await { log_migration_err("ALTER TABLE tasks ADD COLUMN updated_by", e); }
+        if let Err(e) = sqlx::query("ALTER TABLE users ADD COLUMN timezone TEXT").execute(pool).await { log_migration_err("ALTER TABLE users ADD COLUMN timezone", e); }
+        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (24, ?)").bind(now_str()).execute(pool).await.ok();
+    }
+
     Ok(())
 }
 

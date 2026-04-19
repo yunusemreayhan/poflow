@@ -5259,3 +5259,130 @@ async fn test_webhook_update_validates_events() {
     })))).await.unwrap();
     assert_eq!(resp.status(), 200);
 }
+
+// ============================================================
+// Sprint 12: updated_by on tasks
+// ============================================================
+
+#[tokio::test]
+async fn test_updated_by_set_on_task_update() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let task = body_json(app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"UB Test"})))).await.unwrap()).await;
+    let tid = task["id"].as_i64().unwrap();
+    // updated_by should be null on creation
+    assert!(task["updated_by"].is_null());
+    // Update the task
+    let resp = app.clone().oneshot(auth_req("PUT", &format!("/api/tasks/{}", tid), &tok, Some(json!({"title":"UB Updated"})))).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let updated = body_json(resp).await;
+    assert_eq!(updated["updated_by"], task["user_id"]);
+}
+
+// ============================================================
+// Sprint 12: user timezone
+// ============================================================
+
+#[tokio::test]
+async fn test_user_timezone_update() {
+    let app = app().await;
+    let tok = register_user(&app, "tzuser").await;
+    // Set timezone
+    let resp = app.clone().oneshot(auth_req("PUT", "/api/profile", &tok, Some(json!({"timezone":"Europe/Stockholm"})))).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    // Verify via admin user list (root)
+    let root_tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("GET", "/api/admin/users", &root_tok, None)).await.unwrap();
+    let users = body_json(resp).await;
+    let tz_user = users.as_array().unwrap().iter().find(|u| u["username"] == "tzuser").unwrap();
+    assert_eq!(tz_user["timezone"], "Europe/Stockholm");
+}
+
+#[tokio::test]
+async fn test_user_timezone_clear() {
+    let app = app().await;
+    let tok = register_user(&app, "tzuser2").await;
+    // Set then clear
+    app.clone().oneshot(auth_req("PUT", "/api/profile", &tok, Some(json!({"timezone":"US/Eastern"})))).await.unwrap();
+    let resp = app.clone().oneshot(auth_req("PUT", "/api/profile", &tok, Some(json!({"timezone":""})))).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let root_tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("GET", "/api/admin/users", &root_tok, None)).await.unwrap();
+    let users = body_json(resp).await;
+    let u = users.as_array().unwrap().iter().find(|u| u["username"] == "tzuser2").unwrap();
+    assert!(u["timezone"].is_null());
+}
+
+// ============================================================
+// Sprint 12: watcher notifications on comment
+// ============================================================
+
+#[tokio::test]
+async fn test_watcher_notified_on_comment() {
+    let app = app().await;
+    let root_tok = login_root(&app).await;
+    let (alice_tok, _alice_id) = register_user_full(&app, "walice", "Pass1234").await;
+    // Root creates task, alice watches it
+    let tid = body_json(app.clone().oneshot(auth_req("POST", "/api/tasks", &root_tok, Some(json!({"title":"WatchComment"})))).await.unwrap()).await["id"].as_i64().unwrap();
+    app.clone().oneshot(auth_req("POST", &format!("/api/tasks/{}/watch", tid), &alice_tok, None)).await.unwrap();
+    // Root comments — alice should get notified
+    app.clone().oneshot(auth_req("POST", &format!("/api/tasks/{}/comments", tid), &root_tok, Some(json!({"content":"Hello watchers"})))).await.unwrap();
+    // Give the spawned task time to run
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    let resp = app.clone().oneshot(auth_req("GET", "/api/notifications", &alice_tok, None)).await.unwrap();
+    let notifs = body_json(resp).await;
+    let found = notifs.as_array().unwrap().iter().any(|n| n["kind"] == "comment_added");
+    assert!(found, "Watcher should receive comment_added notification");
+}
+
+#[tokio::test]
+async fn test_watcher_not_notified_own_comment() {
+    let app = app().await;
+    let root_tok = login_root(&app).await;
+    // Root creates task and watches it
+    let tid = body_json(app.clone().oneshot(auth_req("POST", "/api/tasks", &root_tok, Some(json!({"title":"SelfComment"})))).await.unwrap()).await["id"].as_i64().unwrap();
+    app.clone().oneshot(auth_req("POST", &format!("/api/tasks/{}/watch", tid), &root_tok, None)).await.unwrap();
+    // Root comments on own watched task — should NOT get notified
+    app.clone().oneshot(auth_req("POST", &format!("/api/tasks/{}/comments", tid), &root_tok, Some(json!({"content":"My own comment"})))).await.unwrap();
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    let resp = app.clone().oneshot(auth_req("GET", "/api/notifications", &root_tok, None)).await.unwrap();
+    let notifs = body_json(resp).await;
+    let found = notifs.as_array().unwrap().iter().any(|n| n["kind"] == "comment_added");
+    assert!(!found, "Commenter should NOT receive own comment notification");
+}
+
+// ============================================================
+// Sprint 12: watcher notifications on status change
+// ============================================================
+
+#[tokio::test]
+async fn test_watcher_notified_on_status_change() {
+    let app = app().await;
+    let root_tok = login_root(&app).await;
+    let (bob_tok, _bob_id) = register_user_full(&app, "wbob", "Pass1234").await;
+    // Root creates task, bob watches it
+    let tid = body_json(app.clone().oneshot(auth_req("POST", "/api/tasks", &root_tok, Some(json!({"title":"WatchStatus"})))).await.unwrap()).await["id"].as_i64().unwrap();
+    app.clone().oneshot(auth_req("POST", &format!("/api/tasks/{}/watch", tid), &bob_tok, None)).await.unwrap();
+    // Root changes status
+    app.clone().oneshot(auth_req("PUT", &format!("/api/tasks/{}", tid), &root_tok, Some(json!({"status":"in_progress"})))).await.unwrap();
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    let resp = app.clone().oneshot(auth_req("GET", "/api/notifications", &bob_tok, None)).await.unwrap();
+    let notifs = body_json(resp).await;
+    let found = notifs.as_array().unwrap().iter().any(|n| n["kind"] == "task_status_changed");
+    assert!(found, "Watcher should receive task_status_changed notification");
+}
+
+// ============================================================
+// Sprint 12: new notification pref event types
+// ============================================================
+
+#[tokio::test]
+async fn test_notification_prefs_include_new_types() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("GET", "/api/profile/notifications", &tok, None)).await.unwrap();
+    let prefs = body_json(resp).await;
+    let types: Vec<&str> = prefs.as_array().unwrap().iter().map(|p| p["event_type"].as_str().unwrap()).collect();
+    assert!(types.contains(&"task_status_changed"), "Should include task_status_changed");
+    assert!(types.contains(&"mention"), "Should include mention");
+}
