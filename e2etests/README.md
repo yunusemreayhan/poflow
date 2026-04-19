@@ -1,4 +1,4 @@
-# E2E Test Suite — pomodoroLinux
+# E2E Test Suite — pojidora
 
 **1011 tests** across **44 files** covering the Tauri GUI, REST API, all 154 endpoints, WebSocket, security, performance, data integrity, multi-user scenarios, edge cases, and concurrent stress testing.
 

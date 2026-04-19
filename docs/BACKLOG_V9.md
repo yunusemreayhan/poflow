@@ -1,4 +1,4 @@
-# Backlog v9 — pomodoroLinux
+# Backlog v9 — pojidora
 
 Generated: 2026-04-12
 Backend: 197 tests | Frontend: 154 tests | TS strict: clean

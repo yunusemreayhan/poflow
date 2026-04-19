@@ -1,4 +1,4 @@
-# Backlog v5 — pomodoroLinux
+# Backlog v5 — pojidora
 
 Generated: 2026-04-11
 Previous: v4 (131/146 complete), v3 (78/78), v2 (61/61)

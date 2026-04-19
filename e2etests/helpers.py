@@ -1,4 +1,4 @@
-"""High-level test helpers for pomodoroLinux E2E tests.
+"""High-level test helpers for pojidora E2E tests.
 
 Import these to write tests in 3-5 lines instead of raw API calls.
 Every helper handles auth, returns the created object, and is composable.

@@ -1,5 +1,5 @@
 # Pomodoro daemon configuration
-# See https://github.com/yunusemreayhan/pomodoroLinux for documentation
+# See https://github.com/yunusemreayhan/pojidora for documentation
 
 # Server bind address and port
 # bind_address = "0.0.0.0"  # Listen on all interfaces (for LAN access)

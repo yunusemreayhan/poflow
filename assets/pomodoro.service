@@ -1,6 +1,6 @@
 [Unit]
 Description=Pomodoro Timer Daemon
-Documentation=https://github.com/yunusemreayhan/pomodoroLinux
+Documentation=https://github.com/yunusemreayhan/pojidora
 After=network.target graphical-session.target
 
 [Service]

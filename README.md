@@ -1,4 +1,4 @@
-# Pomodoro Linux
+# Pojidora
 
 A production-grade multi-user Pomodoro timer and project management platform for Linux. Rust HTTP backend (221 API endpoints), Tauri v2 desktop GUI, web GUI (PWA), hierarchical task management, sprint planning, estimation rooms, Gantt charts, custom workflows, RBAC, and time tracking. Packaged as a single `.deb`.
 

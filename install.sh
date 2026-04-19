@@ -1,5 +1,5 @@
 #!/bin/bash
-# install.sh — Build and install pomodoroLinux from source (Ubuntu/Debian)
+# install.sh — Build and install pojidora from source (Ubuntu/Debian)
 #
 # Installs: pomodoro-daemon, pomo (CLI), web GUI, desktop GUI (optional)
 #
@@ -120,7 +120,7 @@ pass "Installation complete"
 # ── Step 7: Post-install ────────────────────────────────────────
 echo ""
 echo -e "${GREEN}╔══════════════════════════════════════════════╗${NC}"
-echo -e "${GREEN}║  pomodoroLinux installed successfully!        ║${NC}"
+echo -e "${GREEN}║  pojidora installed successfully!        ║${NC}"
 echo -e "${GREEN}╚══════════════════════════════════════════════╝${NC}"
 echo ""
 echo "Start the daemon:"

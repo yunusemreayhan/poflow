@@ -277,7 +277,7 @@ async fn indicator_toggle(enable: bool) -> Result<bool, String> {
         let home = dirs::home_dir().unwrap_or_default();
         let candidates = [
             std::path::PathBuf::from("/usr/share/pomodoro/panel-indicator.py"),
-            home.join("repos/pomodoroLinux/tools/panel-indicator.py"),
+            home.join("repos/pojidora/tools/panel-indicator.py"),
             home.join(".local/share/pomodoro/panel-indicator.py"),
         ];
         let script = candidates.iter().find(|p| p.exists())

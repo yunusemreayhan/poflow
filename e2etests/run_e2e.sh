@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run the full E2E test suite for pomodoroLinux.
+# Run the full E2E test suite for pojidora.
 # Each test file gets its own pytest invocation (fresh daemon + GUI session)
 # to avoid state contamination between files.
 #
@@ -34,7 +34,7 @@ GUI="${POMODORO_GUI_BINARY:-}"
 if [ -z "$GUI" ]; then
     for candidate in \
         "$REPO_DIR/target/release/pomodoro-gui" \
-        "$REPO_DIR/../pomodoroLinux/target/release/pomodoro-gui"; do
+        "$REPO_DIR/../pojidora/target/release/pomodoro-gui"; do
         if [ -f "$candidate" ]; then GUI="$candidate"; break; fi
     done
 fi

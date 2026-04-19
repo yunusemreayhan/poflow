@@ -1,4 +1,4 @@
-# Backlog v7 — pomodoroLinux
+# Backlog v7 — pojidora
 
 Generated: 2026-04-12
 Backend: 174 tests | Frontend: 134 tests | TS strict: clean

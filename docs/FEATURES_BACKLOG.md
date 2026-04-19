@@ -1,6 +1,6 @@
-# FEATURES BACKLOG — pomodoroLinux
+# FEATURES BACKLOG — pojidora
 
-New feature proposals to make pomodoroLinux a best-in-class Pomodoro + project management tool. Organized by category, prioritized by impact within each section.
+New feature proposals to make pojidora a best-in-class Pomodoro + project management tool. Organized by category, prioritized by impact within each section.
 
 Existing feature inventory: 207 API endpoints covering timer, tasks (hierarchical, labels, dependencies, recurrence, attachments, templates, watchers, checklists, custom fields, FTS, advanced search), sprints (board, burndown, velocity, carry-over, snapshots), planning poker rooms (WebSocket, auto-advance), teams, epics, notifications, webhooks, automation rules, audit log, import/export (CSV/JSON/iCal), backup/restore, per-user config, multi-server support, custom statuses, RBAC (root/admin/user), SLA tracking, time tracking reports, bulk operations, Gantt chart, roadmap view, PWA with offline support.
 

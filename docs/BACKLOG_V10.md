@@ -1,4 +1,4 @@
-# BACKLOG v10 — pomodoroLinux
+# BACKLOG v10 — pojidora
 
 Generated from full codebase analysis (5485 LOC backend, 8244 LOC frontend, 211 backend tests, 154 frontend tests).
 
