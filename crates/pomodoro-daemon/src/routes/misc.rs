@@ -58,13 +58,26 @@ pub struct TasksFullResponse {
     pub labels: Vec<db::TaskLabel>,
 }
 
+#[derive(Deserialize)]
+pub struct TasksFullQuery {
+    pub project: Option<String>,
+    pub page: Option<i64>,
+    pub per_page: Option<i64>,
+}
+
 #[utoipa::path(get, path = "/api/tasks/full", responses((status = 200, body = TasksFullResponse)), security(("bearer" = [])))]
-pub async fn get_tasks_full(State(engine): State<AppState>, _claims: Claims, headers: axum::http::HeaderMap) -> Result<axum::response::Response, ApiError> {
+pub async fn get_tasks_full(State(engine): State<AppState>, _claims: Claims, headers: axum::http::HeaderMap, Query(q): Query<TasksFullQuery>) -> Result<axum::response::Response, ApiError> {
+    let project_filter = q.project.as_deref();
+    let page = q.page.unwrap_or(1).max(1);
+    let per_page = q.per_page.unwrap_or(5000).clamp(1, 5000);
+    let offset = (page - 1) * per_page;
+
     // B8: ETag includes labels and attachments to avoid stale data
     let (max_updated, task_count, sprint_task_count, burn_count, assignee_count, label_count, att_count): (String, i64, i64, i64, i64, i64, i64) =
         sqlx::query_as("SELECT COALESCE((SELECT MAX(COALESCE(deleted_at, updated_at)) FROM tasks), ''), (SELECT COUNT(*) FROM tasks WHERE deleted_at IS NULL), (SELECT COUNT(*) FROM sprint_tasks), (SELECT COUNT(*) FROM burn_log WHERE cancelled = 0), (SELECT COUNT(*) FROM task_assignees), (SELECT COUNT(*) FROM task_labels), (SELECT COUNT(*) FROM task_attachments)")
         .fetch_one(&engine.pool).await.map_err(internal)?;
-    let etag = format!("\"{}:{}:{}:{}:{}:{}:{}\"", max_updated, task_count, sprint_task_count, burn_count, assignee_count, label_count, att_count);
+    let etag_base = format!("{}:{}:{}:{}:{}:{}:{}", max_updated, task_count, sprint_task_count, burn_count, assignee_count, label_count, att_count);
+    let etag = format!("\"{}:{}:{}:{}\"", etag_base, project_filter.unwrap_or(""), page, per_page);
 
     if let Some(if_none_match) = headers.get("if-none-match").and_then(|v| v.to_str().ok()) {
         if if_none_match == etag {
@@ -75,8 +88,21 @@ pub async fn get_tasks_full(State(engine): State<AppState>, _claims: Claims, hea
         }
     }
 
+    // Count total for pagination header
+    let total_count: (i64,) = if let Some(proj) = project_filter {
+        sqlx::query_as("SELECT COUNT(*) FROM tasks WHERE deleted_at IS NULL AND project = ?")
+            .bind(proj).fetch_one(&engine.pool).await.map_err(internal)?
+    } else {
+        sqlx::query_as("SELECT COUNT(*) FROM tasks WHERE deleted_at IS NULL")
+            .fetch_one(&engine.pool).await.map_err(internal)?
+    };
+
     let (tasks, task_sprints, burn_totals_raw, assignees, labels) = tokio::join!(
-        db::list_tasks(&engine.pool, None, None),
+        db::list_tasks_paged(&engine.pool, db::TaskFilter {
+            status: None, project: project_filter, search: None, assignee: None,
+            due_before: None, due_after: None, priority: None, team_id: None,
+            user_id: None, label: None,
+        }, per_page, offset),
         db::get_all_task_sprints(&engine.pool),
         db::get_all_burn_totals(&engine.pool),
         db::get_all_assignees(&engine.pool),
@@ -97,6 +123,9 @@ pub async fn get_tasks_full(State(engine): State<AppState>, _claims: Claims, hea
         .status(StatusCode::OK)
         .header("content-type", "application/json")
         .header("etag", &etag)
+        .header("x-total-count", total_count.0.to_string())
+        .header("x-page", page.to_string())
+        .header("x-per-page", per_page.to_string())
         .body(axum::body::Body::from(body)).map_err(|e| internal(e.to_string()))
 }
 

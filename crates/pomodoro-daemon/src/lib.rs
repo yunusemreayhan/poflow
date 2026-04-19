@@ -214,6 +214,7 @@ pub async fn build_router(engine: Arc<engine::Engine>) -> Router {
         // Webhooks & Templates
         .route("/api/webhooks", get(routes::list_webhooks).post(routes::create_webhook))
         .route("/api/webhooks/{id}", put(routes::update_webhook).delete(routes::delete_webhook))
+        .route("/api/webhooks/{id}/deliveries", get(routes::list_webhook_deliveries))
         .route("/api/templates", get(routes::list_templates).post(routes::create_template))
         .route("/api/templates/{id}", put(routes::update_template).delete(routes::delete_template))
         .route("/api/templates/{id}/instantiate", post(routes::instantiate_template))
@@ -238,6 +239,9 @@ pub async fn build_router(engine: Arc<engine::Engine>) -> Router {
         .route("/api/notifications", get(routes::list_notifications))
         .route("/api/notifications/unread", get(routes::unread_count))
         .route("/api/notifications/read", post(routes::mark_notifications_read))
+        // Saved views
+        .route("/api/views", get(routes::list_saved_views).post(routes::create_saved_view))
+        .route("/api/views/{id}", put(routes::update_saved_view).delete(routes::delete_saved_view))
         .layer(axum::extract::DefaultBodyLimit::max(2 * 1024 * 1024)) // 2MB max request body
         .layer(cors)
         .layer(axum::middleware::from_fn(security_headers))

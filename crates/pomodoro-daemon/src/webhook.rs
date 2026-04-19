@@ -83,7 +83,10 @@ pub fn dispatch(pool: Pool, event: &str, payload: serde_json::Value) {
                     } else { None }
                 } else { None }
             } else { None };
-            let mut attempts = 0;
+            let mut attempts = 0u32;
+            let mut last_status: Option<u16> = None;
+            #[allow(unused_assignments)]
+            let mut last_error: Option<String> = None;
             loop {
                 attempts += 1;
                 // B10: Rebuild full request each attempt to avoid lost headers on try_clone failure
@@ -93,13 +96,21 @@ pub fn dispatch(pool: Pool, event: &str, payload: serde_json::Value) {
                     .body(body_str.clone());
                 if let Some(ref sig) = signature { retry_req = retry_req.header("x-pomodoro-signature", sig.as_str()); }
                 match retry_req.send().await {
-                    Ok(resp) if resp.status().is_success() => break,
+                    Ok(resp) if resp.status().is_success() => {
+                        last_status = Some(resp.status().as_u16());
+                        last_error = None;
+                        break;
+                    }
                     Ok(resp) => {
-                        tracing::warn!("Webhook {} returned {}", hook.url, resp.status());
+                        let code = resp.status().as_u16();
+                        tracing::warn!("Webhook {} returned {}", hook.url, code);
+                        last_status = Some(code);
+                        last_error = Some(format!("HTTP {}", code));
                         if attempts >= 3 { break; }
                     }
                     Err(e) => {
                         tracing::warn!("Webhook {} attempt {}/3 failed: {}", hook.url, attempts, e);
+                        last_error = Some(e.to_string().chars().take(500).collect());
                         if attempts >= 3 { break; }
                     }
                 }
@@ -107,6 +118,11 @@ pub fn dispatch(pool: Pool, event: &str, payload: serde_json::Value) {
                 let mut jitter_buf = [0u8; 1];
                 let jitter_ms = if getrandom::fill(&mut jitter_buf).is_ok() { jitter_buf[0] as u64 * 4 } else { 0 };
                 tokio::time::sleep(std::time::Duration::from_millis(base * 1000 + jitter_ms)).await;
+            }
+            // Log delivery result
+            let success = last_error.is_none();
+            if let Err(e) = db::log_delivery(&pool, hook.id, &event, last_status, success, attempts, last_error.as_deref()).await {
+                tracing::warn!("Failed to log webhook delivery: {}", e);
             }
         }
     });

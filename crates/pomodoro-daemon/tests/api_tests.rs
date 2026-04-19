@@ -5386,3 +5386,141 @@ async fn test_notification_prefs_include_new_types() {
     assert!(types.contains(&"task_status_changed"), "Should include task_status_changed");
     assert!(types.contains(&"mention"), "Should include mention");
 }
+
+// ============================================================
+// Sprint 13: Paginate /api/tasks/full
+// ============================================================
+
+#[tokio::test]
+async fn test_tasks_full_returns_pagination_headers() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    // Create a task so there's data
+    app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"Full1"})))).await.unwrap();
+    let resp = app.clone().oneshot(auth_req("GET", "/api/tasks/full?page=1&per_page=10", &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    assert!(resp.headers().get("x-total-count").is_some());
+    assert_eq!(resp.headers().get("x-page").unwrap().to_str().unwrap(), "1");
+    assert_eq!(resp.headers().get("x-per-page").unwrap().to_str().unwrap(), "10");
+}
+
+#[tokio::test]
+async fn test_tasks_full_project_filter() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"ProjA","project":"alpha"})))).await.unwrap();
+    app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"ProjB","project":"beta"})))).await.unwrap();
+    let resp = app.clone().oneshot(auth_req("GET", "/api/tasks/full?project=alpha", &tok, None)).await.unwrap();
+    let j = body_json(resp).await;
+    let tasks = j["tasks"].as_array().unwrap();
+    assert!(tasks.iter().all(|t| t["project"] == "alpha"));
+    assert!(tasks.iter().any(|t| t["title"] == "ProjA"));
+}
+
+#[tokio::test]
+async fn test_tasks_full_pagination() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    for i in 0..5 { app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":format!("Page{}", i)})))).await.unwrap(); }
+    let resp = app.clone().oneshot(auth_req("GET", "/api/tasks/full?per_page=2&page=1", &tok, None)).await.unwrap();
+    let total: i64 = resp.headers().get("x-total-count").unwrap().to_str().unwrap().parse().unwrap();
+    assert!(total >= 5);
+    let j = body_json(resp).await;
+    assert_eq!(j["tasks"].as_array().unwrap().len(), 2);
+}
+
+#[tokio::test]
+async fn test_tasks_full_backward_compatible() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    // No query params — should still work (returns all tasks)
+    let resp = app.clone().oneshot(auth_req("GET", "/api/tasks/full", &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let j = body_json(resp).await;
+    assert!(j["tasks"].is_array());
+    assert!(j["task_sprints"].is_array());
+    assert!(j["burn_totals"].is_array());
+}
+
+// ============================================================
+// Sprint 13: Saved views CRUD
+// ============================================================
+
+#[tokio::test]
+async fn test_saved_views_crud() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    // Create
+    let resp = app.clone().oneshot(auth_req("POST", "/api/views", &tok, Some(json!({"name":"My Filter","filters":{"status":"active","project":"alpha"}})))).await.unwrap();
+    assert_eq!(resp.status(), 201);
+    let view = body_json(resp).await;
+    assert_eq!(view["name"], "My Filter");
+    let vid = view["id"].as_i64().unwrap();
+    // List
+    let resp = app.clone().oneshot(auth_req("GET", "/api/views", &tok, None)).await.unwrap();
+    let views = body_json(resp).await;
+    assert!(views.as_array().unwrap().iter().any(|v| v["id"].as_i64() == Some(vid)));
+    // Update
+    let resp = app.clone().oneshot(auth_req("PUT", &format!("/api/views/{}", vid), &tok, Some(json!({"name":"Updated","filters":{"status":"done"}})))).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    assert_eq!(body_json(resp).await["name"], "Updated");
+    // Delete
+    let resp = app.clone().oneshot(auth_req("DELETE", &format!("/api/views/{}", vid), &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 204);
+}
+
+#[tokio::test]
+async fn test_saved_views_empty_name_rejected() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let resp = app.clone().oneshot(auth_req("POST", "/api/views", &tok, Some(json!({"name":"","filters":{}})))).await.unwrap();
+    assert_eq!(resp.status(), 400);
+}
+
+#[tokio::test]
+async fn test_saved_views_user_isolation() {
+    let app = app().await;
+    let tok_a = register_user(&app, "viewuserA").await;
+    let tok_b = register_user(&app, "viewuserB").await;
+    // A creates a view
+    let resp = app.clone().oneshot(auth_req("POST", "/api/views", &tok_a, Some(json!({"name":"A's view","filters":{}})))).await.unwrap();
+    let vid = body_json(resp).await["id"].as_i64().unwrap();
+    // B cannot see it
+    let resp = app.clone().oneshot(auth_req("GET", "/api/views", &tok_b, None)).await.unwrap();
+    let views = body_json(resp).await;
+    assert!(!views.as_array().unwrap().iter().any(|v| v["id"].as_i64() == Some(vid)));
+    // B cannot delete it
+    let resp = app.clone().oneshot(auth_req("DELETE", &format!("/api/views/{}", vid), &tok_b, None)).await.unwrap();
+    assert_eq!(resp.status(), 404);
+}
+
+// ============================================================
+// Sprint 13: Webhook deliveries endpoint
+// ============================================================
+
+#[tokio::test]
+async fn test_webhook_deliveries_endpoint() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    // Create a webhook
+    let resp = app.clone().oneshot(auth_req("POST", "/api/webhooks", &tok, Some(json!({"url":"https://example.com/hook"})))).await.unwrap();
+    assert_eq!(resp.status(), 201);
+    let wid = body_json(resp).await["id"].as_i64().unwrap();
+    // List deliveries (should be empty)
+    let resp = app.clone().oneshot(auth_req("GET", &format!("/api/webhooks/{}/deliveries", wid), &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let deliveries = body_json(resp).await;
+    assert!(deliveries.as_array().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn test_webhook_deliveries_not_owner_rejected() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    let user_tok = register_user(&app, "whuser").await;
+    let resp = app.clone().oneshot(auth_req("POST", "/api/webhooks", &tok, Some(json!({"url":"https://example.com/hook2"})))).await.unwrap();
+    let wid = body_json(resp).await["id"].as_i64().unwrap();
+    // Non-owner cannot see deliveries
+    let resp = app.clone().oneshot(auth_req("GET", &format!("/api/webhooks/{}/deliveries", wid), &user_tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 403);
+}

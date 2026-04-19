@@ -104,3 +104,16 @@ pub async fn update_webhook(State(engine): State<AppState>, claims: Claims, Path
     let updated = sqlx::query_as::<_, db::Webhook>("SELECT * FROM webhooks WHERE id = ?").bind(id).fetch_one(&engine.pool).await.map_err(internal)?;
     Ok(Json(updated))
 }
+
+// Sprint 13: Webhook delivery observability
+#[derive(Deserialize)]
+pub struct DeliveryQuery { pub limit: Option<i64> }
+
+#[utoipa::path(get, path = "/api/webhooks/{id}/deliveries", responses((status = 200, body = Vec<db::WebhookDelivery>)), security(("bearer" = [])))]
+pub async fn list_webhook_deliveries(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>, Query(q): Query<DeliveryQuery>) -> ApiResult<Vec<db::WebhookDelivery>> {
+    let wh: (i64,) = sqlx::query_as("SELECT user_id FROM webhooks WHERE id = ?")
+        .bind(id).fetch_one(&engine.pool).await.map_err(|_| err(StatusCode::NOT_FOUND, "Webhook not found"))?;
+    if !is_owner_or_root(wh.0, &claims) { return Err(err(StatusCode::FORBIDDEN, "Not owner")); }
+    let limit = q.limit.unwrap_or(50).clamp(1, 200);
+    db::list_deliveries(&engine.pool, id, limit).await.map(Json).map_err(internal)
+}

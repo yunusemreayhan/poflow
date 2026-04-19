@@ -621,6 +621,29 @@ async fn migrate(pool: &Pool) -> Result<()> {
         sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (24, ?)").bind(now_str()).execute(pool).await.ok();
     }
 
+    // Migration 25: saved_views + webhook_deliveries
+    if !applied_set.contains(&25) {
+        sqlx::query("CREATE TABLE IF NOT EXISTS saved_views (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            name        TEXT NOT NULL,
+            filters     TEXT NOT NULL,
+            created_at  TEXT NOT NULL,
+            updated_at  TEXT NOT NULL
+        )").execute(pool).await.ok();
+        sqlx::query("CREATE TABLE IF NOT EXISTS webhook_deliveries (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            webhook_id  INTEGER NOT NULL REFERENCES webhooks(id) ON DELETE CASCADE,
+            event       TEXT NOT NULL,
+            status_code INTEGER,
+            success     INTEGER NOT NULL DEFAULT 0,
+            attempts    INTEGER NOT NULL DEFAULT 0,
+            error       TEXT,
+            created_at  TEXT NOT NULL
+        )").execute(pool).await.ok();
+        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (25, ?)").bind(now_str()).execute(pool).await.ok();
+    }
+
     Ok(())
 }
 
@@ -670,3 +693,7 @@ mod custom_fields;
 pub use custom_fields::*;
 mod checklists;
 pub use checklists::*;
+mod saved_views;
+pub use saved_views::*;
+mod webhook_deliveries;
+pub use webhook_deliveries::*;

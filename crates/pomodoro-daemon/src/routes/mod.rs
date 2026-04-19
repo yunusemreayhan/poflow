@@ -164,3 +164,5 @@ mod custom_fields;
 pub use custom_fields::*;
 mod checklists;
 pub use checklists::*;
+mod saved_views;
+pub use saved_views::*;
