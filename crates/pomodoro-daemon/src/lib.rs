@@ -327,6 +327,9 @@ async fn api_rate_limit(
         if !limiter.check_and_record(&ip) {
             return (axum::http::StatusCode::TOO_MANY_REQUESTS, "Rate limit exceeded").into_response();
         }
+    } else {
+        static WARN: std::sync::Once = std::sync::Once::new();
+        WARN.call_once(|| tracing::warn!("POMODORO_NO_RATE_LIMIT is set — API rate limiting DISABLED"));
     }
     next.run(req).await.into_response()
 }

@@ -79,6 +79,16 @@ pub async fn update_webhook(State(engine): State<AppState>, claims: Claims, Path
             }
         }
     }
+    if let Some(ref events) = req.events {
+        if events != "*" {
+            const VALID_EVENTS: &[&str] = &["task.created", "task.updated", "task.deleted", "sprint.created", "sprint.started", "sprint.completed"];
+            for ev in events.split(',') {
+                if !VALID_EVENTS.contains(&ev.trim()) {
+                    return Err(err(StatusCode::BAD_REQUEST, format!("Unknown event '{}'. Valid: {}", ev.trim(), VALID_EVENTS.join(", "))));
+                }
+            }
+        }
+    }
     let mut sql_parts = Vec::new();
     if req.url.is_some() { sql_parts.push("url = ?"); }
     if req.events.is_some() { sql_parts.push("events = ?"); }

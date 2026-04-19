@@ -96,10 +96,16 @@ pub async fn global_search(State(engine): State<AppState>, claims: Claims, Query
     let task_results = db::search_tasks_fts(&engine.pool, query, limit, user_filter).await.unwrap_or_default();
     let tasks: Vec<serde_json::Value> = task_results.into_iter().map(|(id, title, snippet)| serde_json::json!({"type":"task","id":id,"title":title,"snippet":snippet})).collect();
 
-    // Comments
-    let comments: Vec<(i64, i64, String, String, String)> = sqlx::query_as(
-        "SELECT c.id, c.task_id, c.content, c.created_at, u.username FROM comments c JOIN users u ON c.user_id = u.id WHERE c.content LIKE ? ORDER BY c.created_at DESC LIMIT ?")
-        .bind(&like).bind(limit).fetch_all(&engine.pool).await.unwrap_or_default();
+    // Comments — filter by task ownership for non-admin users
+    let comment_sql = if auth::is_admin_or_root(&claims) {
+        "SELECT c.id, c.task_id, c.content, c.created_at, u.username FROM comments c JOIN users u ON c.user_id = u.id WHERE c.content LIKE ? ORDER BY c.created_at DESC LIMIT ?".to_string()
+    } else {
+        "SELECT c.id, c.task_id, c.content, c.created_at, u.username FROM comments c JOIN users u ON c.user_id = u.id JOIN tasks t ON t.id = c.task_id WHERE c.content LIKE ? AND t.user_id = ? ORDER BY c.created_at DESC LIMIT ?".to_string()
+    };
+    let mut cq = sqlx::query_as::<_, (i64, i64, String, String, String)>(&comment_sql).bind(&like);
+    if !auth::is_admin_or_root(&claims) { cq = cq.bind(claims.user_id); }
+    cq = cq.bind(limit);
+    let comments: Vec<(i64, i64, String, String, String)> = cq.fetch_all(&engine.pool).await.unwrap_or_default();
     let comments: Vec<serde_json::Value> = comments.into_iter().map(|(id, tid, content, at, user)| {
         let snippet = if content.len() > 100 { format!("{}...", &content[..100]) } else { content };
         serde_json::json!({"type":"comment","id":id,"task_id":tid,"snippet":snippet,"created_at":at,"user":user})
@@ -165,7 +171,7 @@ pub async fn advanced_search(State(engine): State<AppState>, claims: Claims, Jso
             "project" => {
                 match f.op.as_str() {
                     "eq" => { conditions.push("t.project = ?".into()); binds.push(f.value.as_str().unwrap_or("").to_string()); }
-                    "contains" => { conditions.push("t.project LIKE ?".into()); binds.push(format!("%{}%", f.value.as_str().unwrap_or(""))); }
+                    "contains" => { conditions.push("t.project LIKE ? ESCAPE '\\'".into()); binds.push(db::escape_like_pub(f.value.as_str().unwrap_or(""))); }
                     _ => {}
                 }
             }
@@ -204,8 +210,8 @@ pub async fn advanced_search(State(engine): State<AppState>, claims: Claims, Jso
             }
             "title" => {
                 if f.op == "contains" {
-                    conditions.push("t.title LIKE ?".into());
-                    binds.push(format!("%{}%", f.value.as_str().unwrap_or("")));
+                    conditions.push("t.title LIKE ? ESCAPE '\\'".into());
+                    binds.push(db::escape_like_pub(f.value.as_str().unwrap_or("")));
                 }
             }
             s if s.starts_with("custom:") => {

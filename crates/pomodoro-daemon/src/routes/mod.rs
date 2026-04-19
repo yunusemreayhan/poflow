@@ -79,7 +79,11 @@ pub(crate) fn extract_ip(headers: &axum::http::HeaderMap) -> String {
 }
 
 pub(crate) fn check_auth_rate_limit(headers: &axum::http::HeaderMap) -> Result<(), ApiError> {
-    if std::env::var("POMODORO_NO_RATE_LIMIT").is_ok() { return Ok(()); }
+    if std::env::var("POMODORO_NO_RATE_LIMIT").is_ok() {
+        static WARN: std::sync::Once = std::sync::Once::new();
+        WARN.call_once(|| tracing::warn!("POMODORO_NO_RATE_LIMIT is set — ALL rate limiting is DISABLED. Do not use in production."));
+        return Ok(());
+    }
     let ip = extract_ip(headers);
     let limiter = auth_limiter();
     check_rate_limit(limiter, &ip)

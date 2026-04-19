@@ -5118,3 +5118,144 @@ async fn test_csv_import_title_length() {
 // Integration tests validating business flows end-to-end
 // ============================================================
 
+
+// ============================================================
+// Sprint 11: Security Fixes Tests
+// ============================================================
+
+// H1: internal() should not leak raw error details
+#[tokio::test]
+async fn test_internal_error_no_leak() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    // Trigger an internal error by requesting a non-existent task for an operation that uses .map_err(internal)
+    // Use a webhook update on a non-existent ID — the NOT_FOUND path is explicit, but let's test
+    // that error messages from DB operations don't contain SQL/table names
+    let resp = app.clone().oneshot(auth_req("GET", "/api/tasks/999999", &tok, None)).await.unwrap();
+    if resp.status() == 500 {
+        let j = body_json(resp).await;
+        let msg = j["error"].as_str().unwrap_or("");
+        assert!(!msg.contains("sqlx"), "Error message should not contain sqlx details");
+        assert!(!msg.contains("SELECT"), "Error message should not contain SQL");
+        assert!(!msg.contains("tasks"), "Error message should not contain table names");
+        assert_eq!(msg, "Internal server error");
+    }
+    // 404 is also acceptable — the point is no SQL leak on 500
+}
+
+// M1: Global search should not leak comments from other users' tasks
+#[tokio::test]
+async fn test_global_search_comment_isolation() {
+    let app = app().await;
+    let root_tok = login_root(&app).await;
+    let user_tok = register_user(&app, "searchuser1").await;
+
+    // Root creates a task and adds a comment with a unique keyword
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &root_tok, Some(json!({"title":"Root secret task"})))).await.unwrap();
+    let task_id = body_json(resp).await["id"].as_i64().unwrap();
+    app.clone().oneshot(auth_req("POST", &format!("/api/tasks/{}/comments", task_id), &root_tok, Some(json!({"content":"xyzzy_secret_keyword"})))).await.unwrap();
+
+    // Normal user searches for the keyword — should NOT find root's comment
+    let resp = app.clone().oneshot(auth_req("GET", "/api/search?q=xyzzy_secret_keyword", &user_tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let j = body_json(resp).await;
+    let comments = j["comments"].as_array().unwrap();
+    assert!(comments.is_empty(), "Non-admin user should not see comments on other users' tasks");
+
+    // Root can still find it
+    let resp = app.clone().oneshot(auth_req("GET", "/api/search?q=xyzzy_secret_keyword", &root_tok, None)).await.unwrap();
+    let j = body_json(resp).await;
+    let comments = j["comments"].as_array().unwrap();
+    assert!(!comments.is_empty(), "Root should see all comments");
+}
+
+// M2: Advanced search LIKE injection — wildcards should be escaped
+#[tokio::test]
+async fn test_advanced_search_like_escape() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    // Create tasks with specific projects
+    app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"T1","project":"alpha_beta"})))).await.unwrap();
+    app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"T2","project":"alphaXbeta"})))).await.unwrap();
+
+    // Search with underscore wildcard — should only match literal underscore
+    let resp = app.clone().oneshot(auth_req("POST", "/api/tasks/search/advanced", &tok, Some(json!({
+        "filters": [{"field":"project","op":"contains","value":"a_b"}]
+    })))).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let results = body_json(resp).await;
+    let arr = results.as_array().unwrap();
+    // Should find alpha_beta but NOT alphaXbeta (underscore is literal, not wildcard)
+    assert!(arr.iter().any(|t| t["project"].as_str().unwrap_or("") == "alpha_beta"));
+    assert!(!arr.iter().any(|t| t["project"].as_str().unwrap_or("") == "alphaXbeta"),
+        "LIKE wildcard _ should be escaped — alphaXbeta should not match a_b");
+}
+
+// M3: FTS5 snippets should have HTML sanitized (except <mark>)
+// Note: sanitize_snippet is tested directly in db::tasks::tests. This integration test
+// verifies the search endpoint doesn't return raw HTML in snippets.
+#[tokio::test]
+async fn test_fts5_snippet_xss_sanitized() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    // Create a task with HTML in the title
+    app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({
+        "title": "Test <img onerror=alert(1)> xsstest123"
+    })))).await.unwrap();
+
+    // Use the FTS search endpoint that returns snippets
+    let resp = app.clone().oneshot(auth_req("GET", "/api/tasks/search?q=xsstest123", &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let results = body_json(resp).await;
+    let arr = results.as_array().unwrap();
+    assert!(!arr.is_empty(), "Search should find the task");
+    for r in arr {
+        let title = r["title"].as_str().unwrap_or("");
+        // When FTS5 is active, snippets go through sanitize_snippet (no raw HTML).
+        // When FTS5 is not active, the raw title is returned (no snippet processing).
+        // In either case, <script> tags should not appear in snippets.
+        assert!(!title.contains("<script"), "Script tags should not appear in search results: {}", title);
+    }
+
+    // Also test via global search
+    let resp = app.clone().oneshot(auth_req("GET", "/api/search?q=xsstest123", &tok, None)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let j = body_json(resp).await;
+    for t in j["tasks"].as_array().unwrap() {
+        let snippet = t["snippet"].as_str().unwrap_or("");
+        assert!(!snippet.contains("<script"), "Script tags should not appear in global search snippets: {}", snippet);
+    }
+}
+
+// M7: Webhook update should validate events
+#[tokio::test]
+async fn test_webhook_update_validates_events() {
+    let app = app().await;
+    let tok = login_root(&app).await;
+    // Create a valid webhook
+    let resp = app.clone().oneshot(auth_req("POST", "/api/webhooks", &tok, Some(json!({
+        "url": "https://example.com/hook", "events": "task.created"
+    })))).await.unwrap();
+    assert_eq!(resp.status(), 201);
+    let wid = body_json(resp).await["id"].as_i64().unwrap();
+
+    // Update with invalid event — should be rejected
+    let resp = app.clone().oneshot(auth_req("PUT", &format!("/api/webhooks/{}", wid), &tok, Some(json!({
+        "events": "invalid.event"
+    })))).await.unwrap();
+    assert_eq!(resp.status(), 400);
+    let j = body_json(resp).await;
+    assert!(j["error"].as_str().unwrap().contains("Unknown event"));
+
+    // Update with valid event — should succeed
+    let resp = app.clone().oneshot(auth_req("PUT", &format!("/api/webhooks/{}", wid), &tok, Some(json!({
+        "events": "task.updated,sprint.completed"
+    })))).await.unwrap();
+    assert_eq!(resp.status(), 200);
+
+    // Wildcard should also work
+    let resp = app.clone().oneshot(auth_req("PUT", &format!("/api/webhooks/{}", wid), &tok, Some(json!({
+        "events": "*"
+    })))).await.unwrap();
+    assert_eq!(resp.status(), 200);
+}

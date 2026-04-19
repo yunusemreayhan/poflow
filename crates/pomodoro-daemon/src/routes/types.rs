@@ -145,7 +145,10 @@ pub fn err(status: StatusCode, msg: impl ToString) -> ApiError {
     };
     ApiError::new(status, code, msg)
 }
-pub fn internal(e: impl ToString) -> ApiError { err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()) }
+pub fn internal(e: impl ToString) -> ApiError {
+    tracing::error!("Internal error: {}", e.to_string());
+    err(StatusCode::INTERNAL_SERVER_ERROR, "Internal server error")
+}
 
 // Q6: Allow `?` on sqlx::Error without explicit .map_err(internal)
 impl From<sqlx::Error> for ApiError {

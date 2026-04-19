@@ -17,6 +17,18 @@ fn escape_like(s: &str) -> String {
     format!("%{}%", s.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_"))
 }
 
+pub fn escape_like_pub(s: &str) -> String { escape_like(s) }
+
+/// Strip all HTML tags except <mark> and </mark> from FTS5 snippets
+fn sanitize_snippet(s: &str) -> String {
+    // Replace <mark> and </mark> with placeholders, strip all other tags, restore placeholders
+    s.replace("<mark>", "\x00MARK\x00")
+     .replace("</mark>", "\x00/MARK\x00")
+     .replace('<', "&lt;").replace('>', "&gt;")
+     .replace("\x00MARK\x00", "<mark>")
+     .replace("\x00/MARK\x00", "</mark>")
+}
+
 // P3: Populate temp table for large ID sets to avoid SQLite bind parameter limit (999)
 async fn populate_team_scope_table(pool: &Pool, ids: &[i64]) -> Result<()> {
     sqlx::query("CREATE TEMP TABLE IF NOT EXISTS _team_scope (id INTEGER PRIMARY KEY)").execute(pool).await?;
@@ -273,7 +285,8 @@ pub async fn search_tasks_fts(pool: &Pool, query: &str, limit: i64, user_id: Opt
     q = q.bind(&fts);
     if let Some(uid) = user_id { q = q.bind(uid); }
     q = q.bind(limit);
-    Ok(q.fetch_all(pool).await?)
+    let rows: Vec<(i64, String, String)> = q.fetch_all(pool).await?;
+    Ok(rows.into_iter().map(|(id, title, desc)| (id, sanitize_snippet(&title), sanitize_snippet(&desc))).collect())
 }
 
 pub async fn restore_task(pool: &Pool, id: i64) -> Result<()> {
@@ -302,4 +315,25 @@ pub async fn get_due_tasks(pool: &Pool, before_date: &str) -> Result<Vec<(i64, S
     Ok(sqlx::query_as(
         "SELECT id, title, due_date FROM tasks WHERE due_date IS NOT NULL AND due_date <= ? AND status != 'completed' AND status != 'done' AND deleted_at IS NULL"
     ).bind(before_date).fetch_all(pool).await?)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sanitize_snippet_strips_html() {
+        assert_eq!(sanitize_snippet("<img onerror=alert(1)>"), "&lt;img onerror=alert(1)&gt;");
+        assert_eq!(sanitize_snippet("<mark>hi</mark>"), "<mark>hi</mark>");
+        assert_eq!(sanitize_snippet("<script>alert(1)</script> <mark>ok</mark>"),
+            "&lt;script&gt;alert(1)&lt;/script&gt; <mark>ok</mark>");
+    }
+
+    #[test]
+    fn test_escape_like_wildcards() {
+        assert_eq!(escape_like("a_b"), "%a\\_b%");
+        assert_eq!(escape_like("100%"), "%100\\%%");
+        assert_eq!(escape_like("a\\b"), "%a\\\\b%");
+        assert_eq!(escape_like("normal"), "%normal%");
+    }
 }
