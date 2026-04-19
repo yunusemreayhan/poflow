@@ -122,17 +122,17 @@ All endpoints return errors in this format:
 
 ### Backend
 ```bash
-cd crates/pomodoro-daemon
+cd crates/poflow-daemon
 cargo check                    # Verify compilation
 cargo test                     # Run 310+ tests
 cargo run                      # Start server on :9090
 ```
 
 Environment variables:
-- `POMODORO_DATA_DIR` — Database directory (default: `~/.local/share/pomodoro`)
-- `POMODORO_ROOT_PASSWORD` — Initial root user password (auto-generated if unset)
+- `POFLOW_DATA_DIR` — Database directory (default: `~/.local/share/poflow`)
+- `POFLOW_ROOT_PASSWORD` — Initial root user password (auto-generated if unset)
 - `GITHUB_WEBHOOK_SECRET` — HMAC secret for GitHub webhook verification
-- `POMODORO_NO_RATE_LIMIT=1` — Disable auth rate limiting (for tests)
+- `POFLOW_NO_RATE_LIMIT=1` — Disable auth rate limiting (for tests)
 
 ### Frontend
 ```bash
@@ -145,7 +145,7 @@ npm test                       # Run 154 tests
 
 ### Database
 SQLite with WAL mode. 16 migrations run automatically on startup.
-Database file: `$POMODORO_DATA_DIR/pomodoro.db` (default: `~/.local/share/pomodoro/pomodoro.db`)
+Database file: `$POFLOW_DATA_DIR/poflow.db` (default: `~/.local/share/poflow/poflow.db`)
 
 ## Webhook Event Payloads
 

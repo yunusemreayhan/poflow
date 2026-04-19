@@ -1,6 +1,6 @@
 """E2E test: OpenAPI spec endpoint and API reference page.
 
-NOTE: The test harness starts the daemon with POMODORO_SWAGGER=0,
+NOTE: The test harness starts the daemon with POFLOW_SWAGGER=0,
 so swagger/openapi endpoints are disabled. These tests verify the
 behavior in both cases.
 

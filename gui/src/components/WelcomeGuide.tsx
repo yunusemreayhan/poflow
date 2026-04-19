@@ -4,7 +4,7 @@ import { Timer, ListTodo, Zap, BarChart3, X } from "lucide-react";
 export default function WelcomeGuide({ onDismiss }: { onDismiss: () => void }) {
   const [step, setStep] = useState(0);
   const steps = [
-    { icon: Timer, title: "Focus with Pomodoro", desc: "Start a 25-minute focus session. Take short breaks between sessions. Track your daily goal." },
+    { icon: Timer, title: "Focus with Poflow", desc: "Start a 25-minute focus session. Take short breaks between sessions. Track your daily goal." },
     { icon: ListTodo, title: "Organize Tasks", desc: "Create projects and tasks with priorities, due dates, and labels. Drag to reorder. Use checklists for sub-items." },
     { icon: Zap, title: "Plan Sprints", desc: "Group tasks into sprints with burndown charts. Use the Kanban board to track progress." },
     { icon: BarChart3, title: "Track Progress", desc: "View your focus heatmap, daily standup, and team leaderboard. Export reports as CSV." },

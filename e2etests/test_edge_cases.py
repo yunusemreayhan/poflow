@@ -8,7 +8,7 @@ class TestUnicodeEmoji:
 
     def test_task_title_emoji(self, logged_in):
         h = H()
-        t = h.create_task("🍅 Pomodoro Task 🎯")
+        t = h.create_task("🍅 Poflow Task 🎯")
         assert "🍅" in t["title"]
 
     def test_task_title_cjk(self, logged_in):

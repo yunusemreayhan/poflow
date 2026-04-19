@@ -11,7 +11,7 @@
 
 ```bash
 # Backend
-cargo build -p pomodoro-daemon
+cargo build -p poflow-daemon
 
 # Frontend
 cd gui && npm ci
@@ -27,18 +27,18 @@ cd e2etests && python -m venv .venv && source .venv/bin/activate && pip install 
 ./check.sh
 
 # Or individually:
-cargo test -p pomodoro-daemon          # 416+ backend tests
+cargo test -p poflow-daemon          # 416+ backend tests
 cd gui && npm test                      # 154+ frontend tests
-cargo clippy -p pomodoro-daemon -- -D warnings  # zero warnings required
+cargo clippy -p poflow-daemon -- -D warnings  # zero warnings required
 ```
 
 ## Quality Gates — ALL MUST PASS
 
 Every PR and commit must pass these gates. Run `./check.sh` to verify all at once.
 
-1. **Backend tests** — `cargo test -p pomodoro-daemon` — zero failures
+1. **Backend tests** — `cargo test -p poflow-daemon` — zero failures
 2. **Frontend tests** — `cd gui && npm test` — zero failures
-3. **Clippy** — `cargo clippy -p pomodoro-daemon -- -D warnings` — zero warnings
+3. **Clippy** — `cargo clippy -p poflow-daemon -- -D warnings` — zero warnings
 4. No test disabling — fix code or adapt test, never skip
 5. New features MUST have tests
 
@@ -74,20 +74,20 @@ docker compose up -d
 ./install.sh
 
 # .deb package
-cargo deb -p pomodoro-daemon
+cargo deb -p poflow-daemon
 ```
 
 ## Key Files
 
 | Area | Path |
 |---|---|
-| Router + middleware | `crates/pomodoro-daemon/src/lib.rs` |
-| Auth (JWT, CSRF) | `crates/pomodoro-daemon/src/auth.rs` |
-| Route handlers | `crates/pomodoro-daemon/src/routes/*.rs` |
-| DB layer | `crates/pomodoro-daemon/src/db/*.rs` |
+| Router + middleware | `crates/poflow-daemon/src/lib.rs` |
+| Auth (JWT, CSRF) | `crates/poflow-daemon/src/auth.rs` |
+| Route handlers | `crates/poflow-daemon/src/routes/*.rs` |
+| DB layer | `crates/poflow-daemon/src/db/*.rs` |
 | Frontend app | `gui/src/App.tsx` |
 | Zustand store | `gui/src/store/` |
 | Platform abstraction | `gui/src/platform.ts` |
-| Backend tests | `crates/pomodoro-daemon/tests/api_tests.rs` |
+| Backend tests | `crates/poflow-daemon/tests/api_tests.rs` |
 | E2E tests | `e2etests/` |
 | Quality gate script | `check.sh` |

@@ -15,7 +15,7 @@ No new features.
 
 ## V37-3 [Medium / Security] `derive_key()` in webhooks falls back to hashing `data_dir` path if no JWT secret exists
 **File:** `db/webhooks.rs:28-31`
-If neither `POMODORO_JWT_SECRET` env var nor `.jwt_secret` file exists, the encryption key is derived from the data directory path — which is predictable (`~/.local/share/pomodoro`). Any attacker who knows the data dir can decrypt all webhook secrets.
+If neither `POFLOW_JWT_SECRET` env var nor `.jwt_secret` file exists, the encryption key is derived from the data directory path — which is predictable (`~/.local/share/poflow`). Any attacker who knows the data dir can decrypt all webhook secrets.
 
 ## V37-4 [Medium / Bug] `config.try_lock()` in `build_router` can fail silently
 **File:** `lib.rs:23`

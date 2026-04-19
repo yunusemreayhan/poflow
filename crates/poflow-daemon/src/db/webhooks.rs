@@ -16,7 +16,7 @@ pub struct Webhook {
 fn derive_key() -> Result<[u8; 32]> {
     use hmac::{Hmac, Mac, KeyInit};
     use sha2::Sha256;
-    let secret_bytes: Vec<u8> = std::env::var("POMODORO_JWT_SECRET")
+    let secret_bytes: Vec<u8> = std::env::var("POFLOW_JWT_SECRET")
         .ok()
         .filter(|s| !s.is_empty())
         .map(|s| s.into_bytes())
@@ -109,7 +109,7 @@ fn decrypt_secret_xor(ciphertext_hex: &str) -> Option<String> {
         .collect::<Option<Vec<u8>>>()?;
     use hmac::{Hmac, Mac, KeyInit};
     use sha2::Sha256;
-    let secret_bytes: Vec<u8> = std::env::var("POMODORO_JWT_SECRET")
+    let secret_bytes: Vec<u8> = std::env::var("POFLOW_JWT_SECRET")
         .ok().filter(|s| !s.is_empty()).map(|s| s.into_bytes())
         .unwrap_or_else(|| {
             let path = crate::db::data_dir().join(".jwt_secret");

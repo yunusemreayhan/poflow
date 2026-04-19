@@ -8,7 +8,7 @@ pub fn send_notification(title: &str, body: &str, phase: TimerPhase, play_sound:
     };
 
     let mut n = notify_rust::Notification::new();
-    n.summary(title).body(body).icon(icon).appname("Pomodoro")
+    n.summary(title).body(body).icon(icon).appname("Poflow")
         .urgency(notify_rust::Urgency::Normal)
         .timeout(notify_rust::Timeout::Milliseconds(8000));
     if play_sound { n.sound_name("complete"); }
@@ -48,7 +48,7 @@ pub fn notify_due_task(title: &str, urgency: &str) {
                 .summary(&summary)
                 .body(&body)
                 .icon("appointment-soon")
-                .appname("Pomodoro")
+                .appname("Poflow")
                 .urgency(notify_rust::Urgency::Normal)
                 .timeout(notify_rust::Timeout::Milliseconds(10000))
                 .show()

@@ -11,7 +11,7 @@
 
 ```bash
 # Backend
-cargo run -p pomodoro-daemon
+cargo run -p poflow-daemon
 
 # Frontend (dev server)
 cd gui && npm install && npm run dev
@@ -24,10 +24,10 @@ cd gui && npm run tauri dev
 
 ```bash
 # Check compilation
-cargo check -p pomodoro-daemon
+cargo check -p poflow-daemon
 
 # Run backend tests (168 tests)
-cargo test -p pomodoro-daemon
+cargo test -p poflow-daemon
 
 # TypeScript check
 cd gui && npx tsc --noEmit
@@ -39,14 +39,14 @@ cd gui && npm test
 cd gui/src-tauri && cargo check
 
 # Production build
-cargo build --release -p pomodoro-daemon
+cargo build --release -p poflow-daemon
 cd gui && npm run tauri build
 ```
 
 ## Project Structure
 
 ```
-crates/pomodoro-daemon/   # Rust backend (axum + SQLite)
+crates/poflow-daemon/   # Rust backend (axum + SQLite)
   src/lib.rs              # Router, CORS, security headers
   src/main.rs             # Server startup, background tasks
   src/engine.rs           # Timer state machine
@@ -65,7 +65,7 @@ gui/                      # React/TypeScript frontend
   src/i18n.ts             # Internationalization
   src-tauri/              # Tauri v2 bridge
 
-crates/pomodoro-cli/      # CLI client
+crates/poflow-cli/      # CLI client
 docs/                     # Documentation
 ```
 
@@ -73,11 +73,11 @@ docs/                     # Documentation
 
 | Variable | Default | Description |
 |---|---|---|
-| `POMODORO_JWT_SECRET` | random | JWT signing secret |
-| `POMODORO_ROOT_PASSWORD` | `root` | Initial root user password |
-| `POMODORO_CORS_ORIGINS` | localhost | Comma-separated CORS origins |
-| `POMODORO_SWAGGER` | `true` | Set to `0` to disable Swagger UI |
-| `DATABASE_URL` | `sqlite:pomodoro.db` | SQLite database path |
+| `POFLOW_JWT_SECRET` | random | JWT signing secret |
+| `POFLOW_ROOT_PASSWORD` | `root` | Initial root user password |
+| `POFLOW_CORS_ORIGINS` | localhost | Comma-separated CORS origins |
+| `POFLOW_SWAGGER` | `true` | Set to `0` to disable Swagger UI |
+| `DATABASE_URL` | `sqlite:poflow.db` | SQLite database path |
 
 ## API Documentation
 

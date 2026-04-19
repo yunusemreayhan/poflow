@@ -440,7 +440,7 @@ export default function EstimationRoomView({ roomId, onBack }: { roomId: number;
                   const color = ratio <= 1.2 ? "text-green-400" : ratio <= 1.5 ? "text-yellow-400" : "text-red-400";
                   return (
                     <div className="text-[10px] text-white/30 mt-2">
-                      Actual: {task.actual} pomodoros vs estimated avg {vh.average.toFixed(1)} →{" "}
+                      Actual: {task.actual} poflows vs estimated avg {vh.average.toFixed(1)} →{" "}
                       <span className={color}>{ratio <= 1 ? "on target" : `+${Math.round((ratio - 1) * 100)}% over`}</span>
                     </div>
                   );

@@ -5,20 +5,20 @@ pub(crate) async fn seed_root_user(pool: &Pool) -> Result<()> {
     let (root_count,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM users WHERE role = 'root'")
         .fetch_one(pool).await?;
     if root_count == 0 {
-        let password = std::env::var("POMODORO_ROOT_PASSWORD").unwrap_or_else(|_| {
+        let password = std::env::var("POFLOW_ROOT_PASSWORD").unwrap_or_else(|_| {
             let mut buf = [0u8; 16];
             getrandom::fill(&mut buf).expect("getrandom failed for root password");
             let pw: String = buf.iter().map(|b| format!("{:02x}", b)).collect();
             // V30-8: Write generated password to a restricted file instead of logging
             let pw_path = super::data_dir().join(".root_password");
             if let Err(e) = std::fs::write(&pw_path, &pw) {
-                tracing::error!("Failed to write root password file: {} — set POMODORO_ROOT_PASSWORD env var instead", e);
+                tracing::error!("Failed to write root password file: {} — set POFLOW_ROOT_PASSWORD env var instead", e);
             } else {
                 #[cfg(unix)] {
                     use std::os::unix::fs::PermissionsExt;
                     std::fs::set_permissions(&pw_path, std::fs::Permissions::from_mode(0o600)).ok();
                 }
-                tracing::warn!("Root password written to {} — set POMODORO_ROOT_PASSWORD to override", pw_path.display());
+                tracing::warn!("Root password written to {} — set POFLOW_ROOT_PASSWORD to override", pw_path.display());
             }
             pw
         });

@@ -56,13 +56,13 @@ async fn flow_register_duplicate_rejected() {
 
 #[tokio::test]
 async fn flow_register_disabled_via_env() {
-    // This test uses POMODORO_ALLOW_REGISTRATION=false to disable registration
+    // This test uses POFLOW_ALLOW_REGISTRATION=false to disable registration
     // We can't set env vars safely in parallel tests, so we test via config instead
-    let pool = pomodoro_daemon::db::connect_memory().await.unwrap();
-    let mut config = pomodoro_daemon::config::Config::default();
+    let pool = poflow_daemon::db::connect_memory().await.unwrap();
+    let mut config = poflow_daemon::config::Config::default();
     config.allow_registration = false;
-    let engine = Arc::new(pomodoro_daemon::engine::Engine::new(pool, config).await);
-    let app = pomodoro_daemon::build_router(engine).await;
+    let engine = Arc::new(poflow_daemon::engine::Engine::new(pool, config).await);
+    let app = poflow_daemon::build_router(engine).await;
     let resp = app.clone().oneshot(json_req("POST", "/api/auth/register", Some(json!({"username":"blocked","password":"Block1234"})))).await.unwrap();
     assert_eq!(resp.status(), 403, "Registration should be disabled");
     let body = body_json(resp).await;
@@ -445,7 +445,7 @@ async fn flow_room_full_estimation_session() {
     assert_eq!(task["estimated"], 5);
 }
 
-// ---- Flow: pomodoro-timer-session ----
+// ---- Flow: poflow-timer-session ----
 
 #[tokio::test]
 async fn flow_timer_multi_user_isolation() {
@@ -2590,23 +2590,23 @@ async fn test_global_search_empty_query() {
 #[tokio::test]
 async fn test_recurrence_auto_creates_task_via_db() {
     // Test the recurrence DB functions directly (simulating background scheduler)
-    std::env::set_var("POMODORO_ROOT_PASSWORD", "root");
-    let pool = pomodoro_daemon::db::connect_memory().await.unwrap();
+    std::env::set_var("POFLOW_ROOT_PASSWORD", "root");
+    let pool = poflow_daemon::db::connect_memory().await.unwrap();
     let yesterday = (chrono::Utc::now() - chrono::Duration::days(1)).format("%Y-%m-%d").to_string();
     let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
     // Create template task
-    let task = pomodoro_daemon::db::create_task(&pool, pomodoro_daemon::db::CreateTaskOpts {
+    let task = poflow_daemon::db::create_task(&pool, poflow_daemon::db::CreateTaskOpts {
         user_id: 1, parent_id: None, title: "Daily standup", description: None, project: Some("Team"), project_id: None, tags: None, priority: 4, estimated: 1, estimated_hours: 0.0, remaining_points: 0.0, due_date: None,
     }).await.unwrap();
     // Set recurrence with yesterday's due date
-    pomodoro_daemon::db::set_recurrence(&pool, task.id, "daily", &yesterday).await.unwrap();
+    poflow_daemon::db::set_recurrence(&pool, task.id, "daily", &yesterday).await.unwrap();
     // Get due recurrences
-    let due = pomodoro_daemon::db::get_due_recurrences(&pool, &today).await.unwrap();
+    let due = poflow_daemon::db::get_due_recurrences(&pool, &today).await.unwrap();
     assert_eq!(due.len(), 1);
     assert_eq!(due[0].task_id, task.id);
     // Simulate auto-creation
     let title = format!("{} ({})", task.title, today);
-    let new_task = pomodoro_daemon::db::create_task(&pool, pomodoro_daemon::db::CreateTaskOpts {
+    let new_task = poflow_daemon::db::create_task(&pool, poflow_daemon::db::CreateTaskOpts {
         user_id: task.user_id, parent_id: task.parent_id, title: &title,
         description: task.description.as_deref(), project: task.project.as_deref(), project_id: task.project_id, tags: task.tags.as_deref(),
         priority: task.priority, estimated: task.estimated, estimated_hours: task.estimated_hours,
@@ -2617,9 +2617,9 @@ async fn test_recurrence_auto_creates_task_via_db() {
     assert_eq!(new_task.priority, 4);
     // Advance recurrence
     let next = chrono::NaiveDate::parse_from_str(&yesterday, "%Y-%m-%d").unwrap() + chrono::Duration::days(1);
-    pomodoro_daemon::db::advance_recurrence(&pool, task.id, &next.format("%Y-%m-%d").to_string()).await.unwrap();
+    poflow_daemon::db::advance_recurrence(&pool, task.id, &next.format("%Y-%m-%d").to_string()).await.unwrap();
     // Verify next_due advanced
-    let rec = pomodoro_daemon::db::get_recurrence(&pool, task.id).await.unwrap().unwrap();
+    let rec = poflow_daemon::db::get_recurrence(&pool, task.id).await.unwrap().unwrap();
     assert_eq!(rec.next_due, today);
     assert!(rec.last_created.as_ref().unwrap().starts_with(&today), "last_created should be today");
 }
@@ -2627,12 +2627,12 @@ async fn test_recurrence_auto_creates_task_via_db() {
 #[tokio::test]
 async fn test_recurrence_monthly_advances_correctly() {
     use chrono::Datelike;
-    std::env::set_var("POMODORO_ROOT_PASSWORD", "root");
-    let pool = pomodoro_daemon::db::connect_memory().await.unwrap();
-    let task = pomodoro_daemon::db::create_task(&pool, pomodoro_daemon::db::CreateTaskOpts {
+    std::env::set_var("POFLOW_ROOT_PASSWORD", "root");
+    let pool = poflow_daemon::db::connect_memory().await.unwrap();
+    let task = poflow_daemon::db::create_task(&pool, poflow_daemon::db::CreateTaskOpts {
         user_id: 1, parent_id: None, title: "Monthly report", description: None, project: None, project_id: None, tags: None, priority: 3, estimated: 1, estimated_hours: 0.0, remaining_points: 0.0, due_date: Some("2026-01-31"),
     }).await.unwrap();
-    pomodoro_daemon::db::set_recurrence(&pool, task.id, "monthly", "2026-01-31").await.unwrap();
+    poflow_daemon::db::set_recurrence(&pool, task.id, "monthly", "2026-01-31").await.unwrap();
     // Advance from Jan 31 → should go to Feb 28 (not Feb 31)
     let d = chrono::NaiveDate::parse_from_str("2026-01-31", "%Y-%m-%d").unwrap();
     let m = d.month() % 12 + 1; // Feb

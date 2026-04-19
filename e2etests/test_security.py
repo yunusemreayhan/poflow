@@ -245,7 +245,7 @@ class TestPrivilegeEscalation:
 # ── Rate Limiter ───────────────────────────────────────────────
 
 class TestRateLimiter:
-    """Start a separate daemon WITHOUT POMODORO_NO_RATE_LIMIT to test
+    """Start a separate daemon WITHOUT POFLOW_NO_RATE_LIMIT to test
     that the rate limiter actually works."""
 
     @pytest.fixture(scope="class")
@@ -253,7 +253,7 @@ class TestRateLimiter:
         """Start a daemon with rate limiting enabled."""
         port = _free_port()
         base_url = f"http://127.0.0.1:{port}"
-        tmpdir = tempfile.mkdtemp(prefix="pomodoro_ratelimit_")
+        tmpdir = tempfile.mkdtemp(prefix="poflow_ratelimit_")
         Path(tmpdir, "config.toml").write_text(
             f'bind_address = "127.0.0.1"\nbind_port = {port}\n'
             f"work_duration_min = 1\nshort_break_min = 1\nlong_break_min = 1\n"
@@ -263,14 +263,14 @@ class TestRateLimiter:
         )
         env = os.environ.copy()
         env.update({
-            "POMODORO_DATA_DIR": tmpdir,
-            "POMODORO_CONFIG_DIR": tmpdir,
-            "POMODORO_JWT_SECRET": JWT_SECRET,
-            "POMODORO_ROOT_PASSWORD": ROOT_PASSWORD,
-            "POMODORO_SWAGGER": "0",
+            "POFLOW_DATA_DIR": tmpdir,
+            "POFLOW_CONFIG_DIR": tmpdir,
+            "POFLOW_JWT_SECRET": JWT_SECRET,
+            "POFLOW_ROOT_PASSWORD": ROOT_PASSWORD,
+            "POFLOW_SWAGGER": "0",
             "RUST_LOG": "warn",
         })
-        env.pop("POMODORO_NO_RATE_LIMIT", None)
+        env.pop("POFLOW_NO_RATE_LIMIT", None)
         proc = subprocess.Popen(
             [DAEMON_BINARY], env=env,
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,

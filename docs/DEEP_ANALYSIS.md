@@ -95,7 +95,7 @@ The bulk endpoint returns every non-deleted task plus all sprint mappings, burn 
 
 ### 2. Timer State Is In-Memory Only
 
-`Engine.states` is a `HashMap<i64, EngineState>` in memory. Daemon restart loses all running timers. Recovery logic marks interrupted sessions in DB, but timers don't resume — they just clean up. Users mid-pomodoro lose their session on restart.
+`Engine.states` is a `HashMap<i64, EngineState>` in memory. Daemon restart loses all running timers. Recovery logic marks interrupted sessions in DB, but timers don't resume — they just clean up. Users mid-poflow lose their session on restart.
 
 ### 3. Webhook Delivery Has No Dead Letter Queue
 

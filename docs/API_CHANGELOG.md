@@ -52,7 +52,7 @@
 - WebSocket room endpoint verifies room membership before allowing connection.
 
 ### Bug Fixes
-- Sprint/epic burndown snapshots now use `remaining_points` (story points) instead of `estimated` (pomodoro count).
+- Sprint/epic burndown snapshots now use `remaining_points` (story points) instead of `estimated` (poflow count).
 - Break sessions created by auto-start no longer associate with the previous work task.
 - `daily_completed` always refreshed from DB on `get_state` (was stale when status != Idle).
 - Room tasks scoped to room members when no project set (was fetching all global tasks).

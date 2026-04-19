@@ -36,13 +36,13 @@ jobs:
         run: cd gui && npm test
 
       - name: Backend tests
-        run: cargo test -p pomodoro-daemon
+        run: cargo test -p poflow-daemon
 
       - name: Clippy
-        run: cargo clippy -p pomodoro-daemon -- -D warnings
+        run: cargo clippy -p poflow-daemon -- -D warnings
 
       - name: Build daemon & CLI
-        run: cargo build --release -p pomodoro-daemon -p pomodoro-cli
+        run: cargo build --release -p poflow-daemon -p poflow-cli
 
       - name: Install Tauri CLI
         run: cargo install tauri-cli --version "^2"
@@ -58,7 +58,7 @@ jobs:
             target/release/bundle/deb/*.deb
             target/release/bundle/rpm/*.rpm
             target/release/bundle/appimage/*.AppImage
-            target/release/pomodoro-daemon
+            target/release/poflow-daemon
             target/release/pomo
 
       - name: Release
@@ -69,5 +69,5 @@ jobs:
             target/release/bundle/deb/*.deb
             target/release/bundle/rpm/*.rpm
             target/release/bundle/appimage/*.AppImage
-            target/release/pomodoro-daemon
+            target/release/poflow-daemon
             target/release/pomo

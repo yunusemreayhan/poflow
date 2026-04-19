@@ -57,7 +57,7 @@ def perf_daemon():
     """Dedicated daemon for performance tests — no GUI, no rate limit."""
     port = _free_port()
     base_url = f"http://127.0.0.1:{port}"
-    tmpdir = tempfile.mkdtemp(prefix="pomodoro_perf_")
+    tmpdir = tempfile.mkdtemp(prefix="poflow_perf_")
     Path(tmpdir, "config.toml").write_text(
         f'bind_address = "127.0.0.1"\nbind_port = {port}\n'
         f"work_duration_min = 1\nshort_break_min = 1\nlong_break_min = 1\n"
@@ -67,12 +67,12 @@ def perf_daemon():
     )
     env = os.environ.copy()
     env.update({
-        "POMODORO_DATA_DIR": tmpdir,
-        "POMODORO_CONFIG_DIR": tmpdir,
-        "POMODORO_JWT_SECRET": JWT_SECRET,
-        "POMODORO_ROOT_PASSWORD": ROOT_PASSWORD,
-        "POMODORO_SWAGGER": "0",
-        "POMODORO_NO_RATE_LIMIT": "1",
+        "POFLOW_DATA_DIR": tmpdir,
+        "POFLOW_CONFIG_DIR": tmpdir,
+        "POFLOW_JWT_SECRET": JWT_SECRET,
+        "POFLOW_ROOT_PASSWORD": ROOT_PASSWORD,
+        "POFLOW_SWAGGER": "0",
+        "POFLOW_NO_RATE_LIMIT": "1",
         "RUST_LOG": "warn",
     })
     proc = subprocess.Popen(
@@ -111,7 +111,7 @@ class TestStartupTime:
     def test_daemon_starts_within_3_seconds(self):
         """Cold start: daemon should pass health check within 3s."""
         port = _free_port()
-        tmpdir = tempfile.mkdtemp(prefix="pomodoro_startup_")
+        tmpdir = tempfile.mkdtemp(prefix="poflow_startup_")
         Path(tmpdir, "config.toml").write_text(
             f'bind_address = "127.0.0.1"\nbind_port = {port}\n'
             f"work_duration_min = 1\nshort_break_min = 1\nlong_break_min = 1\n"
@@ -121,11 +121,11 @@ class TestStartupTime:
         )
         env = os.environ.copy()
         env.update({
-            "POMODORO_DATA_DIR": tmpdir,
-            "POMODORO_CONFIG_DIR": tmpdir,
-            "POMODORO_JWT_SECRET": JWT_SECRET,
-            "POMODORO_ROOT_PASSWORD": ROOT_PASSWORD,
-            "POMODORO_NO_RATE_LIMIT": "1",
+            "POFLOW_DATA_DIR": tmpdir,
+            "POFLOW_CONFIG_DIR": tmpdir,
+            "POFLOW_JWT_SECRET": JWT_SECRET,
+            "POFLOW_ROOT_PASSWORD": ROOT_PASSWORD,
+            "POFLOW_NO_RATE_LIMIT": "1",
             "RUST_LOG": "warn",
         })
         t0 = time.perf_counter()

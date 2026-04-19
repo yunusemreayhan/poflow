@@ -5,8 +5,8 @@ Full audit of 56 backend .rs files (6523 LOC), 53 frontend .ts/.tsx files (9261 
 ## Security (7 items)
 
 - [x] **S1.** `health` endpoint computes `migration_version`, `active_timers`, `tasks` heartbeat map, and `db_size` but returns only `{status, db}` — dead code wastes CPU on every health check. Remove the unused computations or gate behind `?verbose=1` with auth.
-- [x] **S2.** `create_backup` uses `format!("VACUUM INTO '{}'", path_str)` with single-quote escaping — still vulnerable to path injection if `POMODORO_DATA_DIR` contains crafted values. Use parameterized approach or validate path characters.
-- [x] **S3.** `seed_root_user` creates user "root" with password "root" and bcrypt cost 12 — the default password bypasses `validate_password` (no uppercase/digit). Should generate a random password and print it, or refuse to start without `POMODORO_ROOT_PASSWORD`.
+- [x] **S2.** `create_backup` uses `format!("VACUUM INTO '{}'", path_str)` with single-quote escaping — still vulnerable to path injection if `POFLOW_DATA_DIR` contains crafted values. Use parameterized approach or validate path characters.
+- [x] **S3.** `seed_root_user` creates user "root" with password "root" and bcrypt cost 12 — the default password bypasses `validate_password` (no uppercase/digit). Should generate a random password and print it, or refuse to start without `POFLOW_ROOT_PASSWORD`.
 - [x] **S4.** `token_hash` truncates SHA-256 to 128 bits (16 bytes) — reduces collision resistance. Use full 256-bit hash for token blocklist keys.
 - [x] **S5.** Attachment `upload_attachment` reads entire file into memory (`Bytes`) before writing — a 10MB upload holds 10MB in RAM. Use streaming write with `axum::body::Body` to reduce memory pressure.
 - [x] **S6.** `TaskAttachments` component uses `fetch()` directly with `serverUrl + path` bypassing the Tauri `invoke("api_call")` abstraction — this leaks the auth token to the browser's network layer and bypasses CSRF protection (`x-requested-with` header). Route through Tauri IPC or add the header.

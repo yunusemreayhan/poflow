@@ -15,7 +15,7 @@
                ▼                  ▼
 ┌─────────────────────────────────────────────────┐
 │  Backend (Rust + axum + SQLite)                  │
-│  crates/pomodoro-daemon/src/                     │
+│  crates/poflow-daemon/src/                     │
 │  ├── main.rs (server, background tasks)          │
 │  ├── lib.rs (router, middleware, CORS)           │
 │  ├── engine.rs (per-user timer state machine)    │
@@ -28,7 +28,7 @@
                │
                ▼
          SQLite (WAL mode)
-         ~/.local/share/pomodoro/pomodoro.db
+         ~/.local/share/poflow/poflow.db
 ```
 
 ## Data Flow

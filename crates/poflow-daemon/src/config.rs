@@ -64,12 +64,12 @@ impl Default for Config {
 
 impl Config {
     pub fn config_path() -> PathBuf {
-        let dir = match std::env::var("POMODORO_CONFIG_DIR") {
+        let dir = match std::env::var("POFLOW_CONFIG_DIR") {
             Ok(d) if !d.is_empty() => PathBuf::from(d),
             _ => dirs::config_dir()
                 .or_else(|| std::env::var("HOME").ok().map(|h| PathBuf::from(h).join(".config")))
                 .unwrap_or_else(|| PathBuf::from("/tmp"))
-                .join("pomodoro"),
+                .join("poflow"),
         };
         std::fs::create_dir_all(&dir).ok();
         dir.join("config.toml")
@@ -189,7 +189,7 @@ mod tests {
 
     #[test]
     fn config_path_respects_env() {
-        // Test that config_path reads POMODORO_CONFIG_DIR
+        // Test that config_path reads POFLOW_CONFIG_DIR
         // (env var test — may race with other tests, so just verify the function exists)
         let _path = Config::config_path();
         // Path should end with config.toml
@@ -199,7 +199,7 @@ mod tests {
     #[test]
     fn config_save_and_load_via_tempdir() {
         // Test save/load roundtrip using a unique temp directory
-        let dir = std::env::temp_dir().join(format!("pomodoro_cfg_test_{:?}", std::thread::current().id()));
+        let dir = std::env::temp_dir().join(format!("poflow_cfg_test_{:?}", std::thread::current().id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("config.toml");

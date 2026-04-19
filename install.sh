@@ -1,7 +1,7 @@
 #!/bin/bash
-# install.sh — Build and install pojidora from source (Ubuntu/Debian)
+# install.sh — Build and install poflow from source (Ubuntu/Debian)
 #
-# Installs: pomodoro-daemon, pomo (CLI), web GUI, desktop GUI (optional)
+# Installs: poflow-daemon, pofl (CLI), web GUI, desktop GUI (optional)
 #
 # Usage:
 #   ./install.sh              # daemon + CLI + web GUI (no desktop app)
@@ -63,13 +63,13 @@ fi
 pass "Toolchain"
 
 # ── Step 3: Build daemon + CLI ──────────────────────────────────
-info "Building pomodoro-daemon (release)..."
-cargo build --release -p pomodoro-daemon
-pass "pomodoro-daemon"
+info "Building poflow-daemon (release)..."
+cargo build --release -p poflow-daemon
+pass "poflow-daemon"
 
-info "Building pomodoro-cli (release)..."
-cargo build --release -p pomodoro-cli
-pass "pomodoro-cli (pomo)"
+info "Building poflow-cli (release)..."
+cargo build --release -p poflow-cli
+pass "poflow-cli (pofl)"
 
 # ── Step 4: Build web GUI ───────────────────────────────────────
 info "Building web GUI..."
@@ -79,39 +79,39 @@ pass "Web GUI (gui/dist)"
 # ── Step 5: Build desktop GUI (optional) ────────────────────────
 if $DESKTOP; then
   info "Building desktop GUI (Tauri — this takes a few minutes)..."
-  # IMPORTANT: Must use 'cargo tauri build', NOT 'cargo build -p pomodoro-gui'.
+  # IMPORTANT: Must use 'cargo tauri build', NOT 'cargo build -p poflow-gui'.
   # 'cargo build' sets --cfg dev which makes the app load from localhost:1420
   # instead of the embedded frontend assets.
   cd gui && cargo tauri build --no-bundle 2>&1 | tail -3 && cd ..
-  pass "Desktop GUI (pomodoro-gui)"
+  pass "Desktop GUI (poflow-gui)"
 fi
 
 # ── Step 6: Install ─────────────────────────────────────────────
 info "Installing binaries..."
-sudo install -Dm755 target/release/pomodoro-daemon /usr/bin/pomodoro-daemon
-sudo install -Dm755 target/release/pomo /usr/bin/pomo
+sudo install -Dm755 target/release/poflow-daemon /usr/bin/poflow-daemon
+sudo install -Dm755 target/release/pofl /usr/bin/pofl
 
 info "Installing web GUI..."
-sudo mkdir -p /usr/share/pomodoro/gui
-sudo cp -r gui/dist/* /usr/share/pomodoro/gui/
+sudo mkdir -p /usr/share/poflow/gui
+sudo cp -r gui/dist/* /usr/share/poflow/gui/
 
 if $DESKTOP; then
   info "Installing desktop GUI..."
-  sudo install -Dm755 target/release/pomodoro-gui /usr/bin/pomodoro-gui
+  sudo install -Dm755 target/release/poflow-gui /usr/bin/poflow-gui
 fi
 
 info "Installing systemd service..."
-sudo install -Dm644 assets/pomodoro.service /usr/lib/systemd/user/pomodoro.service
+sudo install -Dm644 assets/poflow.service /usr/lib/systemd/user/poflow.service
 
 info "Installing desktop entry and icons..."
-sudo install -Dm644 assets/pomodoro.desktop /usr/share/applications/pomodoro.desktop
+sudo install -Dm644 assets/poflow.desktop /usr/share/applications/poflow.desktop
 for size in 32 64 128 256; do
-  if [ -f "assets/icons/pomodoro-${size}.png" ]; then
-    sudo install -Dm644 "assets/icons/pomodoro-${size}.png" "/usr/share/icons/hicolor/${size}x${size}/apps/pomodoro.png"
+  if [ -f "assets/icons/poflow-${size}.png" ]; then
+    sudo install -Dm644 "assets/icons/poflow-${size}.png" "/usr/share/icons/hicolor/${size}x${size}/apps/poflow.png"
   fi
 done
-if [ -f assets/icons/pomodoro.svg ]; then
-  sudo install -Dm644 assets/icons/pomodoro.svg /usr/share/icons/hicolor/scalable/apps/pomodoro.svg
+if [ -f assets/icons/poflow.svg ]; then
+  sudo install -Dm644 assets/icons/poflow.svg /usr/share/icons/hicolor/scalable/apps/poflow.svg
 fi
 sudo gtk-update-icon-cache /usr/share/icons/hicolor 2>/dev/null || true
 
@@ -120,17 +120,17 @@ pass "Installation complete"
 # ── Step 7: Post-install ────────────────────────────────────────
 echo ""
 echo -e "${GREEN}╔══════════════════════════════════════════════╗${NC}"
-echo -e "${GREEN}║  pojidora installed successfully!        ║${NC}"
+echo -e "${GREEN}║  poflow installed successfully!        ║${NC}"
 echo -e "${GREEN}╚══════════════════════════════════════════════╝${NC}"
 echo ""
 echo "Start the daemon:"
 echo "  systemctl --user daemon-reload"
-echo "  systemctl --user enable --now pomodoro"
+echo "  systemctl --user enable --now poflow"
 echo ""
 echo "Open web GUI:     http://localhost:9090"
 if $DESKTOP; then
-  echo "Open desktop GUI:  pomodoro-gui"
+  echo "Open desktop GUI:  poflow-gui"
 fi
-echo "CLI:              pomo --help"
+echo "CLI:              pofl --help"
 echo ""
 echo "First user to register becomes admin."

@@ -1,4 +1,4 @@
-# Backlog v7 — pojidora
+# Backlog v7 — poflow
 
 Generated: 2026-04-12
 Backend: 174 tests | Frontend: 134 tests | TS strict: clean
@@ -135,7 +135,7 @@ Backend: 174 tests | Frontend: 134 tests | TS strict: clean
 - **D2** — No deployment guide — how to run behind nginx, configure CORS, set JWT secret.
 - **D3** — No database schema documentation — ERD or table descriptions.
 - **D4** — No WebSocket protocol documentation — room WS message format is undocumented.
-- **D5** — No environment variable reference — `POMODORO_JWT_SECRET`, `POMODORO_SWAGGER`, `POMODORO_PORT` etc. are scattered across code.
+- **D5** — No environment variable reference — `POFLOW_JWT_SECRET`, `POFLOW_SWAGGER`, `POFLOW_PORT` etc. are scattered across code.
 
 ## DevOps (O1–O3)
 

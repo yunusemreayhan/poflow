@@ -1,4 +1,4 @@
-# Backlog v9 — pojidora
+# Backlog v9 — poflow
 
 Generated: 2026-04-12
 Backend: 197 tests | Frontend: 154 tests | TS strict: clean
@@ -22,7 +22,7 @@ Previous: v8 (63/63 items completed)
 - **B4** — `routes/sprints.rs:update_sprint`: The `status` field is rejected with an error message, but the field is still passed to `db::update_sprint` as `req.status.as_deref()` (which is `Some(...)` when provided). The early return prevents this, but if the check were removed, the status would be silently applied. Defensive: pass `None` explicitly.
 - **B5** — `store/store.ts:loadTasks`: The F10 status change notification compares against `get().allAssignees` which contains the *previous* load's assignees. If a user was just assigned and the task status changed in the same load, the notification won't fire.
 - **B6** — `routes/export.rs:escape_csv`: The formula-injection prefix (`'`) is added inside the field but the field isn't then quoted. A field like `=SUM(A1)` becomes `'=SUM(A1)` but without quotes, the `'` is literal CSV content, not a spreadsheet protection. Should wrap prefixed fields in quotes.
-- **B7** — `db/sprints.rs:snapshot_sprint`: Uses `estimated` (pomodoro count) as `total_points` and `done_points`. But `remaining_points` is the actual story points field. Burndown chart shows pomodoro estimates instead of story points.
+- **B7** — `db/sprints.rs:snapshot_sprint`: Uses `estimated` (poflow count) as `total_points` and `done_points`. But `remaining_points` is the actual story points field. Burndown chart shows poflow estimates instead of story points.
 - **B8** — `components/TaskDetailParts.tsx:TaskTimeChart`: The `Session` type import is from `../store/api` but the component uses `s.started_at` and `s.duration_s` which are `string` and `Option<i64>` respectively. If `started_at` is missing or `duration_s` is null, the chart silently skips entries without indication.
 
 ## Validation (V1–V5)
@@ -102,7 +102,7 @@ Previous: v8 (63/63 items completed)
 
 ## DevOps (O1–O3)
 
-- **O1** — No database backup mechanism. The SQLite database at `~/.local/share/pomodoro/pomodoro.db` has no automated backup. Add a `/api/admin/backup` endpoint or a CLI command.
+- **O1** — No database backup mechanism. The SQLite database at `~/.local/share/poflow/poflow.db` has no automated backup. Add a `/api/admin/backup` endpoint or a CLI command.
 - **O2** — No health check for background tasks. The tick loop, snapshot loop, and recurrence loop run silently. If one panics, there's no monitoring or restart. Add health status to `/api/health`.
 - **O3** — Attachment storage has no cleanup for orphaned files. If the DB record is deleted but the file deletion fails, the file remains on disk forever. Add a periodic cleanup job.
 

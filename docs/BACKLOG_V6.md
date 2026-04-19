@@ -163,7 +163,7 @@ Priority order: Security → Bugs → Validation → Performance → Code Qualit
 
 **Q11** — No token refresh logic. Store saves `refresh_token` but never uses it. After 7-day JWT expiry, user is silently logged out.
 
-**Q12** — `snapshot_sprint` uses `estimated` (pomodoro count) as "total_points". Semantically confusing — burndown shows pomodoro counts labeled as "points".
+**Q12** — `snapshot_sprint` uses `estimated` (poflow count) as "total_points". Semantically confusing — burndown shows poflow counts labeled as "points".
 
 ---
 
@@ -185,7 +185,7 @@ Priority order: Security → Bugs → Validation → Performance → Code Qualit
 
 **F8** — Confirm dialog: dynamic confirm button text (not always "Delete"). Pass `confirmLabel` to `showConfirm`.
 
-**F9** — Timer: audio/visual feedback on pomodoro completion in frontend (backend sends desktop notification but frontend has no in-app feedback).
+**F9** — Timer: audio/visual feedback on poflow completion in frontend (backend sends desktop notification but frontend has no in-app feedback).
 
 **F10** — Timer: persist selected task across tab switches (currently resets to undefined on remount).
 

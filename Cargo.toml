@@ -1,7 +1,7 @@
 [workspace]
 members = [
-    "crates/pomodoro-daemon",
-    "crates/pomodoro-cli",
+    "crates/poflow-daemon",
+    "crates/poflow-cli",
     "gui/src-tauri",
 ]
 resolver = "2"

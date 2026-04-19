@@ -1,4 +1,4 @@
-"""E2E GUI flow tests for Pomodoro Tauri app.
+"""E2E GUI flow tests for Poflow Tauri app.
 
 All tests interact with the real GUI via WebDriver (DOM-level).
 Daemon runs isolated on a random port with a fresh DB per session.
@@ -149,7 +149,7 @@ class TestLogout:
         app.assert_visible("Start")
 
 
-# ── Flow: pomodoro-timer-session.md ─────────────────────────────
+# ── Flow: poflow-timer-session.md ─────────────────────────────
 
 class TestTimerSession:
 
@@ -422,7 +422,7 @@ class TestDomIntegrity:
         assert 'id="root"' in logged_in.page_source()
 
     def test_title(self, app):
-        assert "Pomodoro" in app.title()
+        assert "Poflow" in app.title()
 
     def test_no_js_errors(self, logged_in):
         root = logged_in.find("#root")

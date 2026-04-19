@@ -1,4 +1,4 @@
-# BACKLOG v12 — pojidora
+# BACKLOG v12 — poflow
 
 Fresh codebase audit: 5,902 LOC backend (Rust), 7,331 LOC frontend (React/TS), 229 backend tests, 154 frontend tests.
 

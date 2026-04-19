@@ -12,19 +12,19 @@ pub fn now_str() -> String {
     Utc::now().naive_utc().format("%Y-%m-%dT%H:%M:%S%.3f").to_string()
 }
 
-/// Resolve the pomodoro data directory.
-/// `POMODORO_DATA_DIR` env var overrides the default `~/.local/share/pomodoro`.
+/// Resolve the poflow data directory.
+/// `POFLOW_DATA_DIR` env var overrides the default `~/.local/share/poflow`.
 pub fn data_dir() -> PathBuf {
-    let dir = match std::env::var("POMODORO_DATA_DIR") {
+    let dir = match std::env::var("POFLOW_DATA_DIR") {
         Ok(d) if !d.is_empty() => PathBuf::from(d),
-        _ => dirs::data_dir().unwrap_or_else(|| PathBuf::from("~/.local/share")).join("pomodoro"),
+        _ => dirs::data_dir().unwrap_or_else(|| PathBuf::from("~/.local/share")).join("poflow"),
     };
     std::fs::create_dir_all(&dir).ok();
     dir
 }
 
 pub(crate) fn db_path() -> PathBuf {
-    data_dir().join("pomodoro.db")
+    data_dir().join("poflow.db")
 }
 
 pub async fn connect() -> Result<Pool> {

@@ -19,8 +19,8 @@ use axum::http::{HeaderValue, Method, header};
 pub async fn build_router(engine: Arc<engine::Engine>) -> Router {
     use axum::routing::{delete, get, post, put};
 
-    // CORS: env var POMODORO_CORS_ORIGINS overrides config, defaults to localhost
-    let origins_str = std::env::var("POMODORO_CORS_ORIGINS").ok();
+    // CORS: env var POFLOW_CORS_ORIGINS overrides config, defaults to localhost
+    let origins_str = std::env::var("POFLOW_CORS_ORIGINS").ok();
     let extra: Vec<HeaderValue> = if let Some(s) = origins_str.as_deref() {
         s.split(',').filter_map(|o| o.trim().parse().ok()).collect()
     } else {
@@ -36,9 +36,9 @@ pub async fn build_router(engine: Arc<engine::Engine>) -> Router {
     ];
     all_origins.extend(extra);
 
-    let allow_all_cors = std::env::var("POMODORO_CORS_ALLOW_ALL").is_ok();
+    let allow_all_cors = std::env::var("POFLOW_CORS_ALLOW_ALL").is_ok();
     if allow_all_cors {
-        tracing::warn!("POMODORO_CORS_ALLOW_ALL is set — CORS allows ALL origins. Do not use in production!");
+        tracing::warn!("POFLOW_CORS_ALLOW_ALL is set — CORS allows ALL origins. Do not use in production!");
     }
     let cors = CorsLayer::new()
         .allow_origin(if allow_all_cors { AllowOrigin::any() } else { AllowOrigin::list(all_origins) })
@@ -271,7 +271,7 @@ pub async fn build_router(engine: Arc<engine::Engine>) -> Router {
 /// Find the gui/dist directory relative to the executable or working directory.
 fn resolve_gui_dir() -> Option<std::path::PathBuf> {
     // 1. Env var override
-    if let Ok(p) = std::env::var("POMODORO_GUI_DIR") {
+    if let Ok(p) = std::env::var("POFLOW_GUI_DIR") {
         let pb = std::path::PathBuf::from(p);
         if pb.join("index.html").exists() { return Some(pb); }
     }
@@ -329,9 +329,9 @@ async fn api_rate_limit(
 ) -> impl IntoResponse {
     let method = req.method().clone();
     let ip = routes::extract_ip(req.headers());
-    if std::env::var("POMODORO_NO_RATE_LIMIT").is_ok() {
+    if std::env::var("POFLOW_NO_RATE_LIMIT").is_ok() {
         static WARN: std::sync::Once = std::sync::Once::new();
-        WARN.call_once(|| tracing::warn!("POMODORO_NO_RATE_LIMIT is set — API rate limiting DISABLED"));
+        WARN.call_once(|| tracing::warn!("POFLOW_NO_RATE_LIMIT is set — API rate limiting DISABLED"));
         return next.run(req).await.into_response();
     }
     if method == axum::http::Method::GET || method == axum::http::Method::HEAD || method == axum::http::Method::OPTIONS {

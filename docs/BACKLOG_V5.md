@@ -1,4 +1,4 @@
-# Backlog v5 — pojidora
+# Backlog v5 — poflow
 
 Generated: 2026-04-11
 Previous: v4 (131/146 complete), v3 (78/78), v2 (61/61)
@@ -280,7 +280,7 @@ Test baseline: 105 backend, 52 frontend
 
 **D4** — No database migration strategy documented. The `migrate()` function uses `CREATE TABLE IF NOT EXISTS` but there's no versioned migration system for schema changes.
 
-**D5** — No CLI (`pomodoro-cli`) usage documentation. The CLI exists but has no README or man page.
+**D5** — No CLI (`poflow-cli`) usage documentation. The CLI exists but has no README or man page.
 
 **D6** — OpenAPI spec is missing several endpoints: `room_ws`, `get_sprint_scope`, `get_team_scope`, `get_my_teams` are not in the `#[openapi]` paths list.
 

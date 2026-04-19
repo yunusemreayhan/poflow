@@ -46,7 +46,7 @@ async fn api_call(state: tauri::State<'_, Arc<AppState>>, method: String, path: 
     if let Some(token) = &config.token {
         req = req.header("Authorization", format!("Bearer {}", token));
     }
-    req = req.header("X-Requested-With", "PomodoroGUI");
+    req = req.header("X-Requested-With", "PoflowGUI");
     if let Some(b) = body {
         req = req.json(&b);
     }
@@ -145,7 +145,7 @@ async fn binary_download(state: tauri::State<'_, Arc<AppState>>, path: String) -
     }
     let config = state.config.lock().await.clone();
     let url = format!("{}{}", config.base_url, path);
-    let mut req = state.client.get(&url).header("X-Requested-With", "PomodoroGUI");
+    let mut req = state.client.get(&url).header("X-Requested-With", "PoflowGUI");
     if let Some(token) = &config.token {
         req = req.header("Authorization", format!("Bearer {}", token));
     }
@@ -166,7 +166,7 @@ async fn binary_upload(state: tauri::State<'_, Arc<AppState>>, path: String, dat
     let url = format!("{}{}", config.base_url, path);
     let bytes = base64::engine::general_purpose::STANDARD.decode(&data).map_err(|e| e.to_string())?;
     let mut req = state.client.post(&url)
-        .header("X-Requested-With", "PomodoroGUI")
+        .header("X-Requested-With", "PoflowGUI")
         .header("Content-Type", if mime.is_empty() { "application/octet-stream" } else { &mime })
         .header("X-Filename", &filename)
         .body(bytes);
@@ -209,7 +209,7 @@ fn auth_key() -> Vec<u8> {
     h.update(whoami::fallible::hostname().unwrap_or_else(|_| "unknown".to_string()).as_bytes());
     h.update(b":");
     h.update(whoami::username().as_bytes());
-    h.update(b":pomodoro-gui-auth-v2");
+    h.update(b":poflow-gui-auth-v2");
     h.finalize().to_vec()
 }
 
@@ -240,7 +240,7 @@ fn decrypt_auth(data: &[u8], key: &[u8]) -> Result<Vec<u8>, String> {
 }
 
 fn auth_dir() -> std::path::PathBuf {
-    dirs::data_dir().unwrap_or_else(|| std::path::PathBuf::from(".")).join("pomodoro-gui")
+    dirs::data_dir().unwrap_or_else(|| std::path::PathBuf::from(".")).join("poflow-gui")
 }
 
 #[tauri::command]
@@ -276,9 +276,9 @@ async fn indicator_toggle(enable: bool) -> Result<bool, String> {
     if enable {
         let home = dirs::home_dir().unwrap_or_default();
         let candidates = [
-            std::path::PathBuf::from("/usr/share/pomodoro/panel-indicator.py"),
-            home.join("repos/pojidora/tools/panel-indicator.py"),
-            home.join(".local/share/pomodoro/panel-indicator.py"),
+            std::path::PathBuf::from("/usr/share/poflow/panel-indicator.py"),
+            home.join("repos/poflow/tools/panel-indicator.py"),
+            home.join(".local/share/poflow/panel-indicator.py"),
         ];
         let script = candidates.iter().find(|p| p.exists())
             .ok_or("panel-indicator.py not found")?;
@@ -329,7 +329,7 @@ pub fn run() {
                 let menu = MenuBuilder::new(app).items(&[&toggle_item, &quit_item]).build()?;
                 TrayIconBuilder::new()
                     .icon(app.default_window_icon().cloned().unwrap_or_else(|| tauri::image::Image::new(&[], 0, 0)))
-                    .tooltip("Pomodoro")
+                    .tooltip("Poflow")
                     .menu(&menu)
                     .on_menu_event(move |_app, event: tauri::menu::MenuEvent| {
                         match event.id().as_ref() {

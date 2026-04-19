@@ -8,7 +8,7 @@ SQLite database with 22 tables. All timestamps are ISO 8601 strings.
 |---|---|
 | `users` | User accounts (id, username, password_hash, role, created_at) |
 | `tasks` | Task tree with soft delete (id, parent_id, user_id, title, description, project, tags, priority, estimated, actual, status, due_date, deleted_at, ...) |
-| `sessions` | Pomodoro timer sessions (id, task_id, user_id, session_type, status, started_at, ended_at, duration_s) |
+| `sessions` | Poflow timer sessions (id, task_id, user_id, session_type, status, started_at, ended_at, duration_s) |
 | `comments` | Task comments (id, task_id, session_id, user_id, content, created_at) |
 | `task_assignees` | Many-to-many task↔user assignments |
 

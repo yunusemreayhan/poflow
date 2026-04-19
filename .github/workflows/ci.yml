@@ -39,10 +39,10 @@ jobs:
         run: cd gui && npm test
 
       - name: Backend tests
-        run: cargo test -p pomodoro-daemon
+        run: cargo test -p poflow-daemon
 
       - name: Clippy
-        run: cargo clippy -p pomodoro-daemon -- -D warnings
+        run: cargo clippy -p poflow-daemon -- -D warnings
 
       - name: Rustfmt
         run: cargo fmt --check

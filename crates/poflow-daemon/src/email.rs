@@ -1,13 +1,13 @@
 //! Email notifications via SMTP.
 //!
 //! Configure via environment variables:
-//! - POMODORO_SMTP_HOST (e.g., smtp.gmail.com)
-//! - POMODORO_SMTP_PORT (default: 587)
-//! - POMODORO_SMTP_USER
-//! - POMODORO_SMTP_PASS
-//! - POMODORO_SMTP_FROM (e.g., pomodoro@example.com)
+//! - POFLOW_SMTP_HOST (e.g., smtp.gmail.com)
+//! - POFLOW_SMTP_PORT (default: 587)
+//! - POFLOW_SMTP_USER
+//! - POFLOW_SMTP_PASS
+//! - POFLOW_SMTP_FROM (e.g., poflow@example.com)
 //!
-//! If POMODORO_SMTP_HOST is not set, email is disabled (no-op).
+//! If POFLOW_SMTP_HOST is not set, email is disabled (no-op).
 
 use std::sync::OnceLock;
 
@@ -23,13 +23,13 @@ static CONFIG: OnceLock<Option<SmtpConfig>> = OnceLock::new();
 
 fn config() -> &'static Option<SmtpConfig> {
     CONFIG.get_or_init(|| {
-        let host = std::env::var("POMODORO_SMTP_HOST").ok()?;
+        let host = std::env::var("POFLOW_SMTP_HOST").ok()?;
         Some(SmtpConfig {
             host,
-            port: std::env::var("POMODORO_SMTP_PORT").ok().and_then(|p| p.parse().ok()).unwrap_or(587),
-            user: std::env::var("POMODORO_SMTP_USER").unwrap_or_default(),
-            pass: std::env::var("POMODORO_SMTP_PASS").unwrap_or_default(),
-            from: std::env::var("POMODORO_SMTP_FROM").unwrap_or_else(|_| "pomodoro@localhost".to_string()),
+            port: std::env::var("POFLOW_SMTP_PORT").ok().and_then(|p| p.parse().ok()).unwrap_or(587),
+            user: std::env::var("POFLOW_SMTP_USER").unwrap_or_default(),
+            pass: std::env::var("POFLOW_SMTP_PASS").unwrap_or_default(),
+            from: std::env::var("POFLOW_SMTP_FROM").unwrap_or_else(|_| "poflow@localhost".to_string()),
         })
     })
 }
@@ -54,7 +54,7 @@ pub fn send(to_email: &str, subject: &str, body: &str) {
         use lettre::transport::smtp::authentication::Credentials;
 
         let email = match Message::builder()
-            .from(match from.parse() { Ok(a) => a, Err(_) => match "pomodoro@localhost".parse() { Ok(a) => a, Err(_) => return } })
+            .from(match from.parse() { Ok(a) => a, Err(_) => match "poflow@localhost".parse() { Ok(a) => a, Err(_) => return } })
             .to(match to.parse() { Ok(a) => a, Err(_) => return })
             .subject(subj)
             .body(text) {

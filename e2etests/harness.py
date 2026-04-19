@@ -21,10 +21,10 @@ import urllib.request
 import urllib.error
 
 DAEMON_BINARY = str(
-    Path(__file__).resolve().parent.parent / "target" / "release" / "pomodoro-daemon"
+    Path(__file__).resolve().parent.parent / "target" / "release" / "poflow-daemon"
 )
 GUI_BINARY = str(
-    Path(__file__).resolve().parent.parent / "target" / "release" / "pomodoro-gui"
+    Path(__file__).resolve().parent.parent / "target" / "release" / "poflow-gui"
 )
 ROOT_PASSWORD = "TestRoot1"
 JWT_SECRET = "test-secret-for-flow-tests-1234567890abcdef"
@@ -43,7 +43,7 @@ def _free_port() -> int:
 
 @dataclass
 class Daemon:
-    """Isolated pomodoro-daemon process."""
+    """Isolated poflow-daemon process."""
 
     proc: Optional[subprocess.Popen] = None
     tmpdir: Optional[str] = None
@@ -54,7 +54,7 @@ class Daemon:
         if not self.port:
             self.port = _free_port()
         self.base_url = f"http://127.0.0.1:{self.port}"
-        self.tmpdir = tempfile.mkdtemp(prefix="pomodoro_e2e_")
+        self.tmpdir = tempfile.mkdtemp(prefix="poflow_e2e_")
         Path(self.tmpdir, "config.toml").write_text(
             f'bind_address = "127.0.0.1"\n'
             f"bind_port = {self.port}\n"
@@ -70,12 +70,12 @@ class Daemon:
         )
         env = os.environ.copy()
         env.update({
-            "POMODORO_DATA_DIR": self.tmpdir,
-            "POMODORO_CONFIG_DIR": self.tmpdir,
-            "POMODORO_JWT_SECRET": JWT_SECRET,
-            "POMODORO_ROOT_PASSWORD": ROOT_PASSWORD,
-            "POMODORO_SWAGGER": "0",
-            "POMODORO_NO_RATE_LIMIT": "1",
+            "POFLOW_DATA_DIR": self.tmpdir,
+            "POFLOW_CONFIG_DIR": self.tmpdir,
+            "POFLOW_JWT_SECRET": JWT_SECRET,
+            "POFLOW_ROOT_PASSWORD": ROOT_PASSWORD,
+            "POFLOW_SWAGGER": "0",
+            "POFLOW_NO_RATE_LIMIT": "1",
             "RUST_LOG": "warn",
         })
         self.proc = subprocess.Popen(

@@ -1,7 +1,7 @@
 import type { Locale } from "../i18n";
 
 const en: Locale = {
-  appName: "Pomodoro",
+  appName: "Poflow",
   logout: "Logout",
   settings: "Settings",
   timer: "Timer",

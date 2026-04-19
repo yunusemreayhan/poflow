@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run the full E2E test suite for pojidora.
+# Run the full E2E test suite for poflow.
 # Each test file gets its own pytest invocation (fresh daemon + GUI session)
 # to avoid state contamination between files.
 #
@@ -24,22 +24,22 @@ done
 command -v Xvfb >/dev/null 2>&1 || { echo "ERROR: Xvfb not found (apt install xvfb)"; exit 1; }
 
 # ── Ensure binaries ─────────────────────────────────────────────
-DAEMON="$REPO_DIR/target/release/pomodoro-daemon"
+DAEMON="$REPO_DIR/target/release/poflow-daemon"
 if [ ! -f "$DAEMON" ]; then
-    echo "Building pomodoro-daemon (release)..."
-    (cd "$REPO_DIR" && cargo build --release -p pomodoro-daemon)
+    echo "Building poflow-daemon (release)..."
+    (cd "$REPO_DIR" && cargo build --release -p poflow-daemon)
 fi
 
-GUI="${POMODORO_GUI_BINARY:-}"
+GUI="${POFLOW_GUI_BINARY:-}"
 if [ -z "$GUI" ]; then
     for candidate in \
-        "$REPO_DIR/target/release/pomodoro-gui" \
-        "$REPO_DIR/../pojidora/target/release/pomodoro-gui"; do
+        "$REPO_DIR/target/release/poflow-gui" \
+        "$REPO_DIR/../poflow/target/release/poflow-gui"; do
         if [ -f "$candidate" ]; then GUI="$candidate"; break; fi
     done
 fi
 if [ -z "$GUI" ] || [ ! -f "$GUI" ]; then
-    echo "ERROR: pomodoro-gui binary not found. Build it or set POMODORO_GUI_BINARY."
+    echo "ERROR: poflow-gui binary not found. Build it or set POFLOW_GUI_BINARY."
     exit 1
 fi
 
@@ -58,7 +58,7 @@ XVFB_PID=""
 cleanup() {
     [ -n "$XVFB_PID" ] && kill "$XVFB_PID" 2>/dev/null || true
     # Kill any leftover processes
-    pkill -9 -f "tauri-driver|WebKitWebDriver|pomodoro-gui|pomodoro-daemon" 2>/dev/null || true
+    pkill -9 -f "tauri-driver|WebKitWebDriver|poflow-gui|poflow-daemon" 2>/dev/null || true
 }
 trap cleanup EXIT
 
@@ -101,7 +101,7 @@ for f in test_*.py; do
     echo ""
     echo "━━━ $f ━━━"
     # Kill leftovers from previous file
-    pkill -9 -f "tauri-driver|WebKitWebDriver|pomodoro-gui|pomodoro-daemon" 2>/dev/null || true
+    pkill -9 -f "tauri-driver|WebKitWebDriver|poflow-gui|poflow-daemon" 2>/dev/null || true
     sleep 1
 
     if output=$("$VENV/bin/python" -m pytest "$f" -q --no-header --tb=line 2>&1); then

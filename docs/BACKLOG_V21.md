@@ -10,7 +10,7 @@ Full audit of 56 backend .rs files (~6600 LOC), 53 frontend .ts/.tsx files (~930
 - [x] **S2.** `login` in `auth_routes.rs` rehashes password on cost upgrade (`current_cost < 12`) but this triggers `update_user_password` which now sets `password_changed_at` — immediately invalidating the token just issued. The rehash path should bypass `password_changed_at` or use a separate DB function.
   **FIXED** (3fd5925) — Added `rehash_user_password()` that updates hash without setting `password_changed_at`.
 
-- [x] **S3.** `create_backup` in `admin.rs` uses `format!("VACUUM INTO '{}'", path_str)` — string interpolation into SQL. While path characters are validated, this is still a SQL injection vector if `POMODORO_DATA_DIR` contains crafted values. Use parameterized approach or `sqlx::query` with bind.
+- [x] **S3.** `create_backup` in `admin.rs` uses `format!("VACUUM INTO '{}'", path_str)` — string interpolation into SQL. While path characters are validated, this is still a SQL injection vector if `POFLOW_DATA_DIR` contains crafted values. Use parameterized approach or `sqlx::query` with bind.
   **FIXED** (a339e8e) — Path validation changed from blocklist (`'`, `;`, `\0`) to allowlist (alphanumeric, `/`, `_`, `-`, `.`, space).
 
 - [x] **S4.** `restore_backup` copies a file over the live DB after `pool.close()`, but the pool is still referenced by all route handlers via `Arc<Engine>`. Subsequent requests will fail with pool-closed errors until restart. Should return 503 after restore or trigger graceful shutdown.

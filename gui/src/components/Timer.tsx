@@ -74,7 +74,7 @@ export default function Timer() {
       const autoStarted = status === "Running";
       toast(autoStarted ? `🍅 Session complete! Auto-starting ${breakType} break...` : "🍅 Session complete!", "success");
       if (config?.sound_enabled) playSound("work-end.ogg");
-      if (config?.notification_enabled) sendNotification("Pomodoro", `Session complete! Time for a ${breakType} break.`);
+      if (config?.notification_enabled) sendNotification("Poflow", `Session complete! Time for a ${breakType} break.`);
       if (prevSessionRef.current) setNotePrompt({ sessionId: prevSessionRef.current });
       // BL15: Celebrate when daily goal is reached
       const dc = engine?.daily_completed ?? 0;
@@ -83,7 +83,7 @@ export default function Timer() {
     }
     if ((prevPhaseRef.current === "ShortBreak" || prevPhaseRef.current === "LongBreak") && phase === "Work") {
       if (config?.sound_enabled) playSound("break-end.ogg");
-      if (config?.notification_enabled) sendNotification("Pomodoro", "Break over! Time to focus.");
+      if (config?.notification_enabled) sendNotification("Poflow", "Break over! Time to focus.");
     }
     prevPhaseRef.current = phase;
     prevSessionRef.current = engine?.current_session_id ?? null;

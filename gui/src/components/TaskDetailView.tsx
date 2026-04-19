@@ -287,7 +287,7 @@ function DetailNode({ detail, depth, onRefresh, hoursMap }: { detail: TaskDetail
                 options={["backlog","active","in_progress","completed","done","estimated","archived"].map(s => ({value:s,label:s}))} />
             </div>
             <EditField label="Priority (1-5)" value={t.priority} type="number" onSave={(v) => saveField("priority", v)} />
-            <EditField label="Est. Pomodoros / Points" value={t.estimated} type="number" onSave={(v) => saveField("estimated", v)} />
+            <EditField label="Est. Poflows / Points" value={t.estimated} type="number" onSave={(v) => saveField("estimated", v)} />
             <EditField label="Est. Hours" value={t.estimated_hours} type="number" onSave={(v) => saveField("estimated_hours", v)} />
             <EditField label="Remaining Points" value={t.remaining_points} type="number" onSave={(v) => saveField("remaining_points", v)} />
             <EditField label="Project" value={t.project || ""} onSave={(v) => saveField("project", v)} />

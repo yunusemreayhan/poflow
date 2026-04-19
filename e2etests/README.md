@@ -1,4 +1,4 @@
-# E2E Test Suite — pojidora
+# E2E Test Suite — poflow
 
 **1011 tests** across **44 files** covering the Tauri GUI, REST API, all 154 endpoints, WebSocket, security, performance, data integrity, multi-user scenarios, edge cases, and concurrent stress testing.
 
@@ -17,7 +17,7 @@ First run auto-creates a Python venv and installs dependencies. Requires:
 - `Xvfb` — `sudo apt install xvfb`
 - `python3` ≥ 3.10
 
-The daemon binary (`pomodoro-daemon`) is built automatically if missing.
+The daemon binary (`poflow-daemon`) is built automatically if missing.
 
 ## Writing New Tests
 
@@ -52,7 +52,7 @@ All 150+ methods in `helpers.py` are documented. Run `python3 -c "import helpers
 
 `run_e2e.sh` runs each `test_*.py` as a **separate pytest invocation**. Every file gets:
 
-- A fresh `pomodoro-daemon` process (random port, temp database)
+- A fresh `poflow-daemon` process (random port, temp database)
 - A fresh Tauri GUI session via `TauriWebDriver`
 - Complete state isolation — no cross-file contamination
 
@@ -66,7 +66,7 @@ The `harness.Daemon` class (in `harness.py`) manages the daemon:
 
 - Picks a random free port
 - Creates a temp directory for the database
-- Sets `POMODORO_NO_RATE_LIMIT=1` to disable auth and API rate limiters
+- Sets `POFLOW_NO_RATE_LIMIT=1` to disable auth and API rate limiters
 - Registers a root user on startup
 - Cleans up temp files on stop
 

@@ -1,20 +1,20 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Pomodoro",
+  "productName": "Poflow",
   "version": "0.1.0",
-  "identifier": "com.pomodoro.linux",
+  "identifier": "com.poflow.app",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:1420",
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npx vite build",
-    "beforeBundleCommand": "cargo build --release -p pomodoro-daemon 2>&1"
+    "beforeBundleCommand": "cargo build --release -p poflow-daemon 2>&1"
   },
   "app": {
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "Pomodoro",
+        "title": "Poflow",
         "width": 1100,
         "height": 750,
         "minWidth": 800,
@@ -41,8 +41,8 @@
       "deb": {
         "depends": ["libnotify4", "libsqlite3-0"],
         "files": {
-          "usr/bin/pomodoro-daemon": "../../target/release/pomodoro-daemon",
-          "usr/lib/systemd/user/pomodoro.service": "../../assets/pomodoro.service"
+          "usr/bin/poflow-daemon": "../../target/release/poflow-daemon",
+          "usr/lib/systemd/user/poflow.service": "../../assets/poflow.service"
         },
         "postInstallScript": "../../packaging/debian/postinst",
         "section": "utils"

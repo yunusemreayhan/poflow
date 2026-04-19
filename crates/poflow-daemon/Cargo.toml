@@ -1,14 +1,14 @@
 [package]
-name = "pomodoro-daemon"
+name = "poflow-daemon"
 version = "0.1.0"
 edition = "2021"
 
 [[bin]]
-name = "pomodoro-daemon"
+name = "poflow-daemon"
 path = "src/main.rs"
 
 [lib]
-name = "pomodoro_daemon"
+name = "poflow_daemon"
 path = "src/lib.rs"
 
 [dependencies]
@@ -56,15 +56,15 @@ hyper = "1"
 maintainer = "Yunus Emre Ayhan <yunus.ayhan@ericsson.com>"
 copyright = "2026, Yunus Emre Ayhan"
 license-file = ["../../LICENSE", "0"]
-extended-description = "Production-grade Pomodoro timer and project management platform. 207 API endpoints, Tauri desktop GUI, web GUI (PWA), hierarchical tasks, sprint planning, Gantt charts, custom workflows, RBAC, and time tracking."
+extended-description = "Production-grade Poflow timer and project management platform. 207 API endpoints, Tauri desktop GUI, web GUI (PWA), hierarchical tasks, sprint planning, Gantt charts, custom workflows, RBAC, and time tracking."
 section = "utils"
 priority = "optional"
 depends = "$auto"
 assets = [
-    ["target/release/pomodoro-daemon", "usr/bin/", "755"],
-    ["../../assets/pomodoro.service", "usr/lib/systemd/user/pomodoro.service", "644"],
-    ["../../assets/pomodoro.desktop", "usr/share/applications/pomodoro.desktop", "644"],
-    ["../../gui/dist/*", "usr/share/pomodoro/gui/", "644"],
-    ["../../gui/dist/assets/*", "usr/share/pomodoro/gui/assets/", "644"],
+    ["target/release/poflow-daemon", "usr/bin/", "755"],
+    ["../../assets/poflow.service", "usr/lib/systemd/user/poflow.service", "644"],
+    ["../../assets/poflow.desktop", "usr/share/applications/poflow.desktop", "644"],
+    ["../../gui/dist/*", "usr/share/poflow/gui/", "644"],
+    ["../../gui/dist/assets/*", "usr/share/poflow/gui/assets/", "644"],
 ]
-conf-files = ["/etc/pomodoro/config.toml"]
+conf-files = ["/etc/poflow/config.toml"]

@@ -79,7 +79,7 @@ export const createAuthSlice: StateCreator<AuthSlice & { mutating: boolean; toas
     }
     set({ token: null, username: null, role: null });
     platformSetToken("").catch(e => console.debug("Clear token:", e));
-    if (typeof caches !== 'undefined') caches.delete('pomo-v1').catch(e => console.debug("Clear cache:", e));
+    if (typeof caches !== 'undefined') caches.delete('pofl-v1').catch(e => console.debug("Clear cache:", e));
   },
 
   restoreAuth: async () => {

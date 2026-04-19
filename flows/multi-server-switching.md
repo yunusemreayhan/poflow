@@ -1,7 +1,7 @@
 # Flow: Multi-Server Switching
 
 ## Actor
-User with accounts on multiple Pomodoro daemon instances.
+User with accounts on multiple Poflow daemon instances.
 
 ## Data Model
 `savedServers` in localStorage:

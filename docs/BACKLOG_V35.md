@@ -59,7 +59,7 @@ The 500-vote limit means rooms with extensive voting history may lose older resu
 
 ## V35-14 [Low / Bug] `processSyncQueue` uses raw `fetch()` bypassing Tauri's `api_call`
 **File:** `gui/src/offlineStore.ts:82-93`
-The offline sync queue uses `fetch()` directly with the full URL, bypassing the Tauri `invoke("api_call")` path. This means: (1) the CSRF header is `x-requested-with: pomo-offline` instead of `PomodoroGUI`, (2) token refresh won't happen if the token expired while offline, (3) the error toast mechanism is bypassed. Should use `apiCall` from the store instead.
+The offline sync queue uses `fetch()` directly with the full URL, bypassing the Tauri `invoke("api_call")` path. This means: (1) the CSRF header is `x-requested-with: pomo-offline` instead of `PoflowGUI`, (2) token refresh won't happen if the token expired while offline, (3) the error toast mechanism is bypassed. Should use `apiCall` from the store instead.
 
 ## V35-15 [Low / Performance] `list_tasks_paged` with assignee filter uses JOIN which may return duplicates
 **File:** `db/tasks.rs:50-55`
@@ -95,7 +95,7 @@ The `tokio::spawn` for @mention parsing runs after the response is sent. If the 
 
 ## V35-23 [Low / Documentation] OpenAPI spec version says "1.0.0" but CHANGELOG is at v2.0.1
 **File:** `main.rs:67`
-`info(title = "Pomodoro API", version = "1.0.0", ...)` — should be "2.0.1" to match the CHANGELOG.
+`info(title = "Poflow API", version = "1.0.0", ...)` — should be "2.0.1" to match the CHANGELOG.
 
 ---
 

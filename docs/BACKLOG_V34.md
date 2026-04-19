@@ -27,7 +27,7 @@ Build warning: `use of deprecated function whoami::hostname`. Should migrate to 
 
 ## V34-6 [Low / Bug] `beforeBundleCommand` stderr redirect is a workaround
 **File:** `gui/src-tauri/tauri.conf.json:11`
-`cargo build --release -p pomodoro-daemon 2>&1` works around a Tauri bug where stderr output causes "failed with exit code 0". Should track upstream fix and revert.
+`cargo build --release -p poflow-daemon 2>&1` works around a Tauri bug where stderr output causes "failed with exit code 0". Should track upstream fix and revert.
 
 ## V34-7 [Low / Security] Webhook private IP check doesn't cover 172.16-31 range completely
 **File:** `routes/webhooks.rs` (create_webhook)

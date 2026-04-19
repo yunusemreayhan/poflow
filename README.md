@@ -1,11 +1,11 @@
-# Pojidora
+# Poflow
 
-A production-grade multi-user Pomodoro timer and project management platform for Linux. Rust HTTP backend (221 API endpoints), Tauri v2 desktop GUI, web GUI (PWA), hierarchical task management, sprint planning, estimation rooms, Gantt charts, custom workflows, RBAC, and time tracking. Packaged as a single `.deb`.
+A production-grade multi-user Poflow timer and project management platform for Linux. Rust HTTP backend (221 API endpoints), Tauri v2 desktop GUI, web GUI (PWA), hierarchical task management, sprint planning, estimation rooms, Gantt charts, custom workflows, RBAC, and time tracking. Packaged as a single `.deb`.
 
 ## Features
 
 ### Timer
-- Pomodoro work/break cycles with configurable durations
+- Poflow work/break cycles with configurable durations
 - Auto-start breaks and work sessions
 - Desktop notifications on session completion
 - **Timer state persistence**: Timer state survives daemon restarts (restored as paused)
@@ -16,7 +16,7 @@ A production-grade multi-user Pomodoro timer and project management platform for
 - Inline create, edit, delete with cascade
 - Double-click to rename task titles
 - Status tracking: backlog → in_progress → completed
-- Priority (1-5), estimated pomodoros, estimated hours, story points
+- Priority (1-5), estimated poflows, estimated hours, story points
 - Task assignees (many-to-many)
 - Comments on tasks
 - Time reports with auto-assignment
@@ -60,9 +60,9 @@ A production-grade multi-user Pomodoro timer and project management platform for
 
 ### Burn Log (Unified Time & Point Tracking)
 - Single source of truth for all burned time and points
-- Three sources: `manual` (sprint burns), `timer` (auto-logged on pomodoro completion), `time_report` (ad-hoc hour logging)
+- Three sources: `manual` (sprint burns), `timer` (auto-logged on poflow completion), `time_report` (ad-hoc hour logging)
 - Sprint-scoped burns (optional sprint_id) or task-level burns
-- Timer auto-logs hours (duration/3600) with session_id reference on pomodoro completion
+- Timer auto-logs hours (duration/3600) with session_id reference on poflow completion
 - Soft-delete (cancel) with full audit trail — who cancelled what
 - Per-user per-day summary view
 - Per-task burn totals computed from burn_log
@@ -145,7 +145,7 @@ A production-grade multi-user Pomodoro timer and project management platform for
 
 ### Multi-User
 - JWT authentication (bcrypt + 7-day tokens)
-- First registered user becomes root (auto-generated password saved to `~/.local/share/pomodoro/.root_password`, or set `POMODORO_ROOT_PASSWORD` env var)
+- First registered user becomes root (auto-generated password saved to `~/.local/share/poflow/.root_password`, or set `POFLOW_ROOT_PASSWORD` env var)
 - Root users can manage all users and override ownership
 - Everyone sees all data; ownership controls edit/delete
 - Profile management (change username/password)
@@ -200,7 +200,7 @@ All user references use `user_id INTEGER REFERENCES users(id)` — usernames are
 |---|---|
 | `users` | id, username (unique, changeable), password_hash, role, created_at |
 | `tasks` | Hierarchical tasks with user_id FK, parent_id self-ref, status, estimates |
-| `sessions` | Pomodoro timer sessions with user_id FK |
+| `sessions` | Poflow timer sessions with user_id FK |
 | `session_participants` | Multi-user session participation tracking |
 | `comments` | Comments on tasks with user_id FK |
 | `task_assignees` | Many-to-many task↔user with user_id FK |
@@ -549,8 +549,8 @@ All user references use `user_id INTEGER REFERENCES users(id)` — usernames are
 docker compose up -d
 
 # Or build and run manually
-docker build -t pomodoro .
-docker run -d -p 9090:9090 -v pomodoro-data:/data pomodoro
+docker build -t poflow .
+docker run -d -p 9090:9090 -v poflow-data:/data poflow
 
 # Open http://localhost:9090
 ```
@@ -573,10 +573,10 @@ The install script handles everything: dependency checks, building, and installi
 After install:
 ```bash
 systemctl --user daemon-reload
-systemctl --user enable --now pomodoro
+systemctl --user enable --now poflow
 # Web GUI: http://localhost:9090
-# Desktop: pomodoro-gui
-# CLI: pomo --help
+# Desktop: poflow-gui
+# CLI: pofl --help
 ```
 
 **Prerequisites:** Rust (via rustup), Node.js 20+, npm. For `--desktop`: `cargo install tauri-cli`.
@@ -589,13 +589,13 @@ systemctl --user enable --now pomodoro
 
 ```bash
 cd gui && npm ci && npx vite build && cd ..
-cargo deb -p pomodoro-daemon
-sudo dpkg -i target/debian/pomodoro-daemon_*.deb
+cargo deb -p poflow-daemon
+sudo dpkg -i target/debian/poflow-daemon_*.deb
 ```
 
 ### ⚠️ Desktop GUI build note
 
-The desktop app **must** be built with `cargo tauri build`, not `cargo build -p pomodoro-gui`. Regular `cargo build` produces a dev binary that tries to connect to `localhost:1420` (Vite dev server) instead of using the embedded frontend. The install script handles this automatically with `--desktop`.
+The desktop app **must** be built with `cargo tauri build`, not `cargo build -p poflow-gui`. Regular `cargo build` produces a dev binary that tries to connect to `localhost:1420` (Vite dev server) instead of using the embedded frontend. The install script handles this automatically with `--desktop`.
 
 ## Testing
 
@@ -607,7 +607,7 @@ The desktop app **must** be built with `cargo tauri build`, not `cargo build -p 
 
 # Or individually:
 # 1. Unit/integration tests (fast, no GUI needed)
-cargo test -p pomodoro-daemon
+cargo test -p poflow-daemon
 
 # 2. Frontend unit tests
 cd gui && npm test
@@ -620,10 +620,10 @@ All three gates must pass before pushing to main.
 
 ### Unit & Integration Tests
 
-520 backend tests run automatically (`cargo test -p pomodoro-daemon`):
+520 backend tests run automatically (`cargo test -p poflow-daemon`):
 
 ```bash
-cargo test -p pomodoro-daemon
+cargo test -p poflow-daemon
 ```
 
 Tests use in-memory SQLite — no disk I/O, fully isolated, no port conflicts.
@@ -672,7 +672,7 @@ Tests cover store logic, i18n, utils, tree operations, rollup, and error boundar
 - `cargo install tauri-driver` (WebDriver bridge for Tauri)
 - `sudo apt install webkit2gtk-driver` (WebKitWebDriver)
 - `sudo apt install xvfb` (headless display)
-- Built daemon: `cargo build --release -p pomodoro-daemon`
+- Built daemon: `cargo build --release -p poflow-daemon`
 - Built GUI: `cargo tauri build`
 
 **Test isolation:** Each test file gets a fresh daemon (random port, temp DB), fresh GUI session, and its own Xvfb display. No cross-file contamination.

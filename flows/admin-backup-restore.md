@@ -2,7 +2,7 @@
 
 ## Create Backup (`POST /api/admin/backup`)
 1. **Root only.**
-2. `VACUUM INTO` creates a consistent copy at `~/.local/share/pomodoro/backups/pomodoro_{timestamp}.db`.
+2. `VACUUM INTO` creates a consistent copy at `~/.local/share/poflow/backups/poflow_{timestamp}.db`.
 3. File permissions set to `0600`.
 4. Retains last 10 backups, deletes older ones.
 5. Returns `{path, size_bytes}`.

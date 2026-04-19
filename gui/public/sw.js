@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pomo-v1';
+const CACHE_NAME = 'pofl-v1';
 const PRECACHE = ['/', '/favicon.svg', '/manifest.json'];
 
 self.addEventListener('install', (e) => {

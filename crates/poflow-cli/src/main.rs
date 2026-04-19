@@ -3,13 +3,13 @@ use clap::{Parser, Subcommand};
 use serde_json::{json, Value};
 
 #[derive(Parser)]
-#[command(name = "pomo", about = "Pomodoro timer CLI")]
+#[command(name = "pomo", about = "Poflow timer CLI")]
 struct Cli {
     /// Server URL
-    #[arg(long, default_value = "http://127.0.0.1:9090", env = "POMODORO_URL")]
+    #[arg(long, default_value = "http://127.0.0.1:9090", env = "POFLOW_URL")]
     url: String,
     /// Auth token
-    #[arg(long, env = "POMODORO_TOKEN")]
+    #[arg(long, env = "POFLOW_TOKEN")]
     token: Option<String>,
     #[command(subcommand)]
     cmd: Cmd,

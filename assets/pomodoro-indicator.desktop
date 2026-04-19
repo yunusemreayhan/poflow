@@ -1,7 +1,7 @@
 [Desktop Entry]
-Name=Pomodoro Panel Indicator
-Comment=Shows pomodoro timer countdown in the MATE panel
-Exec=/usr/bin/python3 /usr/share/pomodoro/panel-indicator.py
+Name=Poflow Panel Indicator
+Comment=Shows poflow timer countdown in the MATE panel
+Exec=/usr/bin/python3 /usr/share/poflow/panel-indicator.py
 Icon=appointment-soon
 Terminal=false
 Type=Application

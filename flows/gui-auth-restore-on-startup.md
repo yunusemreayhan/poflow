@@ -11,9 +11,9 @@ App launches, `useEffect` in `App` calls `restoreAuth()`.
    - Default: `http://127.0.0.1:9090`.
 
 2. **Restore auth credentials**:
-   - Try `invoke("load_auth")` → reads `~/.local/share/pomodoro-gui/.auth`, decrypts with AES-256-GCM.
-   - Key derivation: `SHA-256(salt + hostname + username + "pomodoro-gui-auth-v2")`.
-   - Salt: random 32 bytes, generated once, stored at `~/.local/share/pomodoro-gui/.auth_salt`.
+   - Try `invoke("load_auth")` → reads `~/.local/share/poflow-gui/.auth`, decrypts with AES-256-GCM.
+   - Key derivation: `SHA-256(salt + hostname + username + "poflow-gui-auth-v2")`.
+   - Salt: random 32 bytes, generated once, stored at `~/.local/share/poflow-gui/.auth_salt`.
    - Fallback: `localStorage.getItem("auth")` (unencrypted).
    - If found: parse JSON, set `{token, username, role}` in store, call `setToken(token)`.
 
@@ -25,9 +25,9 @@ App launches, `useEffect` in `App` calls `restoreAuth()`.
 
 ## Encryption Details
 - Algorithm: AES-256-GCM.
-- Key: 32 bytes from SHA-256 of `(salt : hostname : username : "pomodoro-gui-auth-v2")`.
+- Key: 32 bytes from SHA-256 of `(salt : hostname : username : "poflow-gui-auth-v2")`.
 - Nonce: random 12 bytes, prepended to ciphertext.
-- Stored at: `~/.local/share/pomodoro-gui/.auth` (binary file).
+- Stored at: `~/.local/share/poflow-gui/.auth` (binary file).
 
 ## ⚠️ Note: Auth Tied to Machine Identity
 The encryption key includes `hostname` and OS `username`. If either changes (e.g., hostname rename, different user account), the encrypted auth file becomes undecryptable. The fallback to localStorage will be used, but that's unencrypted.

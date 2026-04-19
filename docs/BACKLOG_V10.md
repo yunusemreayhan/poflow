@@ -1,4 +1,4 @@
-# BACKLOG v10 — pojidora
+# BACKLOG v10 — poflow
 
 Generated from full codebase analysis (5485 LOC backend, 8244 LOC frontend, 211 backend tests, 154 frontend tests).
 
@@ -34,7 +34,7 @@ The ETag hash uses `tasks`, `sprint_tasks`, `burn_log`, `task_assignees` counts 
 `rooms.rs:accept_estimate` filters `!has_children.contains(&t.id)` for auto-advance, but `has_children` is built from `parent_id` of all tasks — not just room tasks. A task that's a parent in the global tree but a leaf in the room scope gets skipped.
 
 **B10: Webhook retry uses `try_clone()` which fails for streamed bodies**
-`webhook.rs` retry loop: `req.try_clone().unwrap_or_else(|| client.post(&hook.url).body(body_str.clone()))` — the fallback loses all headers (content-type, x-pomodoro-event, x-pomodoro-signature). Should rebuild the full request.
+`webhook.rs` retry loop: `req.try_clone().unwrap_or_else(|| client.post(&hook.url).body(body_str.clone()))` — the fallback loses all headers (content-type, x-poflow-event, x-poflow-signature). Should rebuild the full request.
 
 ---
 
@@ -162,7 +162,7 @@ Test `expected_updated_at` conflict detection — verify 409 returned when task 
 
 ## UX (U1–U7)
 
-**U1: Timer shows task progress (pomodoros completed / estimated)**
+**U1: Timer shows task progress (poflows completed / estimated)**
 Show "3/8 🍅" on the timer ring when a task is selected, so users know how far along they are.
 
 **U2: Sprint board column WIP limits**
@@ -210,7 +210,7 @@ Several components import icons/hooks that are no longer used after v9 refactors
 Document the overall system architecture: backend modules, frontend component tree, data flow, WebSocket/SSE protocol, auth flow.
 
 **D2: Add ENV_VARS.md**
-Document all environment variables: `POMODORO_JWT_SECRET`, `POMODORO_CORS_ORIGINS`, `POMODORO_LOG_JSON`, `POMODORO_SWAGGER`, `POMODORO_ROOT_PASSWORD`, `ACCESS_TOKEN_EXPIRY_SECS`, `REFRESH_TOKEN_EXPIRY_SECS`.
+Document all environment variables: `POFLOW_JWT_SECRET`, `POFLOW_CORS_ORIGINS`, `POFLOW_LOG_JSON`, `POFLOW_SWAGGER`, `POFLOW_ROOT_PASSWORD`, `ACCESS_TOKEN_EXPIRY_SECS`, `REFRESH_TOKEN_EXPIRY_SECS`.
 
 **D3: Inline API endpoint documentation**
 Add brief doc comments to all route handler functions explaining purpose, auth requirements, and notable behavior.

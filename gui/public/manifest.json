@@ -1,7 +1,7 @@
 {
-  "name": "Pomodoro",
-  "short_name": "Pomodoro",
-  "description": "Pomodoro timer & project management",
+  "name": "Poflow",
+  "short_name": "Poflow",
+  "description": "Poflow timer & project management",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0f0f14",

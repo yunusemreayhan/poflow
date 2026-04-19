@@ -1,4 +1,4 @@
-use pomodoro_daemon::{auth, config, db, engine, notify, routes, build_router};
+use poflow_daemon::{auth, config, db, engine, notify, routes, build_router};
 
 use anyhow::Result;
 use chrono::Datelike;
@@ -145,7 +145,7 @@ use utoipa_swagger_ui::SwaggerUi;
         db::StatusTransition, routes::CreateTransitionRequest,
     )),
     modifiers(&SecurityAddon),
-    info(title = "Pomodoro API", version = "2.1.0", description = "Multi-user Pomodoro timer with hierarchical task management")
+    info(title = "Poflow API", version = "2.1.0", description = "Multi-user Poflow timer with hierarchical task management")
 )]
 struct ApiDoc;
 
@@ -161,16 +161,16 @@ impl utoipa::Modify for SecurityAddon {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let json_logs = std::env::var("POMODORO_LOG_JSON").is_ok_and(|v| v == "1" || v.to_lowercase() == "true");
+    let json_logs = std::env::var("POFLOW_LOG_JSON").is_ok_and(|v| v == "1" || v.to_lowercase() == "true");
     let filter = tracing_subscriber::EnvFilter::from_default_env()
-        .add_directive("pomodoro_daemon=info".parse()?);
+        .add_directive("poflow_daemon=info".parse()?);
     if json_logs {
         tracing_subscriber::fmt().with_env_filter(filter).json().init();
     } else {
         tracing_subscriber::fmt().with_env_filter(filter).init();
     }
 
-    tracing::info!("Pomodoro daemon starting...");
+    tracing::info!("Poflow daemon starting...");
     // V29-8: Warn if GitHub webhook secret is not configured
     if std::env::var("GITHUB_WEBHOOK_SECRET").is_err() {
         tracing::warn!("GITHUB_WEBHOOK_SECRET not set — GitHub webhook endpoint accepts unverified payloads");
@@ -394,15 +394,15 @@ async fn main() -> Result<()> {
 
     let mut app = build_router(engine.clone()).await;
     #[cfg(feature = "swagger")]
-    let swagger_enabled = std::env::var("POMODORO_SWAGGER").is_ok_and(|v| v == "1" || v.to_lowercase() == "true");
+    let swagger_enabled = std::env::var("POFLOW_SWAGGER").is_ok_and(|v| v == "1" || v.to_lowercase() == "true");
     #[cfg(feature = "swagger")]
     if swagger_enabled {
         app = app.merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()));
     }
     let app = app.layer(tower_http::trace::TraceLayer::new_for_http());
 
-    let bind_addr = std::env::var("POMODORO_BIND_ADDRESS").unwrap_or(config.bind_address.clone());
-    let bind_port = std::env::var("POMODORO_BIND_PORT").ok().and_then(|p| p.parse().ok()).unwrap_or(config.bind_port);
+    let bind_addr = std::env::var("POFLOW_BIND_ADDRESS").unwrap_or(config.bind_address.clone());
+    let bind_port = std::env::var("POFLOW_BIND_PORT").ok().and_then(|p| p.parse().ok()).unwrap_or(config.bind_port);
     let addr = format!("{}:{}", bind_addr, bind_port);
     tracing::info!("HTTP server listening on {}", addr);
     #[cfg(feature = "swagger")]

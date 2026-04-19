@@ -61,7 +61,7 @@ headers, so arrow navigation may jump to wrong cells.
 
 ### V30-8 — `seed_root_user` logs generated password to stdout
 **Severity:** Medium | **File:** `db/users.rs`
-When no `POMODORO_ROOT_PASSWORD` is set, the generated password is logged
+When no `POFLOW_ROOT_PASSWORD` is set, the generated password is logged
 via `tracing::warn!`. In production with JSON logging, this password ends
 up in log files. Should only log to stderr on first run, or write to a
 file with restricted permissions.

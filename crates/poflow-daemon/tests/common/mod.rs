@@ -8,13 +8,13 @@ use tower::ServiceExt;
 pub async fn app() -> axum::Router {
     static INIT: std::sync::Once = std::sync::Once::new();
     INIT.call_once(|| {
-        std::env::set_var("POMODORO_ROOT_PASSWORD", "root");
-        std::env::set_var("POMODORO_NO_RATE_LIMIT", "1");
+        std::env::set_var("POFLOW_ROOT_PASSWORD", "root");
+        std::env::set_var("POFLOW_NO_RATE_LIMIT", "1");
     });
-    let pool = pomodoro_daemon::db::connect_memory().await.unwrap();
-    let config = pomodoro_daemon::config::Config::default();
-    let engine = Arc::new(pomodoro_daemon::engine::Engine::new(pool, config).await);
-    pomodoro_daemon::build_router(engine).await
+    let pool = poflow_daemon::db::connect_memory().await.unwrap();
+    let config = poflow_daemon::config::Config::default();
+    let engine = Arc::new(poflow_daemon::engine::Engine::new(pool, config).await);
+    poflow_daemon::build_router(engine).await
 }
 
 pub fn json_req(method: &str, uri: &str, body: Option<Value>) -> Request<Body> {

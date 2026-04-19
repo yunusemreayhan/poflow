@@ -28,7 +28,7 @@ pub async fn init_pool(pool: crate::db::Pool) {
 fn secret() -> &'static [u8] {
     SECRET.get_or_init(|| {
         // 1. Env var override
-        if let Ok(s) = std::env::var("POMODORO_JWT_SECRET") {
+        if let Ok(s) = std::env::var("POFLOW_JWT_SECRET") {
             if !s.is_empty() { return s.into_bytes(); }
         }
         // 2. Persisted secret file
@@ -40,7 +40,7 @@ fn secret() -> &'static [u8] {
         // 3. Generate and persist a new random secret
         let mut buf = [0u8; 64];
         if let Err(e) = getrandom::fill(&mut buf) {
-            panic!("SECURITY: Failed to generate JWT secret via getrandom: {}. Set POMODORO_JWT_SECRET env var.", e);
+            panic!("SECURITY: Failed to generate JWT secret via getrandom: {}. Set POFLOW_JWT_SECRET env var.", e);
         }
         if let Some(parent) = secret_path.parent() { std::fs::create_dir_all(parent).ok(); }
         std::fs::write(&secret_path, buf).ok();
@@ -329,7 +329,7 @@ mod tests {
     #[test]
     fn jwt_create_and_verify_roundtrip() {
         // Force a known secret for testing
-        std::env::set_var("POMODORO_JWT_SECRET", "test-secret-at-least-32-bytes-long!!");
+        std::env::set_var("POFLOW_JWT_SECRET", "test-secret-at-least-32-bytes-long!!");
         let token = create_token(1, "alice", "user").unwrap();
         let claims = verify_token(&token).unwrap();
         assert_eq!(claims.user_id, 1);
@@ -341,7 +341,7 @@ mod tests {
 
     #[test]
     fn jwt_refresh_token_type() {
-        std::env::set_var("POMODORO_JWT_SECRET", "test-secret-at-least-32-bytes-long!!");
+        std::env::set_var("POFLOW_JWT_SECRET", "test-secret-at-least-32-bytes-long!!");
         let token = create_refresh_token(1, "alice", "user").unwrap();
         let claims = verify_token(&token).unwrap();
         assert_eq!(claims.typ, "refresh");
@@ -350,7 +350,7 @@ mod tests {
 
     #[test]
     fn jwt_access_and_refresh_have_different_jti() {
-        std::env::set_var("POMODORO_JWT_SECRET", "test-secret-at-least-32-bytes-long!!");
+        std::env::set_var("POFLOW_JWT_SECRET", "test-secret-at-least-32-bytes-long!!");
         let access = create_token(1, "alice", "user").unwrap();
         let refresh = create_refresh_token(1, "alice", "user").unwrap();
         let ac = verify_token(&access).unwrap();
@@ -360,7 +360,7 @@ mod tests {
 
     #[test]
     fn jwt_tampered_token_fails() {
-        std::env::set_var("POMODORO_JWT_SECRET", "test-secret-at-least-32-bytes-long!!");
+        std::env::set_var("POFLOW_JWT_SECRET", "test-secret-at-least-32-bytes-long!!");
         let token = create_token(1, "alice", "user").unwrap();
         let tampered = format!("{}x", token);
         assert!(verify_token(&tampered).is_err());
@@ -368,14 +368,14 @@ mod tests {
 
     #[test]
     fn jwt_garbage_token_fails() {
-        std::env::set_var("POMODORO_JWT_SECRET", "test-secret-at-least-32-bytes-long!!");
+        std::env::set_var("POFLOW_JWT_SECRET", "test-secret-at-least-32-bytes-long!!");
         assert!(verify_token("not.a.token").is_err());
         assert!(verify_token("").is_err());
     }
 
     #[tokio::test]
     async fn revoke_and_check_in_memory() {
-        std::env::set_var("POMODORO_JWT_SECRET", "test-secret-at-least-32-bytes-long!!");
+        std::env::set_var("POFLOW_JWT_SECRET", "test-secret-at-least-32-bytes-long!!");
         let token = create_token(1, "alice", "user").unwrap();
         assert!(!is_revoked(&token).await);
         // Revoke without DB (AUTH_POOL not set in unit tests — only in-memory blocklist)

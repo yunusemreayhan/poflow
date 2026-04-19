@@ -29,7 +29,7 @@ Tests: 275 backend, 154 frontend
 
 ## Security (5)
 
-- [x] **S1.** Webhook secret `derive_key()` falls back to static `"default-key"` when `POMODORO_JWT_SECRET` env var unset — never reads the persisted `.jwt_secret` file. All webhook secrets effectively unencrypted on most installs.
+- [x] **S1.** Webhook secret `derive_key()` falls back to static `"default-key"` when `POFLOW_JWT_SECRET` env var unset — never reads the persisted `.jwt_secret` file. All webhook secrets effectively unencrypted on most installs.
 - [x] **S2.** FALSE POSITIVE — `api_limiter` (200 req/60s) defined but never applied to mutation endpoints — only auth endpoints are rate-limited.
 - [x] **S3.** FALSE POSITIVE — `delete_user` doesn't revoke active tokens — deleted users retain access for up to 2 hours until JWT expires.
 - [x] **S4.** `register` doesn't check for reserved usernames — "admin", "root", "system", "api" can be registered.

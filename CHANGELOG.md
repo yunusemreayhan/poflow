@@ -7,7 +7,7 @@
 - S2: Auth key derived from random per-installation salt (32 bytes)
 - S3: AES-256-GCM encryption for stored auth (was XOR cipher)
 - S4: Block executable file extensions in Tauri write_file
-- S5: Configurable CORS origins via POMODORO_CORS_ORIGINS env var
+- S5: Configurable CORS origins via POFLOW_CORS_ORIGINS env var
 - S6/B6: SSE ticket generation fails hard without /dev/urandom
 - S7: Bcrypt cost upgrade on login (rehash if cost < 12)
 - S8: Random storage key for attachments (was predictable timestamp)
@@ -189,7 +189,7 @@
 ## v1
 
 ### Initial Release
-- Multi-user Pomodoro timer with Rust/axum backend
+- Multi-user Poflow timer with Rust/axum backend
 - Tauri v2 desktop app (React/TypeScript)
 - SQLite database with WAL mode
 - Hierarchical tasks with drag-and-drop

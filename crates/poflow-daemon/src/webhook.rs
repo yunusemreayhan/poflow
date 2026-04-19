@@ -92,9 +92,9 @@ pub fn dispatch(pool: Pool, event: &str, payload: serde_json::Value) {
                 // B10: Rebuild full request each attempt to avoid lost headers on try_clone failure
                 let mut retry_req = pinned_client.post(&safe_url)
                     .header("content-type", "application/json")
-                    .header("x-pomodoro-event", &event)
+                    .header("x-poflow-event", &event)
                     .body(body_str.clone());
-                if let Some(ref sig) = signature { retry_req = retry_req.header("x-pomodoro-signature", sig.as_str()); }
+                if let Some(ref sig) = signature { retry_req = retry_req.header("x-poflow-signature", sig.as_str()); }
                 match retry_req.send().await {
                     Ok(resp) if resp.status().is_success() => {
                         last_status = Some(resp.status().as_u16());

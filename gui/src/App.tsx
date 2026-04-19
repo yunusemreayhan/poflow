@@ -29,7 +29,7 @@ export default function App() {
   const { activeTab, poll, loadTasks, connected, token, toasts, dismissToast, confirmDialog, dismissConfirm, loading, focusMode } = useStore();
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [offline, setOffline] = useState(!navigator.onLine);
-  const [showWelcome, setShowWelcome] = useState(() => !localStorage.getItem("pomo_welcomed"));
+  const [showWelcome, setShowWelcome] = useState(() => !localStorage.getItem("pofl_welcomed"));
   const t = useT();
 
   // F16: Track online/offline state
@@ -117,7 +117,7 @@ export default function App() {
     <MotionConfig reducedMotion="user">
     <div className="flex h-screen bg-[var(--color-bg)]">
       <CommandPalette />
-      {showWelcome && token && <WelcomeGuide onDismiss={() => { setShowWelcome(false); localStorage.setItem("pomo_welcomed", "1"); }} />}
+      {showWelcome && token && <WelcomeGuide onDismiss={() => { setShowWelcome(false); localStorage.setItem("pofl_welcomed", "1"); }} />}
       <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:top-2 focus:left-2 focus:px-4 focus:py-2 focus:bg-[var(--color-accent)] focus:text-white focus:rounded-lg focus:text-sm">
         {t.skipToContent}
       </a>
@@ -171,7 +171,7 @@ export default function App() {
               className="absolute bottom-6 left-6 right-6 glass p-4 flex items-center gap-3 text-sm text-[var(--color-warning)]"
             >
               <WifiOff size={16} />
-              {t.daemonNotRunning} <code className="bg-white/5 px-2 py-1 rounded text-xs">pomodoro-daemon</code>
+              {t.daemonNotRunning} <code className="bg-white/5 px-2 py-1 rounded text-xs">poflow-daemon</code>
             </motion.div>
           )}
         </AnimatePresence>

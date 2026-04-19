@@ -68,7 +68,7 @@ pub async fn create_backup(State(engine): State<AppState>, claims: Claims) -> Re
     let backup_dir = db_path.parent().unwrap_or(std::path::Path::new("/tmp")).join("backups");
     std::fs::create_dir_all(&backup_dir).map_err(|e| internal(format!("Failed to create backup dir: {}", e)))?;
     let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S");
-    let backup_path = backup_dir.join(format!("pomodoro_{}.db", timestamp));
+    let backup_path = backup_dir.join(format!("poflow_{}.db", timestamp));
     // V29-1: Strict path validation — reject single quotes and other SQL-dangerous chars
     let path_str = backup_path.display().to_string();
     if path_str.contains('\'') || path_str.contains('"') || path_str.contains(';') || path_str.contains('\0') {
@@ -91,7 +91,7 @@ pub async fn create_backup(State(engine): State<AppState>, claims: Claims) -> Re
     let size = std::fs::metadata(&backup_path).map(|m| m.len()).unwrap_or(0);
     // O3: Retain only last 10 backups
     if let Ok(entries) = std::fs::read_dir(&backup_dir) {
-        let mut backups: Vec<_> = entries.filter_map(|e| e.ok()).filter(|e| e.file_name().to_string_lossy().starts_with("pomodoro_") && e.file_name().to_string_lossy().ends_with(".db")).collect();
+        let mut backups: Vec<_> = entries.filter_map(|e| e.ok()).filter(|e| e.file_name().to_string_lossy().starts_with("poflow_") && e.file_name().to_string_lossy().ends_with(".db")).collect();
         backups.sort_by_key(|e| std::cmp::Reverse(e.file_name()));
         for old in backups.into_iter().skip(10) { std::fs::remove_file(old.path()).ok(); }
     }
@@ -114,7 +114,7 @@ pub async fn list_backups(claims: Claims) -> ApiResult<Vec<serde_json::Value>> {
     if let Ok(entries) = std::fs::read_dir(&backup_dir) {
         for e in entries.filter_map(|e| e.ok()) {
             let name = e.file_name().to_string_lossy().to_string();
-            if name.starts_with("pomodoro_") && name.ends_with(".db") {
+            if name.starts_with("poflow_") && name.ends_with(".db") {
                 let size = e.metadata().map(|m| m.len()).unwrap_or(0);
                 backups.push(serde_json::json!({"filename": name, "size_bytes": size}));
             }

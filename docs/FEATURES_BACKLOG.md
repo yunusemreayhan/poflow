@@ -1,6 +1,6 @@
-# FEATURES BACKLOG — pojidora
+# FEATURES BACKLOG — poflow
 
-New feature proposals to make pojidora a best-in-class Pomodoro + project management tool. Organized by category, prioritized by impact within each section.
+New feature proposals to make poflow a best-in-class Poflow + project management tool. Organized by category, prioritized by impact within each section.
 
 Existing feature inventory: 207 API endpoints covering timer, tasks (hierarchical, labels, dependencies, recurrence, attachments, templates, watchers, checklists, custom fields, FTS, advanced search), sprints (board, burndown, velocity, carry-over, snapshots), planning poker rooms (WebSocket, auto-advance), teams, epics, notifications, webhooks, automation rules, audit log, import/export (CSV/JSON/iCal), backup/restore, per-user config, multi-server support, custom statuses, RBAC (root/admin/user), SLA tracking, time tracking reports, bulk operations, Gantt chart, roadmap view, PWA with offline support.
 
@@ -26,7 +26,7 @@ Existing feature inventory: 207 API endpoints covering timer, tasks (hierarchica
   - Backend: `GET /api/analytics/trends?period=week&count=8` — returns array of period summaries.
   - Frontend: Line charts using lightweight SVG (no chart library).
 
-- [x] **F6. Task estimation accuracy report.** Compare estimated vs actual pomodoros/hours across completed tasks. Show accuracy percentage, over/under-estimation patterns, per-project breakdown.
+- [x] **F6. Task estimation accuracy report.** Compare estimated vs actual poflows/hours across completed tasks. Show accuracy percentage, over/under-estimation patterns, per-project breakdown.
   - Backend: `GET /api/analytics/estimation-accuracy?project=X` — computed from tasks where status=completed and estimated>0.
 
 - [x] **F7. Sprint retrospective analytics.** Auto-generated sprint report with: velocity trend, scope change (tasks added/removed mid-sprint), carry-over rate, per-member contribution breakdown, burndown ideal vs actual comparison.
@@ -110,8 +110,8 @@ Existing feature inventory: 207 API endpoints covering timer, tasks (hierarchica
 
 ## 9. Developer Experience
 
-- [x] **F28. CLI client.** `pomodoro-cli` binary that talks to the REST API. `pomodoro start`, `pomodoro status`, `pomodoro log 2h "Fixed auth bug"`, `pomodoro tasks --status active`. Useful for terminal-centric workflows.
-  - New crate: `pomodoro-cli` using clap + reqwest.
+- [x] **F28. CLI client.** `poflow-cli` binary that talks to the REST API. `poflow start`, `poflow status`, `poflow log 2h "Fixed auth bug"`, `poflow tasks --status active`. Useful for terminal-centric workflows.
+  - New crate: `poflow-cli` using clap + reqwest.
 
 - [ ] **F29. Git hook integration.** Pre-commit hook that auto-links the current timer task to the commit message. Post-commit hook that logs time.
   - Ships as installable git hooks in the CLI package.

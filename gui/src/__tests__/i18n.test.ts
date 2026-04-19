@@ -11,7 +11,7 @@ describe("i18n", () => {
   it("defaults to English locale", () => {
     const { locale, t } = useI18n.getState();
     expect(locale).toBe("en");
-    expect(t.appName).toBe("Pomodoro");
+    expect(t.appName).toBe("Poflow");
   });
 
   it("has all required keys in English locale", () => {
@@ -41,7 +41,7 @@ describe("i18n", () => {
   it("falls back to English for unknown locale", () => {
     useI18n.getState().setLocale("xx");
     const { t } = useI18n.getState();
-    expect(t.appName).toBe("Pomodoro");
+    expect(t.appName).toBe("Poflow");
   });
 
   it("availableLocales returns at least English", () => {
@@ -73,7 +73,7 @@ describe("i18n Turkish locale", () => {
     useI18n.getState().setLocale("tr");
     const { locale, t } = useI18n.getState();
     expect(locale).toBe("tr");
-    expect(t.appName).toBe("Pomodoro");
+    expect(t.appName).toBe("Poflow");
     expect(t.logout).toBe("Çıkış");
     expect(t.settings).toBe("Ayarlar");
   });

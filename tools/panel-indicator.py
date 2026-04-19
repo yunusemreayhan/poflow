@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Pomodoro MATE panel indicator — shows timer countdown in the system tray."""
+"""Poflow MATE panel indicator — shows timer countdown in the system tray."""
 
 import json
 import os
@@ -12,14 +12,14 @@ gi.require_version("AppIndicator3", "0.1")
 gi.require_version("Gtk", "3.0")
 from gi.repository import AppIndicator3, Gtk, GLib
 
-BASE_URL = os.environ.get("POMODORO_URL", "http://127.0.0.1:9090")
+BASE_URL = os.environ.get("POFLOW_URL", "http://127.0.0.1:9090")
 POLL_MS = 1000
 TOKEN = None
 
 SOUND_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets", "sounds")
 # Fallback: installed location
 if not os.path.isdir(SOUND_DIR):
-    SOUND_DIR = "/usr/share/pomodoro/sounds"
+    SOUND_DIR = "/usr/share/poflow/sounds"
 
 SOUNDS = {
     "work_start":  os.path.join(SOUND_DIR, "work-start.ogg"),
@@ -72,8 +72,8 @@ def try_login():
     """Try to login with saved auth or env credentials."""
     global TOKEN
     # Try env var
-    user = os.environ.get("POMODORO_USER", "root")
-    pw = os.environ.get("POMODORO_PASSWORD", "root")
+    user = os.environ.get("POFLOW_USER", "root")
+    pw = os.environ.get("POFLOW_PASSWORD", "root")
     try:
         data = json.dumps({"username": user, "password": pw}).encode()
         req = urllib.request.Request(
@@ -86,16 +86,16 @@ def try_login():
         return False
 
 
-class PomodoroIndicator:
+class PoflowIndicator:
     def __init__(self):
         self.indicator = AppIndicator3.Indicator.new(
-            "pomodoro-timer",
+            "poflow-timer",
             "appointment-soon",
             AppIndicator3.IndicatorCategory.APPLICATION_STATUS,
         )
         self.indicator.set_status(AppIndicator3.IndicatorStatus.ACTIVE)
         self.indicator.set_label("⏸ Idle", "")
-        self.indicator.set_title("Pomodoro Timer")
+        self.indicator.set_title("Poflow Timer")
 
         # Menu
         menu = Gtk.Menu()
@@ -201,7 +201,7 @@ class PomodoroIndicator:
                 try:
                     import subprocess
                     msg = f"{'Work time!' if phase == 'Work' else 'Break time!'}"
-                    subprocess.Popen(["notify-send", "Pomodoro", msg, "-i", icon_name])
+                    subprocess.Popen(["notify-send", "Poflow", msg, "-i", icon_name])
                 except Exception:
                     pass
 
@@ -217,7 +217,7 @@ def main():
     signal.signal(signal.SIGINT, signal.SIG_DFL)
     if not TOKEN:
         try_login()
-    PomodoroIndicator()
+    PoflowIndicator()
     Gtk.main()
 
 

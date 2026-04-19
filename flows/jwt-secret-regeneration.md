@@ -1,7 +1,7 @@
 # Flow: JWT Secret Regeneration (Token Invalidation Event)
 
 ## Trigger
-The `.jwt_secret` file at `~/.local/share/pomodoro/.jwt_secret` is deleted, corrupted (< 32 bytes), or the daemon is moved to a new machine.
+The `.jwt_secret` file at `~/.local/share/poflow/.jwt_secret` is deleted, corrupted (< 32 bytes), or the daemon is moved to a new machine.
 
 ## What Happens
 
@@ -28,10 +28,10 @@ The `.jwt_secret` file at `~/.local/share/pomodoro/.jwt_secret` is deleted, corr
 
 ## When This Happens
 - Backup restore that doesn't include `.jwt_secret`.
-- Manual deletion of the pomodoro data directory.
+- Manual deletion of the poflow data directory.
 - Daemon reinstall without preserving data dir.
 - AI agents running tests that wipe/recreate the data dir.
 
 ## Prevention
-- Set `POMODORO_JWT_SECRET` env var for stable secret across restarts.
+- Set `POFLOW_JWT_SECRET` env var for stable secret across restarts.
 - Include `.jwt_secret` in backup/restore procedures.

@@ -119,9 +119,9 @@ The backup path is constructed from a timestamp and validated with strict charac
 The `AUTH_POOL` OnceLock is set by the first `app()` call and never updated. Concurrent tests create separate in-memory DBs but share the same auth pool. When the auth middleware validates a token, it checks user existence against the first test's DB, not the current test's DB. This causes intermittent 401 errors.
 **Fix:** Make `AUTH_POOL` per-Engine by storing the pool in the Engine struct and passing it through the router state. The `FromRequestParts` impl would extract it from state instead of a global. This is a significant refactor but eliminates all test flakiness.
 
-### V33-20 — Rate limiter tests skip with `POMODORO_NO_RATE_LIMIT` but never run in CI
+### V33-20 — Rate limiter tests skip with `POFLOW_NO_RATE_LIMIT` but never run in CI
 **Severity:** Low | **File:** `tests/api_tests.rs`
-The 3 rate limiter tests skip when `POMODORO_NO_RATE_LIMIT=1` is set. Since the full test suite is always run with this flag (to avoid flakiness from the global rate limiter state), these tests effectively never run.
+The 3 rate limiter tests skip when `POFLOW_NO_RATE_LIMIT=1` is set. Since the full test suite is always run with this flag (to avoid flakiness from the global rate limiter state), these tests effectively never run.
 **Fix:** Add a separate test target or `#[cfg(test)]` rate limiter reset function that clears the global state before each rate limiter test.
 
 ---

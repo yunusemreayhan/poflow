@@ -6,7 +6,7 @@
 3. Max 10MB per file.
 4. Filename sanitized: only alphanumeric, `.`, `-`, `_`. Leading dots stripped.
 5. Storage key: `{sha256_hex_8chars}_{sanitized_name}`.
-6. Written to `~/.local/share/pomodoro/attachments/`.
+6. Written to `~/.local/share/poflow/attachments/`.
 7. DB record: task_id, user_id, filename, mime_type, size, storage_key.
 8. **No task ownership check on upload** — any user can attach to any task.
 

@@ -1,4 +1,4 @@
-# Backlog v8 — pojidora
+# Backlog v8 — poflow
 
 Generated: 2026-04-12
 Backend: 186 tests | Frontend: 134 tests | TS strict: clean
@@ -97,7 +97,7 @@ Backend: 186 tests | Frontend: 134 tests | TS strict: clean
 
 ## Documentation (D1–D3)
 
-- **D1** — `docs/ENV_VARS.md`: Missing `POMODORO_ROOT_PASSWORD` documentation (it's referenced in code but not in the env vars doc).
+- **D1** — `docs/ENV_VARS.md`: Missing `POFLOW_ROOT_PASSWORD` documentation (it's referenced in code but not in the env vars doc).
 - **D2** — `docs/API_CHANGELOG.md`: Doesn't document the `/api/import/tasks` response field name (`created` not `imported`).
 - **D3** — No CONTRIBUTING.md with development setup instructions (how to run tests, code style, PR process).
 

@@ -1,4 +1,4 @@
-"""High-level test helpers for pojidora E2E tests.
+"""High-level test helpers for poflow E2E tests.
 
 Import these to write tests in 3-5 lines instead of raw API calls.
 Every helper handles auth, returns the created object, and is composable.
@@ -610,7 +610,7 @@ class H:
     # ── History / Stats / Export ─────────────────────────────────
 
     def history(self) -> list[dict]:
-        """List completed pomodoro sessions."""
+        """List completed poflow sessions."""
         return self.api("GET", "/api/history")
 
     def stats(self):
@@ -618,7 +618,7 @@ class H:
         return self.api("GET", "/api/stats")
 
     def export_sessions(self, fmt="json"):
-        """Export pomodoro sessions. ``fmt``: ``json`` or ``csv``."""
+        """Export poflow sessions. ``fmt``: ``json`` or ``csv``."""
         return self.api("GET", f"/api/export/sessions?format={fmt}")
 
     def export_tasks(self):
@@ -722,7 +722,7 @@ class H:
         return self.api("GET", "/api/task-sprints")
 
     def update_session_note(self, session_id, note):
-        """Update the note on a completed pomodoro session."""
+        """Update the note on a completed poflow session."""
         return self.api("PUT", f"/api/sessions/{session_id}/note", {"note": note})
 
     # ── GUI assertions ──────────────────────────────────────────

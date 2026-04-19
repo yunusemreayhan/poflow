@@ -49,7 +49,7 @@ export default function AuthScreen() {
             className="w-12 h-12 rounded-full mx-auto mb-4"
             style={{ background: "conic-gradient(from 0deg, #FF6B6B, #4ECDC4, #45B7D1, #7C3AED, #FF6B6B)" }}
           />
-          <h1 className="text-xl font-bold text-white">Pomodoro</h1>
+          <h1 className="text-xl font-bold text-white">Poflow</h1>
           <p className="text-xs text-white/40 mt-1">{isRegister ? t.createAccount : t.signIn}</p>
           <p className="text-xs text-white/30 mt-1">{isRegister ? t.firstUserAdmin : ""}</p>
         </div>

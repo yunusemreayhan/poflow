@@ -7,7 +7,7 @@ User hasn't used the app for 30+ days. Both access token (2h) and refresh token 
 
 ### GUI Startup
 1. App launches, `restoreAuth()` runs:
-   - Tries `invoke("load_auth")` → decrypts `~/.local/share/pomodoro-gui/.auth`.
+   - Tries `invoke("load_auth")` → decrypts `~/.local/share/poflow-gui/.auth`.
    - Falls back to `localStorage.getItem("auth")`.
    - If found: sets `{token, username, role}` in store.
 2. `useSseConnection` fires (token is set):
@@ -28,7 +28,7 @@ User hasn't used the app for 30+ days. Both access token (2h) and refresh token 
 
 ## What Gets Cleared on Auto-Logout
 - `token`, `username`, `role` set to `null` in Zustand store.
-- `invoke("clear_auth")` → deletes `~/.local/share/pomodoro-gui/.auth`.
+- `invoke("clear_auth")` → deletes `~/.local/share/poflow-gui/.auth`.
 - `localStorage.removeItem("auth")`.
 - `invoke("set_token", { token: "" })` → clears Tauri HTTP client token.
 - `savedServers` list is **NOT** cleared — preserved for server switching.

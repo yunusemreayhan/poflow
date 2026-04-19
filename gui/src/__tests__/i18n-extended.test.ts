@@ -77,7 +77,7 @@ describe("locale switching", () => {
 
   it("unknown locale falls back to English", () => {
     useI18n.getState().setLocale("xx");
-    expect(useI18n.getState().t.appName).toBe("Pomodoro");
+    expect(useI18n.getState().t.appName).toBe("Poflow");
   });
 
   it("availableLocales includes en and tr", () => {

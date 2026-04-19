@@ -1,0 +1,23 @@
+[Unit]
+Description=Poflow Timer Daemon
+Documentation=https://github.com/yunusemreayhan/poflow
+After=network.target graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/poflow-daemon
+Restart=on-failure
+RestartSec=5
+Environment=RUST_LOG=poflow_daemon=info
+Environment=POFLOW_GUI_DIR=/usr/share/poflow/gui
+Environment=POFLOW_DATA_DIR=%h/.local/share/poflow
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=%h/.local/share/poflow %h/.config/poflow
+PrivateTmp=true
+
+[Install]
+WantedBy=default.target

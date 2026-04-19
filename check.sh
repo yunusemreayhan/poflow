@@ -22,15 +22,15 @@ pass "Frontend tests"
 # Gate 2: Backend tests
 info "Gate 2: Backend tests (cargo test)"
 if [ "$1" = "--quick" ]; then
-    cargo test -p pomodoro-daemon --lib 2>&1 | tail -3 || fail "Backend lib tests failed"
+    cargo test -p poflow-daemon --lib 2>&1 | tail -3 || fail "Backend lib tests failed"
 else
-    cargo test -p pomodoro-daemon 2>&1 | tail -3 || fail "Backend tests failed"
+    cargo test -p poflow-daemon 2>&1 | tail -3 || fail "Backend tests failed"
 fi
 pass "Backend tests"
 
 # Gate 3: Clippy
 info "Gate 3: Clippy (zero warnings)"
-cargo clippy -p pomodoro-daemon -- -D warnings 2>&1 | tail -1 || fail "Clippy warnings found"
+cargo clippy -p poflow-daemon -- -D warnings 2>&1 | tail -1 || fail "Clippy warnings found"
 pass "Clippy clean"
 
 # Gate 4: Frontend build

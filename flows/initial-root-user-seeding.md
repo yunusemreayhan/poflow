@@ -5,12 +5,12 @@ Daemon starts and `db::connect()` is called.
 
 ## Steps
 
-1. `db::connect()` opens/creates SQLite DB at `~/.local/share/pomodoro/pomodoro.db`.
+1. `db::connect()` opens/creates SQLite DB at `~/.local/share/poflow/poflow.db`.
 2. `migrate()` runs — creates all tables if they don't exist.
 3. `seed_root_user()` runs:
    - Queries `SELECT COUNT(*) FROM users`.
    - **Only if count == 0** (empty DB):
-     - Reads `POMODORO_ROOT_PASSWORD` env var (default: `"root"`).
+     - Reads `POFLOW_ROOT_PASSWORD` env var (default: `"root"`).
      - Hashes password with bcrypt cost 12.
      - Inserts user `root` with role `root`.
      - Logs warning if using default password.
@@ -18,8 +18,8 @@ Daemon starts and `db::connect()` is called.
 
 ## JWT Secret Initialization
 Happens on first API call that needs auth (lazy via `OnceLock`):
-1. Check `POMODORO_JWT_SECRET` env var → use if set.
-2. Check `~/.local/share/pomodoro/.jwt_secret` file → use if exists and ≥32 bytes.
+1. Check `POFLOW_JWT_SECRET` env var → use if set.
+2. Check `~/.local/share/poflow/.jwt_secret` file → use if exists and ≥32 bytes.
 3. Generate 64 random bytes from `/dev/urandom`, write to `.jwt_secret`, set permissions `0600`.
 
 ## Token Blocklist Initialization

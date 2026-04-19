@@ -1084,7 +1084,7 @@ async fn test_snapshot_sprint_points_not_double_counted() {
     let app = app().await;
     let tok = login_root(&app).await;
 
-    // Task with remaining_points=5, estimated=3 (pomodoros)
+    // Task with remaining_points=5, estimated=3 (poflows)
     let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok,
         Some(json!({"title":"T","remaining_points":5.0,"estimated":3})))).await.unwrap();
     let tid = body_json(resp).await["id"].as_i64().unwrap();
@@ -1095,7 +1095,7 @@ async fn test_snapshot_sprint_points_not_double_counted() {
 
     let resp = app.clone().oneshot(auth_req("POST", &format!("/api/sprints/{}/snapshot", sid), &tok, None)).await.unwrap();
     let stat = body_json(resp).await;
-    // total_points = remaining_points (story points = 5), not estimated (pomodoros)
+    // total_points = remaining_points (story points = 5), not estimated (poflows)
     assert_eq!(stat["total_points"], 5.0);
 }
 
@@ -2111,8 +2111,8 @@ async fn test_optimistic_locking_sprint_conflict() {
 #[tokio::test]
 async fn test_auth_rate_limiting() {
     let app = app().await;
-    if std::env::var("POMODORO_NO_RATE_LIMIT").is_ok() { return; }
-    pomodoro_daemon::routes::auth_limiter().reset();
+    if std::env::var("POFLOW_NO_RATE_LIMIT").is_ok() { return; }
+    poflow_daemon::routes::auth_limiter().reset();
     // Send 11 login attempts (limit is 10 per 60s)
     // Note: rate limiter uses x-forwarded-for header, which our test doesn't set,
     // so it falls back to "unknown" key. All requests share the same key.
@@ -2191,7 +2191,7 @@ async fn test_due_date_reminder_query() {
 
     // Query due tasks (before day after tomorrow)
     let day_after = (chrono::Utc::now() + chrono::Duration::days(2)).format("%Y-%m-%d").to_string();
-    let pool = pomodoro_daemon::db::connect_memory().await.unwrap();
+    let pool = poflow_daemon::db::connect_memory().await.unwrap();
     // Use the app's pool via a direct DB call through the test helper
     // Instead, test via the tasks list endpoint and filter
     let resp = app.clone().oneshot(auth_req("GET", "/api/tasks", &tok, None)).await.unwrap();
@@ -4080,8 +4080,8 @@ async fn test_webhook_ssrf_additional_patterns() {
 #[tokio::test]
 async fn test_auth_rate_limit_threshold() {
     let app = app().await;
-    if std::env::var("POMODORO_NO_RATE_LIMIT").is_ok() { return; }
-    pomodoro_daemon::routes::auth_limiter().reset();
+    if std::env::var("POFLOW_NO_RATE_LIMIT").is_ok() { return; }
+    poflow_daemon::routes::auth_limiter().reset();
 
     // Send 11 login attempts from same IP (limit is 10/60s)
     let mut last_status = 200;
@@ -4252,8 +4252,8 @@ async fn test_rate_limit_get_not_limited() {
 #[tokio::test]
 async fn test_auth_rate_limit_blocks_after_threshold() {
     let app = app().await;
-    if std::env::var("POMODORO_NO_RATE_LIMIT").is_ok() { return; }
-    pomodoro_daemon::routes::auth_limiter().reset();
+    if std::env::var("POFLOW_NO_RATE_LIMIT").is_ok() { return; }
+    poflow_daemon::routes::auth_limiter().reset();
     // Use a fixed IP for all requests to trigger rate limit
     let fixed_ip = "10.99.99.1";
     for i in 0..12 {
@@ -4910,10 +4910,10 @@ async fn test_webhook_url_length() {
 #[tokio::test]
 async fn test_auto_archive() {
     // Create pool directly so we can run raw SQL
-    let pool = pomodoro_daemon::db::connect_memory().await.unwrap();
-    let config = pomodoro_daemon::config::Config::default();
-    let engine = Arc::new(pomodoro_daemon::engine::Engine::new(pool.clone(), config).await);
-    let app = pomodoro_daemon::build_router(engine).await;
+    let pool = poflow_daemon::db::connect_memory().await.unwrap();
+    let config = poflow_daemon::config::Config::default();
+    let engine = Arc::new(poflow_daemon::engine::Engine::new(pool.clone(), config).await);
+    let app = poflow_daemon::build_router(engine).await;
     let tok = login_root(&app).await;
     // Create and complete a task
     let tid = body_json(app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"ArchiveMe"})))).await.unwrap()).await["id"].as_i64().unwrap();
@@ -5976,7 +5976,7 @@ async fn test_automation_priority_changed_trigger() {
 
 #[tokio::test]
 async fn test_timer_persist_and_restore() {
-    use pomodoro_daemon::{db, config::Config, engine::Engine};
+    use poflow_daemon::{db, config::Config, engine::Engine};
     let pool = db::connect_memory().await.unwrap();
     let config = Config::default();
     let engine = std::sync::Arc::new(Engine::new(pool.clone(), config.clone()).await);
@@ -5986,8 +5986,8 @@ async fn test_timer_persist_and_restore() {
 
     // Start a timer
     let state = engine.start(1, None, None).await.unwrap();
-    assert_eq!(state.status, pomodoro_daemon::engine::TimerStatus::Running);
-    assert_eq!(state.phase, pomodoro_daemon::engine::TimerPhase::Work);
+    assert_eq!(state.status, poflow_daemon::engine::TimerStatus::Running);
+    assert_eq!(state.phase, poflow_daemon::engine::TimerPhase::Work);
 
     // Verify persisted to DB
     let rows = db::load_timer_states(&pool).await.unwrap();
@@ -6000,14 +6000,14 @@ async fn test_timer_persist_and_restore() {
     let engine2 = std::sync::Arc::new(Engine::new(pool.clone(), config).await);
     engine2.restore_states().await;
     let restored = engine2.get_state(1).await;
-    assert_eq!(restored.phase, pomodoro_daemon::engine::TimerPhase::Work);
-    assert_eq!(restored.status, pomodoro_daemon::engine::TimerStatus::Paused); // Restored as Paused
+    assert_eq!(restored.phase, poflow_daemon::engine::TimerPhase::Work);
+    assert_eq!(restored.status, poflow_daemon::engine::TimerStatus::Paused); // Restored as Paused
     assert_eq!(restored.duration_s, state.duration_s);
 }
 
 #[tokio::test]
 async fn test_timer_persist_cleared_on_stop() {
-    use pomodoro_daemon::{db, config::Config, engine::Engine};
+    use poflow_daemon::{db, config::Config, engine::Engine};
     let pool = db::connect_memory().await.unwrap();
     let config = Config::default();
     let engine = std::sync::Arc::new(Engine::new(pool.clone(), config).await);
@@ -6023,7 +6023,7 @@ async fn test_timer_persist_cleared_on_stop() {
 
 #[tokio::test]
 async fn test_timer_persist_pause_resume() {
-    use pomodoro_daemon::{db, config::Config, engine::Engine};
+    use poflow_daemon::{db, config::Config, engine::Engine};
     let pool = db::connect_memory().await.unwrap();
     let config = Config::default();
     let engine = std::sync::Arc::new(Engine::new(pool.clone(), config).await);
@@ -6048,8 +6048,8 @@ async fn test_timer_persist_pause_resume() {
 #[tokio::test]
 async fn test_read_rate_limiter_enforced() {
     // F3: GET requests are rate-limited at 1000/min (not unlimited)
-    if std::env::var("POMODORO_NO_RATE_LIMIT").is_ok() { return; }
-    let limiter = pomodoro_daemon::routes::read_limiter();
+    if std::env::var("POFLOW_NO_RATE_LIMIT").is_ok() { return; }
+    let limiter = poflow_daemon::routes::read_limiter();
     limiter.reset();
     let ip = "10.88.88.88";
     for _ in 0..1000 {

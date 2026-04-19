@@ -5,7 +5,7 @@ use super::*;
 pub async fn register(headers: axum::http::HeaderMap, State(engine): State<AppState>, Json(req): Json<RegisterRequest>) -> ApiResult<AuthResponse> {
     check_auth_rate_limit(&headers)?;
     // Check if registration is disabled (env var overrides config)
-    let allowed = match std::env::var("POMODORO_ALLOW_REGISTRATION") {
+    let allowed = match std::env::var("POFLOW_ALLOW_REGISTRATION") {
         Ok(v) => v != "0" && v != "false",
         Err(_) => engine.config.lock().await.allow_registration,
     };

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Poflow
+Comment=Poflow Timer with Task Management
+Exec=poflow-gui
+Icon=poflow
+Terminal=false
+Type=Application
+Categories=Utility;Office;
+Keywords=poflow;timer;productivity;focus;
+StartupWMClass=Poflow

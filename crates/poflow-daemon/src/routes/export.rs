@@ -251,10 +251,10 @@ pub async fn export_ical(State(engine): State<AppState>, claims: Claims) -> Resu
     let tasks = db::list_tasks_paged(&engine.pool, filter, 50000, 0).await.map_err(internal)?;
     let sprints = db::list_sprints(&engine.pool, None, None).await.map_err(internal)?;
 
-    let mut ical = String::from("BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//PomodoroLinux//EN\r\nCALSCALE:GREGORIAN\r\nMETHOD:PUBLISH\r\n");
+    let mut ical = String::from("BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//PoflowLinux//EN\r\nCALSCALE:GREGORIAN\r\nMETHOD:PUBLISH\r\n");
     for t in &tasks {
         if let Some(ref due) = t.due_date {
-            let uid = format!("task-{}@pomodoro", t.id);
+            let uid = format!("task-{}@poflow", t.id);
             let summary = ical_escape(&t.title);
             let date = due.replace('-', "");
             ical.push_str(&format!("BEGIN:VEVENT\r\nUID:{}\r\nDTSTART;VALUE=DATE:{}\r\nSUMMARY:{}\r\n", uid, date, summary));
@@ -265,7 +265,7 @@ pub async fn export_ical(State(engine): State<AppState>, claims: Claims) -> Resu
     }
     for s in &sprints {
         if let (Some(ref start), Some(ref end)) = (&s.start_date, &s.end_date) {
-            let uid = format!("sprint-{}@pomodoro", s.id);
+            let uid = format!("sprint-{}@poflow", s.id);
             // iCal DTEND;VALUE=DATE is exclusive — add 1 day
             let dtend = chrono::NaiveDate::parse_from_str(end, "%Y-%m-%d")
                 .map(|d| (d + chrono::Duration::days(1)).format("%Y%m%d").to_string())
@@ -281,7 +281,7 @@ pub async fn export_ical(State(engine): State<AppState>, claims: Claims) -> Resu
     axum::response::Response::builder()
         .status(StatusCode::OK)
         .header("content-type", "text/calendar; charset=utf-8")
-        .header("content-disposition", "attachment; filename=\"pomodoro.ics\"")
+        .header("content-disposition", "attachment; filename=\"poflow.ics\"")
         .body(axum::body::Body::from(ical)).map_err(|e| internal(e.to_string()))
 }
 
@@ -354,7 +354,7 @@ pub async fn export_project(State(engine): State<AppState>, claims: Claims, Quer
     });
 
     let body = serde_json::to_vec_pretty(&export).map_err(|e| internal(e.to_string()))?;
-    let filename = format!("pomodoro-export-{}.json", q.project.as_deref().unwrap_or("all"));
+    let filename = format!("poflow-export-{}.json", q.project.as_deref().unwrap_or("all"));
     axum::response::Response::builder()
         .status(StatusCode::OK)
         .header("content-type", "application/json")

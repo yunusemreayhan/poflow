@@ -14,7 +14,7 @@ def daemon():
 
 
 def api(method, path, body=None, token=None, base_url=None):
-    url = base_url or os.environ.get("POMODORO_TEST_URL", "http://127.0.0.1:9090")
+    url = base_url or os.environ.get("POFLOW_TEST_URL", "http://127.0.0.1:9090")
     data = json.dumps(body).encode() if body is not None else (b"" if method in ("POST", "PUT") else None)
     hdrs = {"Content-Type": "application/json", "X-Requested-With": "test"}
     if token:
@@ -33,7 +33,7 @@ def api(method, path, body=None, token=None, base_url=None):
 
 
 def login(base_url, user="root", pw=None):
-    pw = pw or os.environ.get("POMODORO_ROOT_PASSWORD", "TestRoot1")
+    pw = pw or os.environ.get("POFLOW_ROOT_PASSWORD", "TestRoot1")
     status, body = api("POST", "/api/auth/login", {"username": user, "password": pw}, base_url=base_url)
     assert status == 200, f"Login failed: {body}"
     return body["token"]

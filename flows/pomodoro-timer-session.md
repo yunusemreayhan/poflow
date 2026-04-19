@@ -1,4 +1,4 @@
-# Flow: Pomodoro Timer Session (Core)
+# Flow: Poflow Timer Session (Core)
 
 ## Actor
 Any authenticated user.

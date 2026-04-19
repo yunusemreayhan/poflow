@@ -18,7 +18,7 @@ Unauthenticated user with existing account.
 1. AuthScreen sends login request.
 2. On success:
    - `setToken(resp.token)` → sets token in Tauri HTTP client state.
-   - `invoke("save_auth", ...)` → encrypts and saves to `~/.local/share/pomodoro-gui/.auth` (AES-256-GCM, key derived from hostname+username+salt).
+   - `invoke("save_auth", ...)` → encrypts and saves to `~/.local/share/poflow-gui/.auth` (AES-256-GCM, key derived from hostname+username+salt).
    - Saves to `savedServers` list in localStorage.
    - Sets `{token, username, role}` in Zustand store.
 3. `useSseConnection` hook fires (token changed) → establishes SSE connection.
