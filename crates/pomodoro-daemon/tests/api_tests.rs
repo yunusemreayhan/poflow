@@ -5971,3 +5971,72 @@ async fn test_automation_priority_changed_trigger() {
     let detail = common::body_json(resp).await;
     assert_eq!(detail["task"]["status"], "active");
 }
+
+// ---- Timer state persistence ----
+
+#[tokio::test]
+async fn test_timer_persist_and_restore() {
+    use pomodoro_daemon::{db, config::Config, engine::Engine};
+    let pool = db::connect_memory().await.unwrap();
+    let config = Config::default();
+    let engine = std::sync::Arc::new(Engine::new(pool.clone(), config.clone()).await);
+
+    // Create a user
+    db::create_user(&pool, "persist_user", "$2b$04$LJ0fRCDPiLe/gkz0.Ey3/.dummy.hash.value", "user").await.unwrap();
+
+    // Start a timer
+    let state = engine.start(1, None, None).await.unwrap();
+    assert_eq!(state.status, pomodoro_daemon::engine::TimerStatus::Running);
+    assert_eq!(state.phase, pomodoro_daemon::engine::TimerPhase::Work);
+
+    // Verify persisted to DB
+    let rows = db::load_timer_states(&pool).await.unwrap();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].user_id, 1);
+    assert_eq!(rows[0].phase, "Work");
+    assert_eq!(rows[0].status, "Running");
+
+    // Simulate restart: create new engine, restore
+    let engine2 = std::sync::Arc::new(Engine::new(pool.clone(), config).await);
+    engine2.restore_states().await;
+    let restored = engine2.get_state(1).await;
+    assert_eq!(restored.phase, pomodoro_daemon::engine::TimerPhase::Work);
+    assert_eq!(restored.status, pomodoro_daemon::engine::TimerStatus::Paused); // Restored as Paused
+    assert_eq!(restored.duration_s, state.duration_s);
+}
+
+#[tokio::test]
+async fn test_timer_persist_cleared_on_stop() {
+    use pomodoro_daemon::{db, config::Config, engine::Engine};
+    let pool = db::connect_memory().await.unwrap();
+    let config = Config::default();
+    let engine = std::sync::Arc::new(Engine::new(pool.clone(), config).await);
+
+    db::create_user(&pool, "stop_user", "$2b$04$LJ0fRCDPiLe/gkz0.Ey3/.dummy.hash.value", "user").await.unwrap();
+
+    engine.start(1, None, None).await.unwrap();
+    assert_eq!(db::load_timer_states(&pool).await.unwrap().len(), 1);
+
+    engine.stop(1).await.unwrap();
+    assert_eq!(db::load_timer_states(&pool).await.unwrap().len(), 0);
+}
+
+#[tokio::test]
+async fn test_timer_persist_pause_resume() {
+    use pomodoro_daemon::{db, config::Config, engine::Engine};
+    let pool = db::connect_memory().await.unwrap();
+    let config = Config::default();
+    let engine = std::sync::Arc::new(Engine::new(pool.clone(), config).await);
+
+    db::create_user(&pool, "pause_user", "$2b$04$LJ0fRCDPiLe/gkz0.Ey3/.dummy.hash.value", "user").await.unwrap();
+
+    engine.start(1, None, None).await.unwrap();
+    engine.pause(1).await.unwrap();
+
+    let rows = db::load_timer_states(&pool).await.unwrap();
+    assert_eq!(rows[0].status, "Paused");
+
+    engine.resume(1).await.unwrap();
+    let rows = db::load_timer_states(&pool).await.unwrap();
+    assert_eq!(rows[0].status, "Running");
+}

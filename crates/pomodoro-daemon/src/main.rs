@@ -187,6 +187,7 @@ async fn main() -> Result<()> {
     }
 
     let engine = Arc::new(engine::Engine::new(pool, config.clone()).await);
+    engine.restore_states().await;
 
     // Graceful shutdown signal (O1)
     let (shutdown_tx, _) = tokio::sync::watch::channel(false);

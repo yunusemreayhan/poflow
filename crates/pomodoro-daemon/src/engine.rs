@@ -188,6 +188,7 @@ impl Engine {
 
         let s = state.clone();
         self.tx.send(s.clone()).ok();
+        self.persist_state(&s).await;
         Ok(s)
     }
 
@@ -203,6 +204,7 @@ impl Engine {
         }
         let s = state.clone();
         self.tx.send(s.clone()).ok();
+        self.persist_state(&s).await;
         Ok(s)
     }
 
@@ -218,6 +220,7 @@ impl Engine {
         }
         let s = state.clone();
         self.tx.send(s.clone()).ok();
+        self.persist_state(&s).await;
         Ok(s)
     }
 
@@ -240,6 +243,7 @@ impl Engine {
         };
         let s = state.clone();
         self.tx.send(s.clone()).ok();
+        self.persist_state(&s).await;
         Ok(s)
     }
 
@@ -273,6 +277,7 @@ impl Engine {
         state.status = TimerStatus::Idle;
         let s = state.clone();
         self.tx.send(s.clone()).ok();
+        self.persist_state(&s).await;
         Ok(s)
     }
 
@@ -415,10 +420,70 @@ impl Engine {
             }
             if let Some(cs) = completed_states.get(i) {
                 self.tx.send(cs.clone()).ok();
+                self.persist_state(cs).await;
             }
         }
 
         Ok(completed_states)
+    }
+
+    /// Persist a single user's timer state to DB. Called after every mutation.
+    async fn persist_state(&self, state: &EngineState) {
+        if state.status == TimerStatus::Idle && state.phase == TimerPhase::Idle {
+            db::delete_timer_state(&self.pool, state.current_user_id).await.ok();
+        } else {
+            db::save_timer_state(&self.pool, db::SaveTimerState {
+                user_id: state.current_user_id,
+                phase: &format!("{:?}", state.phase),
+                status: &format!("{:?}", state.status),
+                elapsed_s: state.elapsed_s,
+                duration_s: state.duration_s,
+                session_count: state.session_count,
+                task_id: state.current_task_id,
+                session_id: state.current_session_id,
+                daily_completed: state.daily_completed,
+                daily_goal: state.daily_goal,
+            }).await.ok();
+        }
+    }
+
+    /// Restore timer states from DB after daemon restart.
+    pub async fn restore_states(&self) {
+        let rows = match db::load_timer_states(&self.pool).await {
+            Ok(r) => r,
+            Err(e) => { tracing::warn!("Failed to load timer states: {}", e); return; }
+        };
+        let mut states = self.states.lock().await;
+        for row in rows {
+            let phase = match row.phase.as_str() {
+                "Work" => TimerPhase::Work,
+                "ShortBreak" => TimerPhase::ShortBreak,
+                "LongBreak" => TimerPhase::LongBreak,
+                _ => TimerPhase::Idle,
+            };
+            // Restore as Paused — user must explicitly resume after restart
+            let status = match row.status.as_str() {
+                "Running" => TimerStatus::Paused,
+                "Paused" => TimerStatus::Paused,
+                _ => TimerStatus::Idle,
+            };
+            if status == TimerStatus::Idle && phase == TimerPhase::Idle {
+                continue;
+            }
+            states.insert(row.user_id, EngineState {
+                phase,
+                status,
+                elapsed_s: row.elapsed_s as u32,
+                duration_s: row.duration_s as u32,
+                session_count: row.session_count as u32,
+                current_task_id: row.current_task_id,
+                current_session_id: row.current_session_id,
+                current_user_id: row.user_id,
+                daily_completed: row.daily_completed,
+                daily_goal: row.daily_goal as u32,
+            });
+            tracing::info!("Restored timer state for user {}: {:?}/{:?} at {}s/{}s", row.user_id, phase, status, row.elapsed_s, row.duration_s);
+        }
     }
 
     pub async fn get_state(&self, user_id: i64) -> EngineState {

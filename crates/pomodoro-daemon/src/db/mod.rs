@@ -698,6 +698,24 @@ async fn migrate(pool: &Pool) -> Result<()> {
         sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (27, ?)").bind(now_str()).execute(pool).await.ok();
     }
 
+    // Migration 28: Timer state persistence for restart resilience
+    if !applied_set.contains(&28) {
+        sqlx::query("CREATE TABLE IF NOT EXISTS timer_states (
+            user_id            INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+            phase              TEXT NOT NULL,
+            status             TEXT NOT NULL,
+            elapsed_s          INTEGER NOT NULL DEFAULT 0,
+            duration_s         INTEGER NOT NULL DEFAULT 0,
+            session_count      INTEGER NOT NULL DEFAULT 0,
+            current_task_id    INTEGER REFERENCES tasks(id) ON DELETE SET NULL,
+            current_session_id INTEGER REFERENCES sessions(id) ON DELETE SET NULL,
+            daily_completed    INTEGER NOT NULL DEFAULT 0,
+            daily_goal         INTEGER NOT NULL DEFAULT 8,
+            updated_at         TEXT NOT NULL
+        )").execute(pool).await.ok();
+        sqlx::query("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (28, ?)").bind(now_str()).execute(pool).await.ok();
+    }
+
     Ok(())
 }
 
@@ -755,3 +773,5 @@ mod projects;
 pub use projects::*;
 mod status_transitions;
 pub use status_transitions::*;
+mod timer_states;
+pub use timer_states::*;
