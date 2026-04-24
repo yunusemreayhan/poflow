@@ -1,12 +1,11 @@
 use axum::body::Body;
-use http_body_util::BodyExt;
 use hyper::Request;
 use serde_json::{json, Value};
 use std::sync::Arc;
 use tower::ServiceExt;
 
 mod common;
-use common::{app, json_req, auth_req, body_json, login_root, register_user, register_user_full, reg};
+use common::{app, json_req, auth_req, body_json, login_root, register_user, register_user_full};
 
 #[tokio::test]
 async fn test_health_endpoint() {
@@ -166,11 +165,11 @@ async fn test_due_date_reminder_query() {
     let resp = app.clone().oneshot(auth_req("PUT", &format!("/api/tasks/{}", done_id), &tok, Some(json!({"status":"completed"})))).await.unwrap();
     assert_eq!(resp.status(), 200);
     let day_after = (chrono::Utc::now() + chrono::Duration::days(2)).format("%Y-%m-%d").to_string();
-    let pool = poflow_daemon::db::connect_memory().await.unwrap();
+    let _pool = poflow_daemon::db::connect_memory().await.unwrap();
     let resp = app.clone().oneshot(auth_req("GET", "/api/tasks", &tok, None)).await.unwrap();
     let tasks = body_json(resp).await;
     let due_tasks: Vec<&Value> = tasks.as_array().unwrap().iter()
-        .filter(|t| t["due_date"].as_str().map_or(false, |d| d <= day_after.as_str()) && t["status"].as_str() != Some("completed"))
+        .filter(|t| t["due_date"].as_str().is_some_and(|d| d <= day_after.as_str()) && t["status"].as_str() != Some("completed"))
         .collect();
     assert_eq!(due_tasks.len(), 1);
     assert_eq!(due_tasks[0]["title"].as_str().unwrap(), "Due soon");
@@ -347,7 +346,7 @@ async fn test_user_hours_report() {
     let resp = app.clone().oneshot(auth_req("GET", "/api/reports/user-hours", &tok, None)).await.unwrap();
     assert_eq!(resp.status(), 200);
     let data = body_json(resp).await;
-    assert!(data.as_array().unwrap().len() >= 1);
+    assert!(!data.as_array().unwrap().is_empty());
     let resp = app.clone().oneshot(auth_req("GET", "/api/reports/user-hours?from=garbage", &tok, None)).await.unwrap();
     assert_eq!(resp.status(), 400);
 }
@@ -916,7 +915,7 @@ async fn test_activity_feed() {
     let resp = app.clone().oneshot(auth_req("GET", "/api/feed", &tok, None)).await.unwrap();
     assert_eq!(resp.status(), 200);
     let data = body_json(resp).await;
-    assert!(data.as_array().unwrap().len() > 0);
+    assert!(!data.as_array().unwrap().is_empty());
     assert!(data[0]["type"].is_string());
     assert!(data[0]["created_at"].is_string());
 }
@@ -1425,7 +1424,7 @@ async fn test_leaderboard() {
     let resp = app.clone().oneshot(auth_req("GET", "/api/leaderboard", &tok, None)).await.unwrap();
     assert_eq!(resp.status(), 200);
     let data = body_json(resp).await;
-    assert!(data.as_array().unwrap().len() >= 1);
+    assert!(!data.as_array().unwrap().is_empty());
     assert!(data[0]["username"].is_string());
     assert!(data[0]["hours"].is_number());
     assert!(data[0]["sessions"].is_number());
@@ -1473,7 +1472,7 @@ async fn test_priority_suggestions() {
     let resp = app.clone().oneshot(auth_req("GET", "/api/suggestions/priorities", &tok, None)).await.unwrap();
     assert_eq!(resp.status(), 200);
     let data = body_json(resp).await;
-    assert!(data.as_array().unwrap().len() >= 1);
+    assert!(!data.as_array().unwrap().is_empty());
     let suggestion = &data[0];
     assert!(suggestion["suggested_priority"].as_i64().unwrap() >= 4);
     assert!(suggestion["reasons"].as_array().unwrap().iter().any(|r| r.as_str().unwrap().contains("Overdue")));
@@ -1576,7 +1575,7 @@ async fn test_sla_report() {
     let resp = app.clone().oneshot(auth_req("GET", "/api/reports/sla", &tok, None)).await.unwrap();
     assert_eq!(resp.status(), 200);
     let report = body_json(resp).await;
-    assert!(report["resolution_time_by_priority"].as_array().unwrap().len() > 0);
+    assert!(!report["resolution_time_by_priority"].as_array().unwrap().is_empty());
     assert!(report["overdue_tasks"].is_number());
     assert!(report["on_time_completion"]["on_time_pct"].is_number());
 }
@@ -1692,7 +1691,7 @@ async fn test_user_presence() {
     let resp = app.clone().oneshot(auth_req("GET", "/api/users/presence", &tok, None)).await.unwrap();
     assert_eq!(resp.status(), 200);
     let data = body_json(resp).await;
-    assert!(data.as_array().unwrap().len() >= 1);
+    assert!(!data.as_array().unwrap().is_empty());
     let root = data.as_array().unwrap().iter().find(|u| u["username"] == "root").unwrap();
     assert!(root["user_id"].is_number());
     assert!(root["online"].is_boolean());

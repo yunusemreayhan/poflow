@@ -1,12 +1,8 @@
-use axum::body::Body;
-use http_body_util::BodyExt;
-use hyper::Request;
-use serde_json::{json, Value};
-use std::sync::Arc;
+use serde_json::json;
 use tower::ServiceExt;
 
 mod common;
-use common::{app, json_req, auth_req, body_json, login_root, register_user, register_user_full, reg};
+use common::{app, json_req, auth_req, body_json, login_root, register_user, register_user_full};
 
 #[tokio::test]
 async fn test_admin_list_users() {
@@ -15,7 +11,7 @@ async fn test_admin_list_users() {
     let resp = app.oneshot(auth_req("GET", "/api/admin/users", &tok, None)).await.unwrap();
     assert_eq!(resp.status(), 200);
     let users = body_json(resp).await;
-    assert!(users.as_array().unwrap().len() >= 1);
+    assert!(!users.as_array().unwrap().is_empty());
 }
 
 #[tokio::test]

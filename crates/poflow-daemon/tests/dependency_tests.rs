@@ -1,12 +1,8 @@
-use axum::body::Body;
-use http_body_util::BodyExt;
-use hyper::Request;
-use serde_json::{json, Value};
-use std::sync::Arc;
+use serde_json::json;
 use tower::ServiceExt;
 
 mod common;
-use common::{app, json_req, auth_req, body_json, login_root, register_user, register_user_full, reg};
+use common::{app, json_req, auth_req, body_json, login_root};
 
 #[tokio::test]
 async fn test_dependencies_crud() {
@@ -25,7 +21,7 @@ async fn test_dependencies_crud() {
     assert_eq!(deps.as_array().unwrap(), &[json!(a)]);
     // Get all dependencies
     let resp = app.clone().oneshot(auth_req("GET", "/api/dependencies", &tok, None)).await.unwrap();
-    assert!(body_json(resp).await.as_array().unwrap().len() >= 1);
+    assert!(!body_json(resp).await.as_array().unwrap().is_empty());
     // Remove dependency
     let resp = app.clone().oneshot(auth_req("DELETE", &format!("/api/tasks/{}/dependencies/{}", b, a), &tok, None)).await.unwrap();
     assert_eq!(resp.status(), 204);
@@ -50,7 +46,7 @@ async fn test_dependency_crud_and_list() {
     assert_eq!(deps.as_array().unwrap().len(), 1);
     // Get all dependencies
     let all = body_json(app.clone().oneshot(auth_req("GET", "/api/dependencies", &tok, None)).await.unwrap()).await;
-    assert!(all.as_array().unwrap().len() >= 1);
+    assert!(!all.as_array().unwrap().is_empty());
     // Remove dependency
     let resp = app.clone().oneshot(auth_req("DELETE", &format!("/api/tasks/{}/dependencies/{}", id1, id2), &tok, None)).await.unwrap();
     assert!(resp.status().is_success());

@@ -1,12 +1,11 @@
 use axum::body::Body;
-use http_body_util::BodyExt;
 use hyper::Request;
-use serde_json::{json, Value};
+use serde_json::json;
 use std::sync::Arc;
 use tower::ServiceExt;
 
 mod common;
-use common::{app, json_req, auth_req, body_json, login_root, register_user, register_user_full, reg};
+use common::{app, json_req, auth_req, body_json, login_root, register_user_full};
 
 // ---- Flow: initial-root-user-seeding ----
 
@@ -59,8 +58,7 @@ async fn flow_register_disabled_via_env() {
     // This test uses POFLOW_ALLOW_REGISTRATION=false to disable registration
     // We can't set env vars safely in parallel tests, so we test via config instead
     let pool = poflow_daemon::db::connect_memory().await.unwrap();
-    let mut config = poflow_daemon::config::Config::default();
-    config.allow_registration = false;
+    let config = poflow_daemon::config::Config { allow_registration: false, ..Default::default() };
     let engine = Arc::new(poflow_daemon::engine::Engine::new(pool, config).await);
     let app = poflow_daemon::build_router(engine).await;
     let resp = app.clone().oneshot(json_req("POST", "/api/auth/register", Some(json!({"username":"blocked","password":"Block1234"})))).await.unwrap();
@@ -710,7 +708,7 @@ async fn test_full_project_workflow() {
 async fn test_multi_user_collaboration() {
     let app = app().await;
     let root_tok = login_root(&app).await;
-    let (user_tok, user_id) = register_user_full(&app, "collab_dev", "CollDev11").await;
+    let (user_tok, _user_id) = register_user_full(&app, "collab_dev", "CollDev11").await;
     let (_, admin_id) = register_user_full(&app, "collab_admin", "CollAdm11").await;
 
     // Promote to admin

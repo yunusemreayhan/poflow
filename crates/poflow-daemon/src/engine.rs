@@ -548,9 +548,7 @@ mod tests {
 
     #[test]
     fn idle_state_uses_config() {
-        let mut cfg = Config::default();
-        cfg.daily_goal = 12;
-        cfg.work_duration_min = 50;
+        let cfg = Config { daily_goal: 12, work_duration_min: 50, ..Config::default() };
         let s = Engine::idle_state(42, &cfg);
         assert_eq!(s.current_user_id, 42);
         assert_eq!(s.daily_goal, 12);

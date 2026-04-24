@@ -1,12 +1,10 @@
 use axum::body::Body;
-use http_body_util::BodyExt;
 use hyper::Request;
-use serde_json::{json, Value};
-use std::sync::Arc;
+use serde_json::json;
 use tower::ServiceExt;
 
 mod common;
-use common::{app, json_req, auth_req, body_json, login_root, register_user, register_user_full, reg};
+use common::{app, json_req, auth_req, body_json, login_root, register_user};
 
 #[tokio::test]
 async fn test_webhooks_crud() {
@@ -20,7 +18,7 @@ async fn test_webhooks_crud() {
     assert_eq!(wh["events"], "task.created");
     // List webhooks
     let resp = app.clone().oneshot(auth_req("GET", "/api/webhooks", &tok, None)).await.unwrap();
-    assert!(body_json(resp).await.as_array().unwrap().len() >= 1);
+    assert!(!body_json(resp).await.as_array().unwrap().is_empty());
     // Delete webhook
     let resp = app.clone().oneshot(auth_req("DELETE", &format!("/api/webhooks/{}", wid), &tok, None)).await.unwrap();
     assert_eq!(resp.status(), 204);
@@ -114,7 +112,7 @@ async fn test_webhook_crud() {
     let resp = app.clone().oneshot(auth_req("GET", "/api/webhooks", &tok, None)).await.unwrap();
     assert_eq!(resp.status(), 200);
     let list = body_json(resp).await;
-    assert!(list.as_array().unwrap().len() >= 1);
+    assert!(!list.as_array().unwrap().is_empty());
 
     // Invalid event rejected
     let resp = app.clone().oneshot(auth_req("POST", "/api/webhooks", &tok,

@@ -1,12 +1,10 @@
 use axum::body::Body;
-use http_body_util::BodyExt;
 use hyper::Request;
-use serde_json::{json, Value};
-use std::sync::Arc;
+use serde_json::json;
 use tower::ServiceExt;
 
 mod common;
-use common::{app, json_req, auth_req, body_json, login_root, register_user, register_user_full, reg};
+use common::{app, json_req, auth_req, body_json, login_root, register_user};
 
 #[tokio::test]
 async fn test_seed_root_login() {
@@ -85,7 +83,7 @@ async fn test_refresh_token() {
     let resp = app.clone().oneshot(json_req("POST", "/api/auth/login", Some(json!({"username":"root","password":"root"})))).await.unwrap();
     assert_eq!(resp.status(), 200);
     let body = body_json(resp).await;
-    let refresh = body["refresh_token"].as_str().expect(&format!("No refresh_token in: {}", body)).to_string();
+    let refresh = body["refresh_token"].as_str().unwrap_or_else(|| panic!("No refresh_token in: {}", body)).to_string();
     assert!(!refresh.is_empty());
 
     // Use refresh token to get new access token
@@ -103,7 +101,7 @@ async fn test_refresh_token() {
 #[tokio::test]
 async fn test_refresh_token_rejected_as_access() {
     let app = app().await;
-    let tok = login_root(&app).await;
+    let _tok = login_root(&app).await;
     // Get refresh token via a fresh login
     let resp = app.clone().oneshot(json_req("POST", "/api/auth/login", Some(json!({"username":"root","password":"root1234"})))).await.unwrap();
     let body = body_json(resp).await;
@@ -148,13 +146,13 @@ async fn test_sse_ticket_exchange() {
     assert!(ticket.len() >= 16);
     // Use ticket for SSE — should return 200 (streaming)
     let resp = app.clone().oneshot(
-        Request::builder().method("GET").uri(&format!("/api/timer/sse?ticket={}", ticket))
+        Request::builder().method("GET").uri(format!("/api/timer/sse?ticket={}", ticket))
             .body(Body::empty()).unwrap()
     ).await.unwrap();
     assert_eq!(resp.status(), 200);
     // Ticket is single-use — second attempt should fail
     let resp = app.clone().oneshot(
-        Request::builder().method("GET").uri(&format!("/api/timer/sse?ticket={}", ticket))
+        Request::builder().method("GET").uri(format!("/api/timer/sse?ticket={}", ticket))
             .body(Body::empty()).unwrap()
     ).await.unwrap();
     assert_eq!(resp.status(), 401);
@@ -185,7 +183,7 @@ async fn test_sse_ticket_and_connect() {
 
     // Connect to SSE with ticket
     let resp = app.clone().oneshot(
-        Request::builder().method("GET").uri(&format!("/api/timer/sse?ticket={}", ticket))
+        Request::builder().method("GET").uri(format!("/api/timer/sse?ticket={}", ticket))
             .body(Body::empty()).unwrap()
     ).await.unwrap();
     assert_eq!(resp.status(), 200);
@@ -195,7 +193,7 @@ async fn test_sse_ticket_and_connect() {
 
     // Expired/reused ticket should fail
     let resp = app.clone().oneshot(
-        Request::builder().method("GET").uri(&format!("/api/timer/sse?ticket={}", ticket))
+        Request::builder().method("GET").uri(format!("/api/timer/sse?ticket={}", ticket))
             .body(Body::empty()).unwrap()
     ).await.unwrap();
     assert_eq!(resp.status(), 401);
@@ -301,7 +299,7 @@ async fn test_register_duplicate_username() {
 #[tokio::test]
 async fn test_token_refresh_flow() {
     let app = app().await;
-    let tok = login_root(&app).await;
+    let _tok = login_root(&app).await;
     // Get refresh token from login
     let resp = app.clone().oneshot(json_req("POST", "/api/auth/login", Some(json!({"username":"root","password":"root"})))).await.unwrap();
     let body = body_json(resp).await;

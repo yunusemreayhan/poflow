@@ -57,12 +57,14 @@ pub async fn login_root(app: &axum::Router) -> String {
     body_json(resp).await["token"].as_str().unwrap().to_string()
 }
 
+#[allow(dead_code)]
 pub async fn register_user(app: &axum::Router, username: &str) -> String {
     let resp = app.clone().oneshot(json_req("POST", "/api/auth/register", Some(json!({"username": username, "password": "Pass1234"})))).await.unwrap();
     assert!(resp.status().is_success(), "register {} failed: {}", username, resp.status());
     body_json(resp).await["token"].as_str().unwrap().to_string()
 }
 
+#[allow(dead_code)]
 pub async fn register_user_full(app: &axum::Router, username: &str, password: &str) -> (String, i64) {
     let resp = app.clone().oneshot(json_req("POST", "/api/auth/register", Some(json!({"username": username, "password": password})))).await.unwrap();
     assert_eq!(resp.status(), 200, "register {} failed", username);

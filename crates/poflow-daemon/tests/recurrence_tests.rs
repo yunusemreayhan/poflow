@@ -1,12 +1,8 @@
-use axum::body::Body;
-use http_body_util::BodyExt;
-use hyper::Request;
-use serde_json::{json, Value};
-use std::sync::Arc;
+use serde_json::json;
 use tower::ServiceExt;
 
 mod common;
-use common::{app, json_req, auth_req, body_json, login_root, register_user, register_user_full, reg};
+use common::{app, auth_req, body_json, login_root};
 
 #[tokio::test]
 async fn test_recurrence_crud() {
@@ -137,7 +133,7 @@ async fn test_recurrence_crud_and_patterns() {
     // Get should return empty/null
     let resp = app.clone().oneshot(auth_req("GET", &format!("/api/tasks/{}/recurrence", tid), &tok, None)).await.unwrap();
     let rec = body_json(resp).await;
-    assert!(rec.is_null() || rec.as_object().map_or(true, |o| o.is_empty()));
+    assert!(rec.is_null() || rec.as_object().is_none_or(|o| o.is_empty()));
 }
 
 #[tokio::test]

@@ -1,12 +1,8 @@
-use axum::body::Body;
-use http_body_util::BodyExt;
-use hyper::Request;
 use serde_json::{json, Value};
-use std::sync::Arc;
 use tower::ServiceExt;
 
 mod common;
-use common::{app, json_req, auth_req, body_json, login_root, register_user, register_user_full, reg};
+use common::{app, json_req, auth_req, body_json, login_root};
 
 #[tokio::test]
 async fn test_sprint_create_and_list() {
@@ -502,7 +498,7 @@ async fn test_sprint_burndown_with_snapshot() {
     let resp = app.clone().oneshot(auth_req("GET", &format!("/api/sprints/{}/burndown", sid), &tok, None)).await.unwrap();
     assert_eq!(resp.status(), 200);
     let stats = body_json(resp).await;
-    assert!(stats.as_array().unwrap().len() >= 1);
+    assert!(!stats.as_array().unwrap().is_empty());
 }
 
 #[tokio::test]
@@ -601,7 +597,7 @@ async fn test_sprint_completion_takes_snapshot() {
     // Burndown should have at least one snapshot
     let resp = app.clone().oneshot(auth_req("GET", &format!("/api/sprints/{}/burndown", sid), &tok, None)).await.unwrap();
     let burndown = body_json(resp).await;
-    assert!(burndown.as_array().unwrap().len() >= 1);
+    assert!(!burndown.as_array().unwrap().is_empty());
 }
 
 #[tokio::test]
@@ -735,6 +731,7 @@ async fn set_status(app: &axum::Router, tok: &str, tid: i64, status: &str) -> (u
 }
 
 // Helper: get assignees for a task
+#[allow(dead_code)]
 async fn get_assignees(app: &axum::Router, tok: &str, tid: i64) -> Vec<String> {
     let resp = app.clone().oneshot(auth_req("GET", &format!("/api/tasks/{}/assignees", tid), tok, None)).await.unwrap();
     let j = body_json(resp).await;

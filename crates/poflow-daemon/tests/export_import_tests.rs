@@ -1,12 +1,9 @@
-use axum::body::Body;
 use http_body_util::BodyExt;
-use hyper::Request;
-use serde_json::{json, Value};
-use std::sync::Arc;
+use serde_json::json;
 use tower::ServiceExt;
 
 mod common;
-use common::{app, json_req, auth_req, body_json, login_root, register_user, register_user_full, reg};
+use common::{app, auth_req, body_json, login_root};
 
 #[tokio::test]
 async fn test_export_tasks_csv() {
@@ -31,7 +28,7 @@ async fn test_export_tasks_json() {
     let ct = resp.headers().get("content-type").unwrap().to_str().unwrap();
     assert!(ct.contains("application/json"));
     let tasks = body_json(resp).await;
-    assert!(tasks.as_array().unwrap().len() >= 1);
+    assert!(!tasks.as_array().unwrap().is_empty());
 }
 
 #[tokio::test]

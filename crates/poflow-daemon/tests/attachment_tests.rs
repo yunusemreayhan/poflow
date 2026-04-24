@@ -1,12 +1,11 @@
 use axum::body::Body;
 use http_body_util::BodyExt;
 use hyper::Request;
-use serde_json::{json, Value};
-use std::sync::Arc;
+use serde_json::json;
 use tower::ServiceExt;
 
 mod common;
-use common::{app, json_req, auth_req, body_json, login_root, register_user, register_user_full, reg};
+use common::{app, json_req, auth_req, body_json, login_root};
 
 #[tokio::test]
 async fn test_attachments_crud() {
@@ -211,7 +210,7 @@ async fn test_attachment_upload_download_delete() {
     let tid = body_json(resp).await["id"].as_i64().unwrap();
 
     // Upload attachment
-    let req = Request::builder().method("POST").uri(&format!("/api/tasks/{}/attachments", tid))
+    let req = Request::builder().method("POST").uri(format!("/api/tasks/{}/attachments", tid))
         .header("authorization", format!("Bearer {}", tok))
         .header("x-requested-with", "test")
         .header("x-filename", "test.txt")
@@ -245,7 +244,7 @@ async fn test_attachment_empty_file_rejected() {
     let tok = login_root(&app).await;
     let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"T"})))).await.unwrap();
     let tid = body_json(resp).await["id"].as_i64().unwrap();
-    let req = Request::builder().method("POST").uri(&format!("/api/tasks/{}/attachments", tid))
+    let req = Request::builder().method("POST").uri(format!("/api/tasks/{}/attachments", tid))
         .header("authorization", format!("Bearer {}", tok))
         .header("x-requested-with", "test")
         .header("x-filename", "empty.txt")
@@ -261,7 +260,7 @@ async fn test_attachment_unsafe_mime_forced_octet_stream() {
     let resp = app.clone().oneshot(auth_req("POST", "/api/tasks", &tok, Some(json!({"title":"T"})))).await.unwrap();
     let tid = body_json(resp).await["id"].as_i64().unwrap();
     // S3: Upload with HTML content-type should be blocked
-    let req = Request::builder().method("POST").uri(&format!("/api/tasks/{}/attachments", tid))
+    let req = Request::builder().method("POST").uri(format!("/api/tasks/{}/attachments", tid))
         .header("authorization", format!("Bearer {}", tok))
         .header("x-requested-with", "test")
         .header("x-filename", "evil.html")

@@ -1,12 +1,8 @@
-use axum::body::Body;
-use http_body_util::BodyExt;
-use hyper::Request;
-use serde_json::{json, Value};
-use std::sync::Arc;
+use serde_json::json;
 use tower::ServiceExt;
 
 mod common;
-use common::{app, json_req, auth_req, body_json, login_root, register_user, register_user_full, reg};
+use common::{app, auth_req, body_json, login_root, register_user};
 
 #[tokio::test]
 async fn test_teams_crud() {
@@ -70,7 +66,7 @@ async fn test_team_members_and_root_tasks() {
 async fn test_team_member_add_remove() {
     let app = app().await;
     let root_tok = login_root(&app).await;
-    let user_tok = register_user(&app, "teamUser1").await;
+    let _user_tok = register_user(&app, "teamUser1").await;
     // Create team as root
     let team = body_json(app.clone().oneshot(auth_req("POST", "/api/teams", &root_tok, Some(json!({"name":"TestTeam"})))).await.unwrap()).await;
     let tid = team["id"].as_i64().unwrap();

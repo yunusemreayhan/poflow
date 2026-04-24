@@ -1,12 +1,9 @@
 use axum::body::Body;
-use http_body_util::BodyExt;
-use hyper::Request;
 use serde_json::{json, Value};
-use std::sync::Arc;
 use tower::ServiceExt;
 
 mod common;
-use common::{app, json_req, auth_req, body_json, login_root, register_user, register_user_full, reg};
+use common::{app, auth_req, body_json, login_root, register_user, register_user_full};
 
 #[tokio::test]
 async fn test_create_list_tasks() {
@@ -323,7 +320,7 @@ async fn test_task_search_filter() {
     // Search by text
     let resp = app.clone().oneshot(auth_req("GET", "/api/tasks?search=backend", &tok, None)).await.unwrap();
     let tasks = body_json(resp).await;
-    assert!(tasks.as_array().unwrap().iter().all(|t| t["title"].as_str().unwrap().to_lowercase().contains("backend") || t["project"].as_str().map_or(false, |p| p.to_lowercase().contains("backend"))));
+    assert!(tasks.as_array().unwrap().iter().all(|t| t["title"].as_str().unwrap().to_lowercase().contains("backend") || t["project"].as_str().is_some_and(|p| p.to_lowercase().contains("backend"))));
     // Filter by project
     let resp = app.clone().oneshot(auth_req("GET", "/api/tasks?project=frontend", &tok, None)).await.unwrap();
     let tasks = body_json(resp).await;

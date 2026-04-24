@@ -152,8 +152,7 @@ mod tests {
     #[test]
     fn toml_partial_override() {
         // Serialize default, modify one field, deserialize back
-        let mut c = Config::default();
-        c.work_duration_min = 50;
+        let c = Config { work_duration_min: 50, ..Config::default() };
         let toml_str = toml::to_string_pretty(&c).unwrap();
         let d: Config = toml::from_str(&toml_str).unwrap();
         assert_eq!(d.work_duration_min, 50);
@@ -205,9 +204,7 @@ mod tests {
         let path = dir.join("config.toml");
 
         // Save
-        let mut c = Config::default();
-        c.work_duration_min = 45;
-        c.daily_goal = 12;
+        let c = Config { work_duration_min: 45, daily_goal: 12, ..Config::default() };
         let data = toml::to_string_pretty(&c).unwrap();
         std::fs::write(&path, &data).unwrap();
 
