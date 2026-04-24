@@ -26,10 +26,14 @@ fn config() -> &'static Option<SmtpConfig> {
         let host = std::env::var("POFLOW_SMTP_HOST").ok()?;
         Some(SmtpConfig {
             host,
-            port: std::env::var("POFLOW_SMTP_PORT").ok().and_then(|p| p.parse().ok()).unwrap_or(587),
+            port: std::env::var("POFLOW_SMTP_PORT")
+                .ok()
+                .and_then(|p| p.parse().ok())
+                .unwrap_or(587),
             user: std::env::var("POFLOW_SMTP_USER").unwrap_or_default(),
             pass: std::env::var("POFLOW_SMTP_PASS").unwrap_or_default(),
-            from: std::env::var("POFLOW_SMTP_FROM").unwrap_or_else(|_| "poflow@localhost".to_string()),
+            from: std::env::var("POFLOW_SMTP_FROM")
+                .unwrap_or_else(|_| "poflow@localhost".to_string()),
         })
     })
 }
@@ -50,24 +54,43 @@ pub fn send(to_email: &str, subject: &str, body: &str) {
     let pass = cfg.pass.clone();
 
     tokio::spawn(async move {
-        use lettre::{Message, SmtpTransport, Transport};
         use lettre::transport::smtp::authentication::Credentials;
+        use lettre::{Message, SmtpTransport, Transport};
 
         let email = match Message::builder()
-            .from(match from.parse() { Ok(a) => a, Err(_) => match "poflow@localhost".parse() { Ok(a) => a, Err(_) => return } })
-            .to(match to.parse() { Ok(a) => a, Err(_) => return })
+            .from(match from.parse() {
+                Ok(a) => a,
+                Err(_) => match "poflow@localhost".parse() {
+                    Ok(a) => a,
+                    Err(_) => return,
+                },
+            })
+            .to(match to.parse() {
+                Ok(a) => a,
+                Err(_) => return,
+            })
             .subject(subj)
-            .body(text) {
+            .body(text)
+        {
             Ok(e) => e,
-            Err(e) => { tracing::warn!("Email build error: {}", e); return; }
+            Err(e) => {
+                tracing::warn!("Email build error: {}", e);
+                return;
+            }
         };
 
         let transport = if user.is_empty() {
             SmtpTransport::builder_dangerous(&host).port(port).build()
         } else {
             match SmtpTransport::relay(&host) {
-                Ok(b) => b.port(port).credentials(Credentials::new(user, pass)).build(),
-                Err(e) => { tracing::warn!("SMTP relay error: {}", e); return; }
+                Ok(b) => b
+                    .port(port)
+                    .credentials(Credentials::new(user, pass))
+                    .build(),
+                Err(e) => {
+                    tracing::warn!("SMTP relay error: {}", e);
+                    return;
+                }
             }
         };
 
@@ -80,14 +103,24 @@ pub fn send(to_email: &str, subject: &str, body: &str) {
 
 /// Send task assignment notification
 pub fn notify_assigned(to_email: &str, task_title: &str, assigned_by: &str) {
-    send(to_email,
+    send(
+        to_email,
         &format!("Task assigned: {}", task_title),
-        &format!("You were assigned to \"{}\" by {}.\n\nLog in to view the task.", task_title, assigned_by));
+        &format!(
+            "You were assigned to \"{}\" by {}.\n\nLog in to view the task.",
+            task_title, assigned_by
+        ),
+    );
 }
 
 /// Send due date reminder
 pub fn notify_due_soon(to_email: &str, task_title: &str, due_date: &str) {
-    send(to_email,
+    send(
+        to_email,
         &format!("Due soon: {}", task_title),
-        &format!("Task \"{}\" is due on {}.\n\nLog in to update your progress.", task_title, due_date));
+        &format!(
+            "Task \"{}\" is due on {}.\n\nLog in to update your progress.",
+            task_title, due_date
+        ),
+    );
 }

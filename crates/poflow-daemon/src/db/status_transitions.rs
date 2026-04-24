@@ -12,7 +12,10 @@ pub struct StatusTransition {
     pub created_at: String,
 }
 
-pub async fn list_status_transitions(pool: &Pool, project_id: Option<i64>) -> Result<Vec<StatusTransition>> {
+pub async fn list_status_transitions(
+    pool: &Pool,
+    project_id: Option<i64>,
+) -> Result<Vec<StatusTransition>> {
     let rows = if let Some(pid) = project_id {
         sqlx::query_as::<_, StatusTransition>(
             "SELECT * FROM status_transitions WHERE project_id = ? ORDER BY from_status, to_status",
@@ -48,7 +51,9 @@ pub async fn create_status_transition(
         ).bind(from_status).bind(to_status).fetch_one(pool).await?;
         c > 0
     };
-    if exists { anyhow::bail!("UNIQUE constraint failed: transition already exists"); }
+    if exists {
+        anyhow::bail!("UNIQUE constraint failed: transition already exists");
+    }
     let now = now_str();
     let id = sqlx::query_scalar::<_, i64>(
         "INSERT INTO status_transitions (from_status, to_status, project_id, created_at) VALUES (?, ?, ?, ?) RETURNING id",
@@ -59,11 +64,20 @@ pub async fn create_status_transition(
     .bind(&now)
     .fetch_one(pool)
     .await?;
-    Ok(StatusTransition { id, from_status: from_status.to_string(), to_status: to_status.to_string(), project_id, created_at: now })
+    Ok(StatusTransition {
+        id,
+        from_status: from_status.to_string(),
+        to_status: to_status.to_string(),
+        project_id,
+        created_at: now,
+    })
 }
 
 pub async fn delete_status_transition(pool: &Pool, id: i64) -> Result<()> {
-    sqlx::query("DELETE FROM status_transitions WHERE id = ?").bind(id).execute(pool).await?;
+    sqlx::query("DELETE FROM status_transitions WHERE id = ?")
+        .bind(id)
+        .execute(pool)
+        .await?;
     Ok(())
 }
 
@@ -80,12 +94,11 @@ pub async fn validate_status_transition(
 ) -> Result<()> {
     // Check project-specific rules first
     if let Some(pid) = project_id {
-        let (count,): (i64,) = sqlx::query_as(
-            "SELECT COUNT(*) FROM status_transitions WHERE project_id = ?",
-        )
-        .bind(pid)
-        .fetch_one(pool)
-        .await?;
+        let (count,): (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM status_transitions WHERE project_id = ?")
+                .bind(pid)
+                .fetch_one(pool)
+                .await?;
         if count > 0 {
             let (allowed,): (i64,) = sqlx::query_as(
                 "SELECT COUNT(*) FROM status_transitions WHERE from_status = ? AND to_status = ? AND project_id = ?",
@@ -96,17 +109,20 @@ pub async fn validate_status_transition(
             .fetch_one(pool)
             .await?;
             if allowed == 0 {
-                anyhow::bail!("Transition from '{}' to '{}' is not allowed", from_status, to_status);
+                anyhow::bail!(
+                    "Transition from '{}' to '{}' is not allowed",
+                    from_status,
+                    to_status
+                );
             }
             return Ok(());
         }
     }
     // Fall back to global rules
-    let (count,): (i64,) = sqlx::query_as(
-        "SELECT COUNT(*) FROM status_transitions WHERE project_id IS NULL",
-    )
-    .fetch_one(pool)
-    .await?;
+    let (count,): (i64,) =
+        sqlx::query_as("SELECT COUNT(*) FROM status_transitions WHERE project_id IS NULL")
+            .fetch_one(pool)
+            .await?;
     if count == 0 {
         return Ok(()); // No rules defined = everything allowed
     }
@@ -118,7 +134,11 @@ pub async fn validate_status_transition(
     .fetch_one(pool)
     .await?;
     if allowed == 0 {
-        anyhow::bail!("Transition from '{}' to '{}' is not allowed", from_status, to_status);
+        anyhow::bail!(
+            "Transition from '{}' to '{}' is not allowed",
+            from_status,
+            to_status
+        );
     }
     Ok(())
 }

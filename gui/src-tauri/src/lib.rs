@@ -1,9 +1,9 @@
+use base64::Engine as _;
 use serde_json::Value;
 use std::sync::Arc;
-use tokio::sync::Mutex;
 use tauri::Emitter;
 use tauri::Manager;
-use base64::Engine as _;
+use tokio::sync::Mutex;
 
 #[derive(Clone)]
 struct ConnectionConfig {
@@ -26,7 +26,12 @@ struct AppState {
 }
 
 #[tauri::command]
-async fn api_call(state: tauri::State<'_, Arc<AppState>>, method: String, path: String, body: Option<Value>) -> Result<Value, String> {
+async fn api_call(
+    state: tauri::State<'_, Arc<AppState>>,
+    method: String,
+    path: String,
+    body: Option<Value>,
+) -> Result<Value, String> {
     // V35-4: Validate path to prevent SSRF — must start with /api
     if !path.starts_with("/api") {
         return Err("Invalid API path".to_string());
@@ -51,7 +56,10 @@ async fn api_call(state: tauri::State<'_, Arc<AppState>>, method: String, path: 
         req = req.json(&b);
     }
 
-    let resp = req.send().await.map_err(|e| format!("Request failed: {}", e))?;
+    let resp = req
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {}", e))?;
     let status = resp.status().as_u16();
     let text = resp.text().await.map_err(|e| e.to_string())?;
 
@@ -85,9 +93,15 @@ async fn get_connection(state: tauri::State<'_, Arc<AppState>>) -> Result<Value,
 }
 
 #[tauri::command]
-async fn set_connection(state: tauri::State<'_, Arc<AppState>>, base_url: String) -> Result<(), String> {
+async fn set_connection(
+    state: tauri::State<'_, Arc<AppState>>,
+    base_url: String,
+) -> Result<(), String> {
     // Warn if not HTTPS and not localhost
-    if !base_url.starts_with("https://") && !base_url.contains("127.0.0.1") && !base_url.contains("localhost") {
+    if !base_url.starts_with("https://")
+        && !base_url.contains("127.0.0.1")
+        && !base_url.contains("localhost")
+    {
         eprintln!("WARNING: Connection to {} is not using HTTPS — credentials may be transmitted in plaintext", base_url);
     }
     state.config.lock().await.base_url = base_url;
@@ -108,10 +122,13 @@ async fn write_file(path: String, content: String) -> Result<(), String> {
         .chain(dirs::desktop_dir())
         .any(|dir| p.starts_with(&dir));
     if !allowed {
-        return Err("Write denied: path must be in Downloads, Documents, or Desktop directory".to_string());
+        return Err(
+            "Write denied: path must be in Downloads, Documents, or Desktop directory".to_string(),
+        );
     }
     // Prevent path traversal — canonicalize to resolve symlinks
-    let canonical = p.parent()
+    let canonical = p
+        .parent()
         .and_then(|parent| std::fs::canonicalize(parent).ok())
         .map(|parent| parent.join(p.file_name().unwrap_or_default()));
     let check_path = canonical.as_deref().unwrap_or(p);
@@ -121,31 +138,62 @@ async fn write_file(path: String, content: String) -> Result<(), String> {
         .chain(dirs::desktop_dir())
         .any(|dir| check_path.starts_with(&dir));
     if !allowed {
-        return Err("Write denied: path must be in Downloads, Documents, or Desktop directory".to_string());
+        return Err(
+            "Write denied: path must be in Downloads, Documents, or Desktop directory".to_string(),
+        );
     }
     if path.contains("..") {
         return Err("Write denied: path traversal not allowed".to_string());
     }
     // Block executable file extensions
-    let blocked_ext = [".desktop", ".sh", ".bash", ".bat", ".cmd", ".exe", ".ps1", ".app", ".run",
-        ".py", ".pl", ".rb", ".jar", ".deb", ".rpm", ".appimage", ".msi", ".com", ".csh", ".ksh", ".zsh"];
+    let blocked_ext = [
+        ".desktop",
+        ".sh",
+        ".bash",
+        ".bat",
+        ".cmd",
+        ".exe",
+        ".ps1",
+        ".app",
+        ".run",
+        ".py",
+        ".pl",
+        ".rb",
+        ".jar",
+        ".deb",
+        ".rpm",
+        ".appimage",
+        ".msi",
+        ".com",
+        ".csh",
+        ".ksh",
+        ".zsh",
+    ];
     if let Some(ext) = p.extension().and_then(|e| e.to_str()) {
         let dot_ext = format!(".{}", ext.to_lowercase());
         if blocked_ext.contains(&dot_ext.as_str()) {
             return Err(format!("Write denied: .{} files not allowed", ext));
         }
     }
-    tokio::fs::write(&path, content).await.map_err(|e| e.to_string())
+    tokio::fs::write(&path, content)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-async fn binary_download(state: tauri::State<'_, Arc<AppState>>, path: String) -> Result<String, String> {
+async fn binary_download(
+    state: tauri::State<'_, Arc<AppState>>,
+    path: String,
+) -> Result<String, String> {
     if !path.starts_with("/api") {
         return Err("Invalid API path".to_string());
     }
     let config = state.config.lock().await.clone();
     let url = format!("{}{}", config.base_url, path);
-    let mut req = state.client.get(&url).header("X-Requested-With", "PoflowGUI");
+    let mut req = state
+        .client
+        .get(&url)
+        .header("X-Requested-With", "PoflowGUI");
     if let Some(token) = &config.token {
         req = req.header("Authorization", format!("Bearer {}", token));
     }
@@ -158,16 +206,33 @@ async fn binary_download(state: tauri::State<'_, Arc<AppState>>, path: String) -
 }
 
 #[tauri::command]
-async fn binary_upload(state: tauri::State<'_, Arc<AppState>>, path: String, data: String, filename: String, mime: String) -> Result<Value, String> {
+async fn binary_upload(
+    state: tauri::State<'_, Arc<AppState>>,
+    path: String,
+    data: String,
+    filename: String,
+    mime: String,
+) -> Result<Value, String> {
     if !path.starts_with("/api") {
         return Err("Invalid API path".to_string());
     }
     let config = state.config.lock().await.clone();
     let url = format!("{}{}", config.base_url, path);
-    let bytes = base64::engine::general_purpose::STANDARD.decode(&data).map_err(|e| e.to_string())?;
-    let mut req = state.client.post(&url)
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(&data)
+        .map_err(|e| e.to_string())?;
+    let mut req = state
+        .client
+        .post(&url)
         .header("X-Requested-With", "PoflowGUI")
-        .header("Content-Type", if mime.is_empty() { "application/octet-stream" } else { &mime })
+        .header(
+            "Content-Type",
+            if mime.is_empty() {
+                "application/octet-stream"
+            } else {
+                &mime
+            },
+        )
         .header("X-Filename", &filename)
         .body(bytes);
     if let Some(token) = &config.token {
@@ -177,21 +242,26 @@ async fn binary_upload(state: tauri::State<'_, Arc<AppState>>, path: String, dat
     let status = resp.status().as_u16();
     let text = resp.text().await.map_err(|e| e.to_string())?;
     if status >= 400 {
-        return Err(serde_json::from_str::<Value>(&text).ok()
+        return Err(serde_json::from_str::<Value>(&text)
+            .ok()
             .and_then(|v| v.get("error").and_then(|e| e.as_str().map(String::from)))
             .unwrap_or_else(|| format!("Upload failed ({})", status)));
     }
-    if text.is_empty() { return Ok(Value::Null); }
+    if text.is_empty() {
+        return Ok(Value::Null);
+    }
     serde_json::from_str(&text).map_err(|e| e.to_string())
 }
 
 fn auth_key() -> Vec<u8> {
-    use sha2::{Sha256, Digest};
+    use sha2::{Digest, Sha256};
     // Load or create a random salt (generated once per installation)
     let dir = auth_dir();
     let salt_path = dir.join(".auth_salt");
     let salt = if let Ok(s) = std::fs::read(&salt_path) {
-        if s.len() == 32 { s } else {
+        if s.len() == 32 {
+            s
+        } else {
             let s = generate_salt().expect("Failed to generate cryptographic salt");
             let _ = std::fs::create_dir_all(&dir);
             let _ = std::fs::write(&salt_path, &s);
@@ -206,7 +276,11 @@ fn auth_key() -> Vec<u8> {
     let mut h = Sha256::new();
     h.update(&salt);
     h.update(b":");
-    h.update(whoami::fallible::hostname().unwrap_or_else(|_| "unknown".to_string()).as_bytes());
+    h.update(
+        whoami::fallible::hostname()
+            .unwrap_or_else(|_| "unknown".to_string())
+            .as_bytes(),
+    );
     h.update(b":");
     h.update(whoami::username().as_bytes());
     h.update(b":poflow-gui-auth-v2");
@@ -220,7 +294,7 @@ fn generate_salt() -> Result<Vec<u8>, String> {
 }
 
 fn encrypt_auth(data: &[u8], key: &[u8]) -> Result<Vec<u8>, String> {
-    use aes_gcm::{Aes256Gcm, KeyInit, Nonce, aead::Aead};
+    use aes_gcm::{aead::Aead, Aes256Gcm, KeyInit, Nonce};
     let cipher = Aes256Gcm::new_from_slice(key).map_err(|e| e.to_string())?;
     let mut nonce_bytes = [0u8; 12];
     getrandom::fill(&mut nonce_bytes).map_err(|e| format!("Failed to generate nonce: {}", e))?;
@@ -232,15 +306,21 @@ fn encrypt_auth(data: &[u8], key: &[u8]) -> Result<Vec<u8>, String> {
 }
 
 fn decrypt_auth(data: &[u8], key: &[u8]) -> Result<Vec<u8>, String> {
-    use aes_gcm::{Aes256Gcm, KeyInit, Nonce, aead::Aead};
-    if data.len() < 12 { return Err("Data too short".into()); }
+    use aes_gcm::{aead::Aead, Aes256Gcm, KeyInit, Nonce};
+    if data.len() < 12 {
+        return Err("Data too short".into());
+    }
     let cipher = Aes256Gcm::new_from_slice(key).map_err(|e| e.to_string())?;
     let nonce = Nonce::from_slice(&data[..12]);
-    cipher.decrypt(nonce, &data[12..]).map_err(|e| e.to_string())
+    cipher
+        .decrypt(nonce, &data[12..])
+        .map_err(|e| e.to_string())
 }
 
 fn auth_dir() -> std::path::PathBuf {
-    dirs::data_dir().unwrap_or_else(|| std::path::PathBuf::from(".")).join("poflow-gui")
+    dirs::data_dir()
+        .unwrap_or_else(|| std::path::PathBuf::from("."))
+        .join("poflow-gui")
 }
 
 #[tauri::command]
@@ -266,8 +346,10 @@ async fn clear_auth(_state: tauri::State<'_, Arc<AppState>>) -> Result<(), Strin
 
 #[tauri::command]
 async fn indicator_status() -> Result<bool, String> {
-    let output = std::process::Command::new("pgrep").args(["-f", "panel-indicator.py"])
-        .output().map_err(|e| e.to_string())?;
+    let output = std::process::Command::new("pgrep")
+        .args(["-f", "panel-indicator.py"])
+        .output()
+        .map_err(|e| e.to_string())?;
     Ok(output.status.success())
 }
 
@@ -280,15 +362,22 @@ async fn indicator_toggle(enable: bool) -> Result<bool, String> {
             home.join("repos/poflow/tools/panel-indicator.py"),
             home.join(".local/share/poflow/panel-indicator.py"),
         ];
-        let script = candidates.iter().find(|p| p.exists())
+        let script = candidates
+            .iter()
+            .find(|p| p.exists())
             .ok_or("panel-indicator.py not found")?;
-        std::process::Command::new("python3").arg(script)
-            .stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null())
-            .spawn().map_err(|e| e.to_string())?;
+        std::process::Command::new("python3")
+            .arg(script)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+            .map_err(|e| e.to_string())?;
         Ok(true)
     } else {
-        std::process::Command::new("pkill").args(["-f", "panel-indicator.py"])
-            .output().map_err(|e| e.to_string())?;
+        std::process::Command::new("pkill")
+            .args(["-f", "panel-indicator.py"])
+            .output()
+            .map_err(|e| e.to_string())?;
         Ok(false)
     }
 }
@@ -309,37 +398,54 @@ pub fn run() {
             {
                 use tauri_plugin_global_shortcut::GlobalShortcutExt;
                 let handle = app.handle().clone();
-                if let Err(e) = app.global_shortcut().on_shortcut("CmdOrCtrl+Shift+P", move |_app, _shortcut, event| {
-                    if event.state == tauri_plugin_global_shortcut::ShortcutState::Pressed {
-                        let _ = handle.emit("global-timer-toggle", ());
-                    }
-                }) {
+                if let Err(e) = app.global_shortcut().on_shortcut(
+                    "CmdOrCtrl+Shift+P",
+                    move |_app, _shortcut, event| {
+                        if event.state == tauri_plugin_global_shortcut::ShortcutState::Pressed {
+                            let _ = handle.emit("global-timer-toggle", ());
+                        }
+                    },
+                ) {
                     eprintln!("Global shortcut registration failed (non-fatal): {e}");
                 }
             }
 
             // U7: Native tray icon (non-fatal — app works without it)
             if let Err(e) = (|| -> Result<(), Box<dyn std::error::Error>> {
-                use tauri::tray::TrayIconBuilder;
                 use tauri::menu::{MenuBuilder, MenuItemBuilder};
+                use tauri::tray::TrayIconBuilder;
                 let handle2 = app.handle().clone();
                 let handle3 = app.handle().clone();
                 let toggle_item = MenuItemBuilder::with_id("toggle", "Start/Pause").build(app)?;
                 let quit_item = MenuItemBuilder::with_id("quit", "Quit").build(app)?;
-                let menu = MenuBuilder::new(app).items(&[&toggle_item, &quit_item]).build()?;
+                let menu = MenuBuilder::new(app)
+                    .items(&[&toggle_item, &quit_item])
+                    .build()?;
                 TrayIconBuilder::new()
-                    .icon(app.default_window_icon().cloned().unwrap_or_else(|| tauri::image::Image::new(&[], 0, 0)))
+                    .icon(
+                        app.default_window_icon()
+                            .cloned()
+                            .unwrap_or_else(|| tauri::image::Image::new(&[], 0, 0)),
+                    )
                     .tooltip("Poflow")
                     .menu(&menu)
                     .on_menu_event(move |_app, event: tauri::menu::MenuEvent| {
                         match event.id().as_ref() {
-                            "toggle" => { let _ = handle2.emit("global-timer-toggle", ()); }
-                            "quit" => { std::process::exit(0); }
+                            "toggle" => {
+                                let _ = handle2.emit("global-timer-toggle", ());
+                            }
+                            "quit" => {
+                                std::process::exit(0);
+                            }
                             _ => {}
                         }
                     })
                     .on_tray_icon_event(move |_tray, event| {
-                        if let tauri::tray::TrayIconEvent::Click { button: tauri::tray::MouseButton::Left, .. } = event {
+                        if let tauri::tray::TrayIconEvent::Click {
+                            button: tauri::tray::MouseButton::Left,
+                            ..
+                        } = event
+                        {
                             if let Some(w) = handle3.get_webview_window("main") {
                                 let _ = w.show();
                                 let _ = w.set_focus();
@@ -354,7 +460,20 @@ pub fn run() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![api_call, set_token, get_connection, set_connection, write_file, save_auth, load_auth, clear_auth, indicator_status, indicator_toggle, binary_download, binary_upload])
+        .invoke_handler(tauri::generate_handler![
+            api_call,
+            set_token,
+            get_connection,
+            set_connection,
+            write_file,
+            save_auth,
+            load_auth,
+            clear_auth,
+            indicator_status,
+            indicator_toggle,
+            binary_download,
+            binary_upload
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

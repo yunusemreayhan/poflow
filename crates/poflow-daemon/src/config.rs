@@ -31,12 +31,24 @@ pub struct Config {
     pub allow_registration: bool,
 }
 
-fn default_bind_address() -> String { "127.0.0.1".to_string() }
-fn default_bind_port() -> u16 { 9090 }
-fn default_estimation_mode() -> String { "hours".to_string() }
-fn default_theme() -> String { "dark".to_string() }
-fn default_auto_archive_days() -> u32 { 90 }
-fn default_true() -> bool { true }
+fn default_bind_address() -> String {
+    "127.0.0.1".to_string()
+}
+fn default_bind_port() -> u16 {
+    9090
+}
+fn default_estimation_mode() -> String {
+    "hours".to_string()
+}
+fn default_theme() -> String {
+    "dark".to_string()
+}
+fn default_auto_archive_days() -> u32 {
+    90
+}
+fn default_true() -> bool {
+    true
+}
 
 impl Default for Config {
     fn default() -> Self {
@@ -67,7 +79,11 @@ impl Config {
         let dir = match std::env::var("POFLOW_CONFIG_DIR") {
             Ok(d) if !d.is_empty() => PathBuf::from(d),
             _ => dirs::config_dir()
-                .or_else(|| std::env::var("HOME").ok().map(|h| PathBuf::from(h).join(".config")))
+                .or_else(|| {
+                    std::env::var("HOME")
+                        .ok()
+                        .map(|h| PathBuf::from(h).join(".config"))
+                })
                 .unwrap_or_else(|| PathBuf::from("/tmp"))
                 .join("poflow"),
         };
@@ -96,7 +112,8 @@ impl Config {
             std::io::Write::write_all(&mut &f, data.as_bytes())?;
             f.sync_all()?;
         }
-        #[cfg(unix)] {
+        #[cfg(unix)]
+        {
             use std::os::unix::fs::PermissionsExt;
             std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o600)).ok();
         }
@@ -152,7 +169,10 @@ mod tests {
     #[test]
     fn toml_partial_override() {
         // Serialize default, modify one field, deserialize back
-        let c = Config { work_duration_min: 50, ..Config::default() };
+        let c = Config {
+            work_duration_min: 50,
+            ..Config::default()
+        };
         let toml_str = toml::to_string_pretty(&c).unwrap();
         let d: Config = toml::from_str(&toml_str).unwrap();
         assert_eq!(d.work_duration_min, 50);
@@ -198,13 +218,18 @@ mod tests {
     #[test]
     fn config_save_and_load_via_tempdir() {
         // Test save/load roundtrip using a unique temp directory
-        let dir = std::env::temp_dir().join(format!("poflow_cfg_test_{:?}", std::thread::current().id()));
+        let dir =
+            std::env::temp_dir().join(format!("poflow_cfg_test_{:?}", std::thread::current().id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("config.toml");
 
         // Save
-        let c = Config { work_duration_min: 45, daily_goal: 12, ..Config::default() };
+        let c = Config {
+            work_duration_min: 45,
+            daily_goal: 12,
+            ..Config::default()
+        };
         let data = toml::to_string_pretty(&c).unwrap();
         std::fs::write(&path, &data).unwrap();
 

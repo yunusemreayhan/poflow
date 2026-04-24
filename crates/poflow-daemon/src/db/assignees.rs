@@ -1,18 +1,25 @@
 use super::*;
 
-
 // --- Assignees ---
 
 pub async fn add_assignee(pool: &Pool, task_id: i64, user_id: i64) -> Result<()> {
     sqlx::query("INSERT OR IGNORE INTO task_assignees (task_id, user_id) VALUES (?, ?)")
-        .bind(task_id).bind(user_id).execute(pool).await?;
+        .bind(task_id)
+        .bind(user_id)
+        .execute(pool)
+        .await?;
     Ok(())
 }
 
 pub async fn remove_assignee(pool: &Pool, task_id: i64, user_id: i64) -> Result<()> {
     let r = sqlx::query("DELETE FROM task_assignees WHERE task_id = ? AND user_id = ?")
-        .bind(task_id).bind(user_id).execute(pool).await?;
-    if r.rows_affected() == 0 { return Err(anyhow::anyhow!("User not assigned")); }
+        .bind(task_id)
+        .bind(user_id)
+        .execute(pool)
+        .await?;
+    if r.rows_affected() == 0 {
+        return Err(anyhow::anyhow!("User not assigned"));
+    }
     Ok(())
 }
 
@@ -23,8 +30,10 @@ pub async fn list_assignees(pool: &Pool, task_id: i64) -> Result<Vec<String>> {
 }
 
 pub async fn get_user_id_by_username(pool: &Pool, username: &str) -> Result<Option<i64>> {
-    let row: Option<(i64,)> = sqlx::query_as("SELECT id FROM users WHERE username = ?").bind(username)
-        .fetch_optional(pool).await?;
+    let row: Option<(i64,)> = sqlx::query_as("SELECT id FROM users WHERE username = ?")
+        .bind(username)
+        .fetch_optional(pool)
+        .await?;
     Ok(row.map(|(id,)| id))
 }
 

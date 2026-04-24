@@ -5,9 +5,15 @@ async fn auto_unblock_dependents(engine: &AppState, task_id: i64) {
     // 1. Get all blocked dependents in one query
     let blocked: Vec<(i64,)> = sqlx::query_as(
         "SELECT td.task_id FROM task_dependencies td JOIN tasks t ON t.id = td.task_id \
-         WHERE td.depends_on = ? AND t.status = 'blocked' AND t.deleted_at IS NULL")
-        .bind(task_id).fetch_all(&engine.pool).await.unwrap_or_default();
-    if blocked.is_empty() { return; }
+         WHERE td.depends_on = ? AND t.status = 'blocked' AND t.deleted_at IS NULL",
+    )
+    .bind(task_id)
+    .fetch_all(&engine.pool)
+    .await
+    .unwrap_or_default();
+    if blocked.is_empty() {
+        return;
+    }
     // 2. For each blocked dependent, check if ALL its deps are resolved
     for (dep_id,) in blocked {
         let unresolved: Vec<(i64,)> = sqlx::query_as(
@@ -15,48 +21,103 @@ async fn auto_unblock_dependents(engine: &AppState, task_id: i64) {
              WHERE td.task_id = ? AND t.deleted_at IS NULL AND t.status NOT IN ('completed','done')")
             .bind(dep_id).fetch_all(&engine.pool).await.unwrap_or_default();
         if unresolved.is_empty() {
-            db::update_task(&engine.pool, dep_id, db::UpdateTaskOpts { status: Some("backlog"), ..Default::default() }).await.ok();
+            db::update_task(
+                &engine.pool,
+                dep_id,
+                db::UpdateTaskOpts {
+                    status: Some("backlog"),
+                    ..Default::default()
+                },
+            )
+            .await
+            .ok();
         }
     }
 }
 
 #[utoipa::path(post, path = "/api/tasks/{id}/duplicate", responses((status = 201, body = db::Task)), security(("bearer" = [])))]
-pub async fn duplicate_task(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>) -> Result<(StatusCode, Json<db::Task>), ApiError> {
-    let task = db::get_task(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Task not found"))?;
-    if task.deleted_at.is_some() { return Err(err(StatusCode::BAD_REQUEST, "Cannot duplicate deleted task")); }
+pub async fn duplicate_task(
+    State(engine): State<AppState>,
+    claims: Claims,
+    Path(id): Path<i64>,
+) -> Result<(StatusCode, Json<db::Task>), ApiError> {
+    let task = db::get_task(&engine.pool, id)
+        .await
+        .map_err(|_| err(StatusCode::NOT_FOUND, "Task not found"))?;
+    if task.deleted_at.is_some() {
+        return Err(err(
+            StatusCode::BAD_REQUEST,
+            "Cannot duplicate deleted task",
+        ));
+    }
     // BL7: Only owner or root can duplicate
-    if task.user_id != claims.user_id && !auth::is_admin_or_root(&claims) { return Err(err(StatusCode::FORBIDDEN, "Not your task")); }
-    let t = db::create_task(&engine.pool, db::CreateTaskOpts {
-        user_id: claims.user_id, parent_id: task.parent_id,
-        title: &format!("{} (copy)", task.title), description: task.description.as_deref(),
-        project: task.project.as_deref(), project_id: task.project_id, tags: task.tags.as_deref(),
-        priority: task.priority as i64, estimated: task.estimated as i64,
-        estimated_hours: task.estimated_hours, remaining_points: task.remaining_points, due_date: task.due_date.as_deref(),
-    }).await.map_err(internal)?;
+    if task.user_id != claims.user_id && !auth::is_admin_or_root(&claims) {
+        return Err(err(StatusCode::FORBIDDEN, "Not your task"));
+    }
+    let t = db::create_task(
+        &engine.pool,
+        db::CreateTaskOpts {
+            user_id: claims.user_id,
+            parent_id: task.parent_id,
+            title: &format!("{} (copy)", task.title),
+            description: task.description.as_deref(),
+            project: task.project.as_deref(),
+            project_id: task.project_id,
+            tags: task.tags.as_deref(),
+            priority: task.priority as i64,
+            estimated: task.estimated as i64,
+            estimated_hours: task.estimated_hours,
+            remaining_points: task.remaining_points,
+            due_date: task.due_date.as_deref(),
+        },
+    )
+    .await
+    .map_err(internal)?;
     // Copy work_duration_minutes and PERT estimates if set
-    if task.work_duration_minutes.is_some() || task.estimate_optimistic.is_some() || task.estimate_pessimistic.is_some() {
-        db::update_task(&engine.pool, t.id, db::UpdateTaskOpts {
-            work_duration_minutes: task.work_duration_minutes.map(Some),
-            estimate_optimistic: task.estimate_optimistic.map(Some),
-            estimate_pessimistic: task.estimate_pessimistic.map(Some),
-            ..Default::default()
-        }).await.ok();
+    if task.work_duration_minutes.is_some()
+        || task.estimate_optimistic.is_some()
+        || task.estimate_pessimistic.is_some()
+    {
+        db::update_task(
+            &engine.pool,
+            t.id,
+            db::UpdateTaskOpts {
+                work_duration_minutes: task.work_duration_minutes.map(Some),
+                estimate_optimistic: task.estimate_optimistic.map(Some),
+                estimate_pessimistic: task.estimate_pessimistic.map(Some),
+                ..Default::default()
+            },
+        )
+        .await
+        .ok();
     }
     // Copy labels
     if let Ok(labels) = db::get_task_labels(&engine.pool, id).await {
-        for label in labels { db::add_task_label(&engine.pool, t.id, label.id).await.ok(); }
+        for label in labels {
+            db::add_task_label(&engine.pool, t.id, label.id).await.ok();
+        }
     }
     // B5: Copy assignees
-    let assignee_ids: Vec<(i64,)> = sqlx::query_as("SELECT user_id FROM task_assignees WHERE task_id = ?")
-        .bind(id).fetch_all(&engine.pool).await.unwrap_or_default();
-    for (uid,) in assignee_ids { db::add_assignee(&engine.pool, t.id, uid).await.ok(); }
+    let assignee_ids: Vec<(i64,)> =
+        sqlx::query_as("SELECT user_id FROM task_assignees WHERE task_id = ?")
+            .bind(id)
+            .fetch_all(&engine.pool)
+            .await
+            .unwrap_or_default();
+    for (uid,) in assignee_ids {
+        db::add_assignee(&engine.pool, t.id, uid).await.ok();
+    }
     // V32-4: Copy dependencies
     if let Ok(deps) = db::get_dependencies(&engine.pool, id).await {
-        for dep_id in deps { db::add_dependency(&engine.pool, t.id, dep_id).await.ok(); }
+        for dep_id in deps {
+            db::add_dependency(&engine.pool, t.id, dep_id).await.ok();
+        }
     }
     // V37-8: Copy recurrence
     if let Ok(Some(rec)) = db::get_recurrence(&engine.pool, id).await {
-        db::set_recurrence(&engine.pool, t.id, &rec.pattern, &rec.next_due).await.ok();
+        db::set_recurrence(&engine.pool, t.id, &rec.pattern, &rec.next_due)
+            .await
+            .ok();
     }
     engine.notify(ChangeEvent::Tasks);
     Ok((StatusCode::CREATED, Json(t)))
@@ -68,32 +129,64 @@ pub(super) fn valid_date(s: &str) -> bool {
 
 // F1: Search endpoint with highlighted snippets
 #[derive(Deserialize, utoipa::IntoParams)]
-pub struct SearchQuery { pub q: String, pub limit: Option<i64> }
+pub struct SearchQuery {
+    pub q: String,
+    pub limit: Option<i64>,
+}
 
 #[utoipa::path(get, path = "/api/tasks/search", responses((status = 200)), security(("bearer" = [])))]
-pub async fn search_tasks(State(engine): State<AppState>, claims: Claims, Query(q): Query<SearchQuery>) -> ApiResult<Vec<serde_json::Value>> {
-    if q.q.trim().is_empty() { return Ok(Json(vec![])); }
+pub async fn search_tasks(
+    State(engine): State<AppState>,
+    claims: Claims,
+    Query(q): Query<SearchQuery>,
+) -> ApiResult<Vec<serde_json::Value>> {
+    if q.q.trim().is_empty() {
+        return Ok(Json(vec![]));
+    }
     let limit = q.limit.unwrap_or(20).min(100);
     // B2: Non-root users only see their own tasks
-    let user_id = if claims.role == "root" { None } else { Some(claims.user_id) };
-    let results = db::search_tasks_fts(&engine.pool, &q.q, limit, user_id).await.map_err(internal)?;
+    let user_id = if claims.role == "root" {
+        None
+    } else {
+        Some(claims.user_id)
+    };
+    let results = db::search_tasks_fts(&engine.pool, &q.q, limit, user_id)
+        .await
+        .map_err(internal)?;
     Ok(Json(results.into_iter().map(|(id, title, snippet)| serde_json::json!({"id": id, "title": title, "snippet": snippet})).collect()))
 }
 
 // Global search across tasks, comments, and sprints
 #[derive(Deserialize)]
-pub struct GlobalSearchQuery { pub q: String, pub limit: Option<i64> }
+pub struct GlobalSearchQuery {
+    pub q: String,
+    pub limit: Option<i64>,
+}
 
 #[utoipa::path(get, path = "/api/search", responses((status = 200)), security(("bearer" = [])))]
-pub async fn global_search(State(engine): State<AppState>, claims: Claims, Query(q): Query<GlobalSearchQuery>) -> ApiResult<serde_json::Value> {
+pub async fn global_search(
+    State(engine): State<AppState>,
+    claims: Claims,
+    Query(q): Query<GlobalSearchQuery>,
+) -> ApiResult<serde_json::Value> {
     let query = q.q.trim();
-    if query.is_empty() { return Ok(Json(serde_json::json!({"tasks":[],"comments":[],"sprints":[]}))); }
+    if query.is_empty() {
+        return Ok(Json(
+            serde_json::json!({"tasks":[],"comments":[],"sprints":[]}),
+        ));
+    }
     let limit = q.limit.unwrap_or(10).min(50);
     let like = format!("%{}%", query);
 
     // Tasks
-    let user_filter = if auth::is_admin_or_root(&claims) { None } else { Some(claims.user_id) };
-    let task_results = db::search_tasks_fts(&engine.pool, query, limit, user_filter).await.unwrap_or_default();
+    let user_filter = if auth::is_admin_or_root(&claims) {
+        None
+    } else {
+        Some(claims.user_id)
+    };
+    let task_results = db::search_tasks_fts(&engine.pool, query, limit, user_filter)
+        .await
+        .unwrap_or_default();
     let tasks: Vec<serde_json::Value> = task_results.into_iter().map(|(id, title, snippet)| serde_json::json!({"type":"task","id":id,"title":title,"snippet":snippet})).collect();
 
     // Comments — filter by task ownership for non-admin users
@@ -103,9 +196,12 @@ pub async fn global_search(State(engine): State<AppState>, claims: Claims, Query
         "SELECT c.id, c.task_id, c.content, c.created_at, u.username FROM comments c JOIN users u ON c.user_id = u.id JOIN tasks t ON t.id = c.task_id WHERE c.content LIKE ? AND t.user_id = ? ORDER BY c.created_at DESC LIMIT ?".to_string()
     };
     let mut cq = sqlx::query_as::<_, (i64, i64, String, String, String)>(&comment_sql).bind(&like);
-    if !auth::is_admin_or_root(&claims) { cq = cq.bind(claims.user_id); }
+    if !auth::is_admin_or_root(&claims) {
+        cq = cq.bind(claims.user_id);
+    }
     cq = cq.bind(limit);
-    let comments: Vec<(i64, i64, String, String, String)> = cq.fetch_all(&engine.pool).await.unwrap_or_default();
+    let comments: Vec<(i64, i64, String, String, String)> =
+        cq.fetch_all(&engine.pool).await.unwrap_or_default();
     let comments: Vec<serde_json::Value> = comments.into_iter().map(|(id, tid, content, at, user)| {
         let snippet = if content.len() > 100 { format!("{}...", &content[..100]) } else { content };
         serde_json::json!({"type":"comment","id":id,"task_id":tid,"snippet":snippet,"created_at":at,"user":user})
@@ -119,28 +215,34 @@ pub async fn global_search(State(engine): State<AppState>, claims: Claims, Query
         serde_json::json!({"type":"sprint","id":id,"name":name,"status":status,"project":project})
     }).collect();
 
-    Ok(Json(serde_json::json!({"tasks":tasks,"comments":comments,"sprints":sprints})))
+    Ok(Json(
+        serde_json::json!({"tasks":tasks,"comments":comments,"sprints":sprints}),
+    ))
 }
 
 // Advanced structured search (JQL-like)
 #[derive(Deserialize, utoipa::ToSchema)]
 pub struct AdvancedSearchRequest {
     pub filters: Vec<SearchFilter>,
-    pub sort_by: Option<String>,   // "created_at", "updated_at", "priority", "due_date", "title"
-    pub sort_dir: Option<String>,  // "asc" or "desc"
+    pub sort_by: Option<String>, // "created_at", "updated_at", "priority", "due_date", "title"
+    pub sort_dir: Option<String>, // "asc" or "desc"
     pub limit: Option<i64>,
     pub offset: Option<i64>,
 }
 
 #[derive(Deserialize, utoipa::ToSchema)]
 pub struct SearchFilter {
-    pub field: String,    // "status", "project", "assignee", "label", "priority", "due_date", "title", "description", "custom:<field_name>"
-    pub op: String,       // "eq", "neq", "gt", "lt", "gte", "lte", "in", "contains"
+    pub field: String, // "status", "project", "assignee", "label", "priority", "due_date", "title", "description", "custom:<field_name>"
+    pub op: String,    // "eq", "neq", "gt", "lt", "gte", "lte", "in", "contains"
     pub value: serde_json::Value,
 }
 
 #[utoipa::path(post, path = "/api/tasks/search/advanced", request_body = AdvancedSearchRequest, responses((status = 200, body = Vec<db::Task>)), security(("bearer" = [])))]
-pub async fn advanced_search(State(engine): State<AppState>, claims: Claims, Json(req): Json<AdvancedSearchRequest>) -> ApiResult<Vec<db::Task>> {
+pub async fn advanced_search(
+    State(engine): State<AppState>,
+    claims: Claims,
+    Json(req): Json<AdvancedSearchRequest>,
+) -> ApiResult<Vec<db::Task>> {
     let limit = req.limit.unwrap_or(100).min(500);
     let offset = req.offset.unwrap_or(0);
     let mut conditions = Vec::new();
@@ -154,27 +256,37 @@ pub async fn advanced_search(State(engine): State<AppState>, claims: Claims, Jso
 
     for f in &req.filters {
         match f.field.as_str() {
-            "status" => {
-                match f.op.as_str() {
-                    "eq" => { conditions.push("t.status = ?".into()); binds.push(f.value.as_str().unwrap_or("").to_string()); }
-                    "neq" => { conditions.push("t.status != ?".into()); binds.push(f.value.as_str().unwrap_or("").to_string()); }
-                    "in" => {
-                        if let Some(arr) = f.value.as_array() {
-                            let ph = arr.iter().map(|_| "?").collect::<Vec<_>>().join(",");
-                            conditions.push(format!("t.status IN ({})", ph));
-                            for v in arr { binds.push(v.as_str().unwrap_or("").to_string()); }
+            "status" => match f.op.as_str() {
+                "eq" => {
+                    conditions.push("t.status = ?".into());
+                    binds.push(f.value.as_str().unwrap_or("").to_string());
+                }
+                "neq" => {
+                    conditions.push("t.status != ?".into());
+                    binds.push(f.value.as_str().unwrap_or("").to_string());
+                }
+                "in" => {
+                    if let Some(arr) = f.value.as_array() {
+                        let ph = arr.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+                        conditions.push(format!("t.status IN ({})", ph));
+                        for v in arr {
+                            binds.push(v.as_str().unwrap_or("").to_string());
                         }
                     }
-                    _ => {}
                 }
-            }
-            "project" => {
-                match f.op.as_str() {
-                    "eq" => { conditions.push("t.project = ?".into()); binds.push(f.value.as_str().unwrap_or("").to_string()); }
-                    "contains" => { conditions.push("t.project LIKE ? ESCAPE '\\'".into()); binds.push(db::escape_like_pub(f.value.as_str().unwrap_or(""))); }
-                    _ => {}
+                _ => {}
+            },
+            "project" => match f.op.as_str() {
+                "eq" => {
+                    conditions.push("t.project = ?".into());
+                    binds.push(f.value.as_str().unwrap_or("").to_string());
                 }
-            }
+                "contains" => {
+                    conditions.push("t.project LIKE ? ESCAPE '\\'".into());
+                    binds.push(db::escape_like_pub(f.value.as_str().unwrap_or("")));
+                }
+                _ => {}
+            },
             "assignee" => {
                 if f.op == "eq" {
                     conditions.push("EXISTS (SELECT 1 FROM task_assignees _ta JOIN users _au ON _au.id = _ta.user_id WHERE _ta.task_id = t.id AND _au.username = ?)".into());
@@ -190,21 +302,48 @@ pub async fn advanced_search(State(engine): State<AppState>, claims: Claims, Jso
             "priority" => {
                 let val = f.value.as_i64().unwrap_or(0).to_string();
                 match f.op.as_str() {
-                    "eq" => { conditions.push("t.priority = ?".into()); binds.push(val); }
-                    "gt" => { conditions.push("t.priority > ?".into()); binds.push(val); }
-                    "gte" => { conditions.push("t.priority >= ?".into()); binds.push(val); }
-                    "lt" => { conditions.push("t.priority < ?".into()); binds.push(val); }
+                    "eq" => {
+                        conditions.push("t.priority = ?".into());
+                        binds.push(val);
+                    }
+                    "gt" => {
+                        conditions.push("t.priority > ?".into());
+                        binds.push(val);
+                    }
+                    "gte" => {
+                        conditions.push("t.priority >= ?".into());
+                        binds.push(val);
+                    }
+                    "lt" => {
+                        conditions.push("t.priority < ?".into());
+                        binds.push(val);
+                    }
                     _ => {}
                 }
             }
             "due_date" => {
                 let val = f.value.as_str().unwrap_or("").to_string();
                 match f.op.as_str() {
-                    "lt" => { conditions.push("t.due_date IS NOT NULL AND t.due_date < ?".into()); binds.push(val); }
-                    "lte" => { conditions.push("t.due_date IS NOT NULL AND t.due_date <= ?".into()); binds.push(val); }
-                    "gt" => { conditions.push("t.due_date IS NOT NULL AND t.due_date > ?".into()); binds.push(val); }
-                    "gte" => { conditions.push("t.due_date IS NOT NULL AND t.due_date >= ?".into()); binds.push(val); }
-                    "eq" => { conditions.push("t.due_date = ?".into()); binds.push(val); }
+                    "lt" => {
+                        conditions.push("t.due_date IS NOT NULL AND t.due_date < ?".into());
+                        binds.push(val);
+                    }
+                    "lte" => {
+                        conditions.push("t.due_date IS NOT NULL AND t.due_date <= ?".into());
+                        binds.push(val);
+                    }
+                    "gt" => {
+                        conditions.push("t.due_date IS NOT NULL AND t.due_date > ?".into());
+                        binds.push(val);
+                    }
+                    "gte" => {
+                        conditions.push("t.due_date IS NOT NULL AND t.due_date >= ?".into());
+                        binds.push(val);
+                    }
+                    "eq" => {
+                        conditions.push("t.due_date = ?".into());
+                        binds.push(val);
+                    }
                     _ => {}
                 }
             }
@@ -234,13 +373,24 @@ pub async fn advanced_search(State(engine): State<AppState>, claims: Claims, Jso
         Some("title") => "t.title",
         _ => "t.sort_order",
     };
-    let dir = if req.sort_dir.as_deref() == Some("asc") { "ASC" } else { "DESC" };
+    let dir = if req.sort_dir.as_deref() == Some("asc") {
+        "ASC"
+    } else {
+        "DESC"
+    };
 
-    let sql = format!("{} WHERE {} ORDER BY {} {} LIMIT ? OFFSET ?",
-        db::TASK_SELECT, conditions.join(" AND "), sort, dir);
+    let sql = format!(
+        "{} WHERE {} ORDER BY {} {} LIMIT ? OFFSET ?",
+        db::TASK_SELECT,
+        conditions.join(" AND "),
+        sort,
+        dir
+    );
 
     let mut query = sqlx::query_as::<_, db::Task>(&sql);
-    for b in &binds { query = query.bind(b); }
+    for b in &binds {
+        query = query.bind(b);
+    }
     query = query.bind(limit).bind(offset);
     let tasks = query.fetch_all(&engine.pool).await.map_err(internal)?;
     Ok(Json(tasks))
@@ -248,9 +398,15 @@ pub async fn advanced_search(State(engine): State<AppState>, claims: Claims, Jso
 
 // F4: Task time tracking summary
 #[utoipa::path(get, path = "/api/tasks/{id}/time-summary", responses((status = 200)), security(("bearer" = [])))]
-pub async fn get_task_time_summary(State(engine): State<AppState>, _claims: Claims, Path(id): Path<i64>) -> ApiResult<serde_json::Value> {
+pub async fn get_task_time_summary(
+    State(engine): State<AppState>,
+    _claims: Claims,
+    Path(id): Path<i64>,
+) -> ApiResult<serde_json::Value> {
     // B3: Verify task exists
-    db::get_task(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Task not found"))?;
+    db::get_task(&engine.pool, id)
+        .await
+        .map_err(|_| err(StatusCode::NOT_FOUND, "Task not found"))?;
     let rows: Vec<(String, f64, i64)> = sqlx::query_as(
         "SELECT u.username, COALESCE(SUM(s.duration_s),0)/3600.0, COUNT(s.id) \
          FROM sessions s JOIN users u ON s.user_id = u.id \
@@ -258,67 +414,141 @@ pub async fn get_task_time_summary(State(engine): State<AppState>, _claims: Clai
         .bind(id).fetch_all(&engine.pool).await.map_err(internal)?;
     let total_hours: f64 = rows.iter().map(|(_, h, _)| h).sum();
     let by_user: Vec<serde_json::Value> = rows.into_iter().map(|(u, h, c)| serde_json::json!({"username": u, "hours": (h * 100.0).round() / 100.0, "sessions": c})).collect();
-    Ok(Json(serde_json::json!({"task_id": id, "total_hours": (total_hours * 100.0).round() / 100.0, "by_user": by_user})))
+    Ok(Json(
+        serde_json::json!({"task_id": id, "total_hours": (total_hours * 100.0).round() / 100.0, "by_user": by_user}),
+    ))
 }
 
 #[utoipa::path(get, path = "/api/tasks/trash", responses((status = 200, body = Vec<db::Task>)), security(("bearer" = [])))]
-pub async fn list_deleted_tasks(State(engine): State<AppState>, claims: Claims) -> ApiResult<Vec<db::Task>> {
-    let user_filter = if claims.role == "root" { None } else { Some(claims.user_id) };
-    db::list_deleted_tasks(&engine.pool, user_filter).await.map(Json).map_err(internal)
+pub async fn list_deleted_tasks(
+    State(engine): State<AppState>,
+    claims: Claims,
+) -> ApiResult<Vec<db::Task>> {
+    let user_filter = if claims.role == "root" {
+        None
+    } else {
+        Some(claims.user_id)
+    };
+    db::list_deleted_tasks(&engine.pool, user_filter)
+        .await
+        .map(Json)
+        .map_err(internal)
 }
 
 #[utoipa::path(get, path = "/api/tasks/archived", responses((status = 200, body = Vec<db::Task>)), security(("bearer" = [])))]
-pub async fn list_archived_tasks(State(engine): State<AppState>, claims: Claims) -> ApiResult<Vec<db::Task>> {
-    let mut q = format!("{} WHERE t.status = 'archived' AND t.deleted_at IS NULL", db::TASK_SELECT);
-    if !auth::is_admin_or_root(&claims) { q.push_str(" AND t.user_id = ?"); }
+pub async fn list_archived_tasks(
+    State(engine): State<AppState>,
+    claims: Claims,
+) -> ApiResult<Vec<db::Task>> {
+    let mut q = format!(
+        "{} WHERE t.status = 'archived' AND t.deleted_at IS NULL",
+        db::TASK_SELECT
+    );
+    if !auth::is_admin_or_root(&claims) {
+        q.push_str(" AND t.user_id = ?");
+    }
     q.push_str(" ORDER BY t.updated_at DESC LIMIT 500");
     let mut query = sqlx::query_as::<_, db::Task>(&q);
-    if !auth::is_admin_or_root(&claims) { query = query.bind(claims.user_id); }
-    query.fetch_all(&engine.pool).await.map(Json).map_err(internal)
+    if !auth::is_admin_or_root(&claims) {
+        query = query.bind(claims.user_id);
+    }
+    query
+        .fetch_all(&engine.pool)
+        .await
+        .map(Json)
+        .map_err(internal)
 }
 
 #[utoipa::path(post, path = "/api/tasks/{id}/unarchive", responses((status = 204)), security(("bearer" = [])))]
-pub async fn unarchive_task(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>) -> Result<StatusCode, ApiError> {
-    let task = db::get_task(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Task not found"))?;
-    if !is_owner_or_root(task.user_id, &claims) { return Err(err(StatusCode::FORBIDDEN, "Not owner")); }
-    if task.status != "archived" { return Err(err(StatusCode::BAD_REQUEST, "Task is not archived")); }
-    db::update_task(&engine.pool, id, db::UpdateTaskOpts { status: Some("completed"), ..Default::default() }).await.map_err(internal)?;
+pub async fn unarchive_task(
+    State(engine): State<AppState>,
+    claims: Claims,
+    Path(id): Path<i64>,
+) -> Result<StatusCode, ApiError> {
+    let task = db::get_task(&engine.pool, id)
+        .await
+        .map_err(|_| err(StatusCode::NOT_FOUND, "Task not found"))?;
+    if !is_owner_or_root(task.user_id, &claims) {
+        return Err(err(StatusCode::FORBIDDEN, "Not owner"));
+    }
+    if task.status != "archived" {
+        return Err(err(StatusCode::BAD_REQUEST, "Task is not archived"));
+    }
+    db::update_task(
+        &engine.pool,
+        id,
+        db::UpdateTaskOpts {
+            status: Some("completed"),
+            ..Default::default()
+        },
+    )
+    .await
+    .map_err(internal)?;
     engine.notify(ChangeEvent::Tasks);
     Ok(StatusCode::NO_CONTENT)
 }
 
 #[derive(Deserialize)]
 pub struct TaskQuery {
-    pub status: Option<String>, pub project: Option<String>,
-    pub page: Option<i64>, pub per_page: Option<i64>, pub team_id: Option<i64>,
-    pub search: Option<String>, pub assignee: Option<String>,
-    pub due_before: Option<String>, pub due_after: Option<String>,
+    pub status: Option<String>,
+    pub project: Option<String>,
+    pub page: Option<i64>,
+    pub per_page: Option<i64>,
+    pub team_id: Option<i64>,
+    pub search: Option<String>,
+    pub assignee: Option<String>,
+    pub due_before: Option<String>,
+    pub due_after: Option<String>,
     pub priority: Option<i64>,
     pub label: Option<String>,
 }
 
 #[utoipa::path(get, path = "/api/tasks", responses((status = 200, body = Vec<db::Task>)), security(("bearer" = [])))]
-pub async fn list_tasks(State(engine): State<AppState>, _claims: Claims, Query(q): Query<TaskQuery>) -> Result<axum::response::Response, ApiError> {
+pub async fn list_tasks(
+    State(engine): State<AppState>,
+    _claims: Claims,
+    Query(q): Query<TaskQuery>,
+) -> Result<axum::response::Response, ApiError> {
     let page = q.page.unwrap_or(1).max(1);
     let per_page = q.per_page.unwrap_or(5000).min(5000);
     let offset = (page - 1) * per_page;
     let filter = db::TaskFilter {
-        status: q.status.as_deref(), project: q.project.as_deref(),
-        search: q.search.as_deref(), assignee: q.assignee.as_deref(),
-        due_before: q.due_before.as_deref(), due_after: q.due_after.as_deref(),
-        priority: q.priority, team_id: q.team_id, user_id: None, label: q.label.as_deref(),
+        status: q.status.as_deref(),
+        project: q.project.as_deref(),
+        search: q.search.as_deref(),
+        assignee: q.assignee.as_deref(),
+        due_before: q.due_before.as_deref(),
+        due_after: q.due_after.as_deref(),
+        priority: q.priority,
+        team_id: q.team_id,
+        user_id: None,
+        label: q.label.as_deref(),
     };
-    let tasks = db::list_tasks_paged(&engine.pool, filter, per_page, offset).await.map_err(internal)?;
+    let tasks = db::list_tasks_paged(&engine.pool, filter, per_page, offset)
+        .await
+        .map_err(internal)?;
     // Only compute total count if pagination is explicitly requested
     let total = if q.page.is_some() {
         let filter2 = db::TaskFilter {
-            status: q.status.as_deref(), project: q.project.as_deref(),
-            search: q.search.as_deref(), assignee: q.assignee.as_deref(),
-            due_before: q.due_before.as_deref(), due_after: q.due_after.as_deref(),
-            priority: q.priority, team_id: q.team_id, user_id: None, label: q.label.as_deref(),
+            status: q.status.as_deref(),
+            project: q.project.as_deref(),
+            search: q.search.as_deref(),
+            assignee: q.assignee.as_deref(),
+            due_before: q.due_before.as_deref(),
+            due_after: q.due_after.as_deref(),
+            priority: q.priority,
+            team_id: q.team_id,
+            user_id: None,
+            label: q.label.as_deref(),
         };
-        Some(db::count_tasks(&engine.pool, filter2).await.map_err(internal)?)
-    } else { None };
+        Some(
+            db::count_tasks(&engine.pool, filter2)
+                .await
+                .map_err(internal)?,
+        )
+    } else {
+        None
+    };
     let body = serde_json::to_vec(&tasks).map_err(internal)?;
     let mut resp = axum::response::Response::builder()
         .status(StatusCode::OK)
@@ -329,124 +559,330 @@ pub async fn list_tasks(State(engine): State<AppState>, _claims: Claims, Query(q
             .header("x-page", page.to_string())
             .header("x-per-page", per_page.to_string());
     }
-    resp.body(axum::body::Body::from(body)).map_err(|e| internal(e.to_string()))
+    resp.body(axum::body::Body::from(body))
+        .map_err(|e| internal(e.to_string()))
 }
 
 #[utoipa::path(post, path = "/api/tasks", request_body = CreateTaskRequest, responses((status = 201, body = db::Task), (status = 400, body = ApiErrorBody), (status = 401), (status = 403, body = ApiErrorBody)), security(("bearer" = [])))]
-pub async fn create_task(State(engine): State<AppState>, claims: Claims, Json(req): Json<CreateTaskRequest>) -> Result<(StatusCode, Json<db::Task>), ApiError> {
-    if req.title.trim().is_empty() { return Err(err(StatusCode::BAD_REQUEST, "Title cannot be empty")); }
-    if req.title.len() > 500 { return Err(err(StatusCode::BAD_REQUEST, "Title too long (max 500 chars)")); }
-    if req.description.as_ref().is_some_and(|d| d.len() > 10000) { return Err(err(StatusCode::BAD_REQUEST, "Description too long (max 10000 chars)")); }
-    if req.project.as_ref().is_some_and(|p| p.len() > 200) { return Err(err(StatusCode::BAD_REQUEST, "Project too long (max 200 chars)")); }
-    if req.tags.as_ref().is_some_and(|t| t.len() > 500) { return Err(err(StatusCode::BAD_REQUEST, "Tags too long (max 500 chars)")); }
+pub async fn create_task(
+    State(engine): State<AppState>,
+    claims: Claims,
+    Json(req): Json<CreateTaskRequest>,
+) -> Result<(StatusCode, Json<db::Task>), ApiError> {
+    if req.title.trim().is_empty() {
+        return Err(err(StatusCode::BAD_REQUEST, "Title cannot be empty"));
+    }
+    if req.title.len() > 500 {
+        return Err(err(
+            StatusCode::BAD_REQUEST,
+            "Title too long (max 500 chars)",
+        ));
+    }
+    if req.description.as_ref().is_some_and(|d| d.len() > 10000) {
+        return Err(err(
+            StatusCode::BAD_REQUEST,
+            "Description too long (max 10000 chars)",
+        ));
+    }
+    if req.project.as_ref().is_some_and(|p| p.len() > 200) {
+        return Err(err(
+            StatusCode::BAD_REQUEST,
+            "Project too long (max 200 chars)",
+        ));
+    }
+    if req.tags.as_ref().is_some_and(|t| t.len() > 500) {
+        return Err(err(
+            StatusCode::BAD_REQUEST,
+            "Tags too long (max 500 chars)",
+        ));
+    }
     let priority = req.priority.unwrap_or(3);
-    if !(1..=5).contains(&priority) { return Err(err(StatusCode::BAD_REQUEST, "Priority must be 1-5")); }
+    if !(1..=5).contains(&priority) {
+        return Err(err(StatusCode::BAD_REQUEST, "Priority must be 1-5"));
+    }
     let estimated = req.estimated.unwrap_or(1);
-    if estimated < 0 { return Err(err(StatusCode::BAD_REQUEST, "Estimated cannot be negative")); }
-    if req.estimated_hours.is_some_and(|h| h < 0.0) { return Err(err(StatusCode::BAD_REQUEST, "Estimated hours cannot be negative")); }
-    if let Some(ref d) = req.due_date { if !valid_date(d) { return Err(err(StatusCode::BAD_REQUEST, "due_date must be YYYY-MM-DD")); } }
+    if estimated < 0 {
+        return Err(err(StatusCode::BAD_REQUEST, "Estimated cannot be negative"));
+    }
+    if req.estimated_hours.is_some_and(|h| h < 0.0) {
+        return Err(err(
+            StatusCode::BAD_REQUEST,
+            "Estimated hours cannot be negative",
+        ));
+    }
+    if let Some(ref d) = req.due_date {
+        if !valid_date(d) {
+            return Err(err(StatusCode::BAD_REQUEST, "due_date must be YYYY-MM-DD"));
+        }
+    }
     // BL6: Validate parent_id exists and belongs to user (or is root)
     if let Some(pid) = req.parent_id {
-        let parent = db::get_task(&engine.pool, pid).await.map_err(|_| err(StatusCode::NOT_FOUND, "Parent task not found"))?;
-        if parent.user_id != claims.user_id && !auth::is_admin_or_root(&claims) { return Err(err(StatusCode::FORBIDDEN, "Parent task not owned by you")); }
+        let parent = db::get_task(&engine.pool, pid)
+            .await
+            .map_err(|_| err(StatusCode::NOT_FOUND, "Parent task not found"))?;
+        if parent.user_id != claims.user_id && !auth::is_admin_or_root(&claims) {
+            return Err(err(StatusCode::FORBIDDEN, "Parent task not owned by you"));
+        }
     }
-    let t = db::create_task(&engine.pool, db::CreateTaskOpts {
-        user_id: claims.user_id, parent_id: req.parent_id, title: req.title.trim(), description: req.description.as_deref(),
-        project: req.project.as_deref(), project_id: req.project_id, tags: req.tags.as_deref(), priority, estimated,
-        estimated_hours: req.estimated_hours.unwrap_or(0.0), remaining_points: req.remaining_points.unwrap_or(0.0), due_date: req.due_date.as_deref(),
-    })
-        .await.map_err(internal)?;
-    if let Err(e) = db::audit(&engine.pool, claims.user_id, "create", "task", Some(t.id), Some(&t.title)).await { tracing::warn!("Audit log failed: {}", e); }
-    crate::webhook::dispatch(engine.pool.clone(), "task.created", serde_json::json!({"id": t.id, "title": &t.title}));
+    let t = db::create_task(
+        &engine.pool,
+        db::CreateTaskOpts {
+            user_id: claims.user_id,
+            parent_id: req.parent_id,
+            title: req.title.trim(),
+            description: req.description.as_deref(),
+            project: req.project.as_deref(),
+            project_id: req.project_id,
+            tags: req.tags.as_deref(),
+            priority,
+            estimated,
+            estimated_hours: req.estimated_hours.unwrap_or(0.0),
+            remaining_points: req.remaining_points.unwrap_or(0.0),
+            due_date: req.due_date.as_deref(),
+        },
+    )
+    .await
+    .map_err(internal)?;
+    if let Err(e) = db::audit(
+        &engine.pool,
+        claims.user_id,
+        "create",
+        "task",
+        Some(t.id),
+        Some(&t.title),
+    )
+    .await
+    {
+        tracing::warn!("Audit log failed: {}", e);
+    }
+    crate::webhook::dispatch(
+        engine.pool.clone(),
+        "task.created",
+        serde_json::json!({"id": t.id, "title": &t.title}),
+    );
     // F19: Run task.created automations
     let pool = engine.pool.clone();
     let tid = t.id;
-    tokio::spawn(async move { crate::automation::run_task_created(&pool, tid).await; });
+    tokio::spawn(async move {
+        crate::automation::run_task_created(&pool, tid).await;
+    });
     engine.notify(ChangeEvent::Tasks);
     Ok((StatusCode::CREATED, Json(t)))
 }
 
 #[utoipa::path(get, path = "/api/tasks/{id}", responses((status = 200, body = db::TaskDetail)), security(("bearer" = [])))]
-pub async fn get_task_detail(State(engine): State<AppState>, _claims: Claims, Path(id): Path<i64>) -> ApiResult<db::TaskDetail> {
-    db::get_task(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Task not found"))?;
-    db::get_task_detail(&engine.pool, id).await.map(Json).map_err(internal)
+pub async fn get_task_detail(
+    State(engine): State<AppState>,
+    _claims: Claims,
+    Path(id): Path<i64>,
+) -> ApiResult<db::TaskDetail> {
+    db::get_task(&engine.pool, id)
+        .await
+        .map_err(|_| err(StatusCode::NOT_FOUND, "Task not found"))?;
+    db::get_task_detail(&engine.pool, id)
+        .await
+        .map(Json)
+        .map_err(internal)
 }
 
 #[utoipa::path(get, path = "/api/tasks/{id}/sessions", responses((status = 200, body = Vec<db::Session>)), security(("bearer" = [])))]
-pub async fn get_task_sessions(State(engine): State<AppState>, _claims: Claims, Path(id): Path<i64>) -> ApiResult<Vec<db::Session>> {
-    db::get_task(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Task not found"))?;
-    db::get_task_sessions(&engine.pool, id).await.map(Json).map_err(internal)
+pub async fn get_task_sessions(
+    State(engine): State<AppState>,
+    _claims: Claims,
+    Path(id): Path<i64>,
+) -> ApiResult<Vec<db::Session>> {
+    db::get_task(&engine.pool, id)
+        .await
+        .map_err(|_| err(StatusCode::NOT_FOUND, "Task not found"))?;
+    db::get_task_sessions(&engine.pool, id)
+        .await
+        .map(Json)
+        .map_err(internal)
 }
 
 // F7: Update session note
 #[utoipa::path(put, path = "/api/sessions/{id}/note", request_body = UpdateSessionNoteRequest, responses((status = 200, body = db::Session)), security(("bearer" = [])))]
-pub async fn update_session_note(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>, Json(req): Json<UpdateSessionNoteRequest>) -> ApiResult<db::Session> {
-    let session = db::get_session(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Session not found"))?;
-    if !is_owner_or_root(session.user_id, &claims) { return Err(err(StatusCode::FORBIDDEN, "Not session owner")); }
-    if req.note.len() > 5000 { return Err(err(StatusCode::BAD_REQUEST, "Note too long (max 5000 chars)")); }
-    db::update_session_note(&engine.pool, id, &req.note).await.map(Json).map_err(internal)
+pub async fn update_session_note(
+    State(engine): State<AppState>,
+    claims: Claims,
+    Path(id): Path<i64>,
+    Json(req): Json<UpdateSessionNoteRequest>,
+) -> ApiResult<db::Session> {
+    let session = db::get_session(&engine.pool, id)
+        .await
+        .map_err(|_| err(StatusCode::NOT_FOUND, "Session not found"))?;
+    if !is_owner_or_root(session.user_id, &claims) {
+        return Err(err(StatusCode::FORBIDDEN, "Not session owner"));
+    }
+    if req.note.len() > 5000 {
+        return Err(err(
+            StatusCode::BAD_REQUEST,
+            "Note too long (max 5000 chars)",
+        ));
+    }
+    db::update_session_note(&engine.pool, id, &req.note)
+        .await
+        .map(Json)
+        .map_err(internal)
 }
 
 #[utoipa::path(put, path = "/api/tasks/{id}", request_body = UpdateTaskRequest, responses((status = 200, body = db::Task), (status = 400, body = ApiErrorBody), (status = 403, body = ApiErrorBody), (status = 404, body = ApiErrorBody), (status = 409, body = ApiErrorBody)), security(("bearer" = [])))]
-pub async fn update_task(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>, Json(req): Json<UpdateTaskRequest>) -> ApiResult<db::Task> {
-    let task = db::get_task(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Task not found"))?;
+pub async fn update_task(
+    State(engine): State<AppState>,
+    claims: Claims,
+    Path(id): Path<i64>,
+    Json(req): Json<UpdateTaskRequest>,
+) -> ApiResult<db::Task> {
+    let task = db::get_task(&engine.pool, id)
+        .await
+        .map_err(|_| err(StatusCode::NOT_FOUND, "Task not found"))?;
     if !is_owner_or_root(task.user_id, &claims) {
-        let assignees = db::list_assignees(&engine.pool, id).await.map_err(internal)?;
+        let assignees = db::list_assignees(&engine.pool, id)
+            .await
+            .map_err(internal)?;
         if !assignees.contains(&claims.username) {
             return Err(err(StatusCode::FORBIDDEN, "Not owner or assignee"));
         }
     }
-    if let Some(ref t) = req.title { if t.trim().is_empty() { return Err(err(StatusCode::BAD_REQUEST, "Title cannot be empty")); } else if t.len() > 500 { return Err(err(StatusCode::BAD_REQUEST, "Title too long (max 500)")); } }
-    if let Some(ref d) = req.description { if d.as_ref().is_some_and(|d| d.len() > 10000) { return Err(err(StatusCode::BAD_REQUEST, "Description too long")); } }
+    if let Some(ref t) = req.title {
+        if t.trim().is_empty() {
+            return Err(err(StatusCode::BAD_REQUEST, "Title cannot be empty"));
+        } else if t.len() > 500 {
+            return Err(err(StatusCode::BAD_REQUEST, "Title too long (max 500)"));
+        }
+    }
+    if let Some(ref d) = req.description {
+        if d.as_ref().is_some_and(|d| d.len() > 10000) {
+            return Err(err(StatusCode::BAD_REQUEST, "Description too long"));
+        }
+    }
     if let Some(ref s) = req.status {
         validate_task_status(s)?;
         if !VALID_TASK_STATUSES.contains(&s.as_str()) {
-            db::get_custom_status_by_name(&engine.pool, s).await.map_err(internal)?
-                .ok_or_else(|| err(StatusCode::BAD_REQUEST, format!("Unknown status '{}'. Create it via POST /api/statuses first", s)))?;
+            db::get_custom_status_by_name(&engine.pool, s)
+                .await
+                .map_err(internal)?
+                .ok_or_else(|| {
+                    err(
+                        StatusCode::BAD_REQUEST,
+                        format!(
+                            "Unknown status '{}'. Create it via POST /api/statuses first",
+                            s
+                        ),
+                    )
+                })?;
         }
         // Enforce workflow transition rules (skip if status unchanged)
         if s != &task.status {
-            db::validate_status_transition(&engine.pool, &task.status, s, task.project_id).await
+            db::validate_status_transition(&engine.pool, &task.status, s, task.project_id)
+                .await
                 .map_err(|e| err(StatusCode::BAD_REQUEST, e.to_string()))?;
         }
     }
-    if let Some(p) = req.priority { if !(1..=5).contains(&p) { return Err(err(StatusCode::BAD_REQUEST, "Priority must be 1-5")); } }
-    if let Some(e) = req.estimated { if e < 0 { return Err(err(StatusCode::BAD_REQUEST, "Estimated cannot be negative")); } }
-    if let Some(h) = req.estimated_hours { if h < 0.0 { return Err(err(StatusCode::BAD_REQUEST, "Estimated hours cannot be negative")); } }
-    if let Some(Some(ref d)) = req.due_date { if !valid_date(d) { return Err(err(StatusCode::BAD_REQUEST, "due_date must be YYYY-MM-DD")); } }
+    if let Some(p) = req.priority {
+        if !(1..=5).contains(&p) {
+            return Err(err(StatusCode::BAD_REQUEST, "Priority must be 1-5"));
+        }
+    }
+    if let Some(e) = req.estimated {
+        if e < 0 {
+            return Err(err(StatusCode::BAD_REQUEST, "Estimated cannot be negative"));
+        }
+    }
+    if let Some(h) = req.estimated_hours {
+        if h < 0.0 {
+            return Err(err(
+                StatusCode::BAD_REQUEST,
+                "Estimated hours cannot be negative",
+            ));
+        }
+    }
+    if let Some(Some(ref d)) = req.due_date {
+        if !valid_date(d) {
+            return Err(err(StatusCode::BAD_REQUEST, "due_date must be YYYY-MM-DD"));
+        }
+    }
     // V7: Prevent circular parent_id references
     if let Some(Some(new_parent)) = req.parent_id {
-        if new_parent == id { return Err(err(StatusCode::BAD_REQUEST, "Task cannot be its own parent")); }
+        if new_parent == id {
+            return Err(err(
+                StatusCode::BAD_REQUEST,
+                "Task cannot be its own parent",
+            ));
+        }
         // Walk up the ancestor chain to detect cycles
         let mut ancestor = Some(new_parent);
         let mut depth = 0;
         while let Some(aid) = ancestor {
             depth += 1;
-            if depth > 50 { break; }
-            if aid == id { return Err(err(StatusCode::BAD_REQUEST, "Circular parent reference detected")); }
-            ancestor = db::get_task(&engine.pool, aid).await.ok().and_then(|t| t.parent_id);
+            if depth > 50 {
+                break;
+            }
+            if aid == id {
+                return Err(err(
+                    StatusCode::BAD_REQUEST,
+                    "Circular parent reference detected",
+                ));
+            }
+            ancestor = db::get_task(&engine.pool, aid)
+                .await
+                .ok()
+                .and_then(|t| t.parent_id);
         }
     }
     if let Some(ref expected) = req.expected_updated_at {
         if *expected != task.updated_at {
-            return Err(err(StatusCode::CONFLICT, "Task was modified by another user. Please refresh and try again."));
+            return Err(err(
+                StatusCode::CONFLICT,
+                "Task was modified by another user. Please refresh and try again.",
+            ));
         }
     }
-    if let Some(Some(wdm)) = req.work_duration_minutes { if !(1..=480).contains(&wdm) { return Err(err(StatusCode::BAD_REQUEST, "work_duration_minutes must be 1-480")); } }
-    let t = db::update_task(&engine.pool, id, db::UpdateTaskOpts {
-        title: req.title.as_deref(),
-        description: req.description.as_ref().map(|o| o.as_deref()),
-        project: req.project.as_ref().map(|o| o.as_deref()),
-        project_id: req.project_id,
-        tags: req.tags.as_ref().map(|o| o.as_deref()),
-        priority: req.priority, estimated: req.estimated, estimated_hours: req.estimated_hours, remaining_points: req.remaining_points,
-        due_date: req.due_date.as_ref().map(|o| o.as_deref()),
-        status: req.status.as_deref(), sort_order: req.sort_order, parent_id: req.parent_id,
-        work_duration_minutes: req.work_duration_minutes.as_ref().map(|o| *o),
-        estimate_optimistic: req.estimate_optimistic, estimate_pessimistic: req.estimate_pessimistic,
-        updated_by: Some(claims.user_id),
-    }).await.map_err(internal)?;
-    if let Err(e) = db::audit(&engine.pool, claims.user_id, "update", "task", Some(id), None).await { tracing::warn!("Audit log failed: {}", e); }
+    if let Some(Some(wdm)) = req.work_duration_minutes {
+        if !(1..=480).contains(&wdm) {
+            return Err(err(
+                StatusCode::BAD_REQUEST,
+                "work_duration_minutes must be 1-480",
+            ));
+        }
+    }
+    let t = db::update_task(
+        &engine.pool,
+        id,
+        db::UpdateTaskOpts {
+            title: req.title.as_deref(),
+            description: req.description.as_ref().map(|o| o.as_deref()),
+            project: req.project.as_ref().map(|o| o.as_deref()),
+            project_id: req.project_id,
+            tags: req.tags.as_ref().map(|o| o.as_deref()),
+            priority: req.priority,
+            estimated: req.estimated,
+            estimated_hours: req.estimated_hours,
+            remaining_points: req.remaining_points,
+            due_date: req.due_date.as_ref().map(|o| o.as_deref()),
+            status: req.status.as_deref(),
+            sort_order: req.sort_order,
+            parent_id: req.parent_id,
+            work_duration_minutes: req.work_duration_minutes.as_ref().map(|o| *o),
+            estimate_optimistic: req.estimate_optimistic,
+            estimate_pessimistic: req.estimate_pessimistic,
+            updated_by: Some(claims.user_id),
+        },
+    )
+    .await
+    .map_err(internal)?;
+    if let Err(e) = db::audit(
+        &engine.pool,
+        claims.user_id,
+        "update",
+        "task",
+        Some(id),
+        None,
+    )
+    .await
+    {
+        tracing::warn!("Audit log failed: {}", e);
+    }
     // BL3: Auto-unblock dependents when task is completed or done
     if req.status.as_deref() == Some("completed") || req.status.as_deref() == Some("done") {
         auto_unblock_dependents(&engine, id).await;
@@ -467,8 +903,23 @@ pub async fn update_task(State(engine): State<AppState>, claims: Claims, Path(id
                 if let Ok(watcher_ids) = db::get_task_watcher_ids(&pool, id).await {
                     for wid in watcher_ids {
                         if wid != updater_id {
-                            if let Err(e) = db::create_notification(&pool, wid, "task_status_changed", &format!("{} changed task #{} from {} to {}", updater_name, id, old, new_s), Some("task"), Some(id)).await {
-                                tracing::warn!("Failed to create watcher status notification: {}", e);
+                            if let Err(e) = db::create_notification(
+                                &pool,
+                                wid,
+                                "task_status_changed",
+                                &format!(
+                                    "{} changed task #{} from {} to {}",
+                                    updater_name, id, old, new_s
+                                ),
+                                Some("task"),
+                                Some(id),
+                            )
+                            .await
+                            {
+                                tracing::warn!(
+                                    "Failed to create watcher status notification: {}",
+                                    e
+                                );
                             }
                         }
                     }
@@ -481,82 +932,182 @@ pub async fn update_task(State(engine): State<AppState>, claims: Claims, Path(id
         if new_priority != task.priority {
             let pool = engine.pool.clone();
             let old_p = task.priority;
-            tokio::spawn(async move { crate::automation::run_priority_changed(&pool, id, old_p, new_priority).await; });
+            tokio::spawn(async move {
+                crate::automation::run_priority_changed(&pool, id, old_p, new_priority).await;
+            });
         }
     }
-    crate::webhook::dispatch(engine.pool.clone(), "task.updated", serde_json::json!({"id": id}));
+    crate::webhook::dispatch(
+        engine.pool.clone(),
+        "task.updated",
+        serde_json::json!({"id": id}),
+    );
     engine.notify(ChangeEvent::Tasks);
     Ok(Json(t))
 }
 
 #[utoipa::path(delete, path = "/api/tasks/{id}", responses((status = 204), (status = 403, body = ApiErrorBody), (status = 404, body = ApiErrorBody)), security(("bearer" = [])))]
-pub async fn delete_task(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>) -> Result<impl IntoResponse, ApiError> {
-    let task = db::get_task(&engine.pool, id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Task not found"))?;
-    if !is_owner_or_root(task.user_id, &claims) { return Err(err(StatusCode::FORBIDDEN, "Not owner")); }
+pub async fn delete_task(
+    State(engine): State<AppState>,
+    claims: Claims,
+    Path(id): Path<i64>,
+) -> Result<impl IntoResponse, ApiError> {
+    let task = db::get_task(&engine.pool, id)
+        .await
+        .map_err(|_| err(StatusCode::NOT_FOUND, "Task not found"))?;
+    if !is_owner_or_root(task.user_id, &claims) {
+        return Err(err(StatusCode::FORBIDDEN, "Not owner"));
+    }
     db::delete_task(&engine.pool, id).await.map_err(internal)?;
-    if let Err(e) = db::audit(&engine.pool, claims.user_id, "delete", "task", Some(id), Some(&task.title)).await { tracing::warn!("Audit log failed: {}", e); }
-    crate::webhook::dispatch(engine.pool.clone(), "task.deleted", serde_json::json!({"id": id, "title": &task.title}));
+    if let Err(e) = db::audit(
+        &engine.pool,
+        claims.user_id,
+        "delete",
+        "task",
+        Some(id),
+        Some(&task.title),
+    )
+    .await
+    {
+        tracing::warn!("Audit log failed: {}", e);
+    }
+    crate::webhook::dispatch(
+        engine.pool.clone(),
+        "task.deleted",
+        serde_json::json!({"id": id, "title": &task.title}),
+    );
     engine.notify(ChangeEvent::Tasks);
     Ok(StatusCode::NO_CONTENT)
 }
 
 #[utoipa::path(post, path = "/api/tasks/{id}/restore", responses((status = 204)), security(("bearer" = [])))]
-pub async fn restore_task(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>) -> Result<StatusCode, ApiError> {
+pub async fn restore_task(
+    State(engine): State<AppState>,
+    claims: Claims,
+    Path(id): Path<i64>,
+) -> Result<StatusCode, ApiError> {
     let task: (i64,) = sqlx::query_as("SELECT user_id FROM tasks WHERE id = ?")
-        .bind(id).fetch_one(&engine.pool).await.map_err(|_| err(StatusCode::NOT_FOUND, "Task not found"))?;
-    if !is_owner_or_root(task.0, &claims) { return Err(err(StatusCode::FORBIDDEN, "Not owner")); }
+        .bind(id)
+        .fetch_one(&engine.pool)
+        .await
+        .map_err(|_| err(StatusCode::NOT_FOUND, "Task not found"))?;
+    if !is_owner_or_root(task.0, &claims) {
+        return Err(err(StatusCode::FORBIDDEN, "Not owner"));
+    }
     db::restore_task(&engine.pool, id).await.map_err(internal)?;
     engine.notify(ChangeEvent::Tasks);
     Ok(StatusCode::NO_CONTENT)
 }
 
 #[utoipa::path(delete, path = "/api/tasks/{id}/permanent", responses((status = 204)), security(("bearer" = [])))]
-pub async fn purge_task(State(engine): State<AppState>, claims: Claims, Path(id): Path<i64>) -> Result<StatusCode, ApiError> {
-    let task: (i64, Option<String>) = sqlx::query_as("SELECT user_id, deleted_at FROM tasks WHERE id = ?")
-        .bind(id).fetch_one(&engine.pool).await.map_err(|_| err(StatusCode::NOT_FOUND, "Task not found"))?;
-    if !is_owner_or_root(task.0, &claims) { return Err(err(StatusCode::FORBIDDEN, "Not owner")); }
-    if task.1.is_none() { return Err(err(StatusCode::BAD_REQUEST, "Task must be in trash first")); }
-    sqlx::query("DELETE FROM tasks WHERE id = ? AND deleted_at IS NOT NULL").bind(id).execute(&engine.pool).await.map_err(internal)?;
+pub async fn purge_task(
+    State(engine): State<AppState>,
+    claims: Claims,
+    Path(id): Path<i64>,
+) -> Result<StatusCode, ApiError> {
+    let task: (i64, Option<String>) =
+        sqlx::query_as("SELECT user_id, deleted_at FROM tasks WHERE id = ?")
+            .bind(id)
+            .fetch_one(&engine.pool)
+            .await
+            .map_err(|_| err(StatusCode::NOT_FOUND, "Task not found"))?;
+    if !is_owner_or_root(task.0, &claims) {
+        return Err(err(StatusCode::FORBIDDEN, "Not owner"));
+    }
+    if task.1.is_none() {
+        return Err(err(StatusCode::BAD_REQUEST, "Task must be in trash first"));
+    }
+    sqlx::query("DELETE FROM tasks WHERE id = ? AND deleted_at IS NOT NULL")
+        .bind(id)
+        .execute(&engine.pool)
+        .await
+        .map_err(internal)?;
     engine.notify(ChangeEvent::Tasks);
     Ok(StatusCode::NO_CONTENT)
 }
 
 #[derive(Deserialize, utoipa::ToSchema)]
-pub struct BulkStatusRequest { pub task_ids: Vec<i64>, pub status: String }
+pub struct BulkStatusRequest {
+    pub task_ids: Vec<i64>,
+    pub status: String,
+}
 
 #[utoipa::path(put, path = "/api/tasks/bulk-status", request_body = BulkStatusRequest, responses((status = 204)), security(("bearer" = [])))]
-pub async fn bulk_update_status(State(engine): State<AppState>, claims: Claims, Json(req): Json<BulkStatusRequest>) -> Result<StatusCode, ApiError> {
+pub async fn bulk_update_status(
+    State(engine): State<AppState>,
+    claims: Claims,
+    Json(req): Json<BulkStatusRequest>,
+) -> Result<StatusCode, ApiError> {
     validate_task_status(&req.status)?;
     if !VALID_TASK_STATUSES.contains(&req.status.as_str()) {
-        db::get_custom_status_by_name(&engine.pool, &req.status).await.map_err(internal)?
-            .ok_or_else(|| err(StatusCode::BAD_REQUEST, format!("Unknown status '{}'", req.status)))?;
+        db::get_custom_status_by_name(&engine.pool, &req.status)
+            .await
+            .map_err(internal)?
+            .ok_or_else(|| {
+                err(
+                    StatusCode::BAD_REQUEST,
+                    format!("Unknown status '{}'", req.status),
+                )
+            })?;
     }
-    if req.task_ids.is_empty() { return Ok(StatusCode::NO_CONTENT); }
-    if req.task_ids.len() > 500 { return Err(err(StatusCode::BAD_REQUEST, "Too many task IDs (max 500)")); }
+    if req.task_ids.is_empty() {
+        return Ok(StatusCode::NO_CONTENT);
+    }
+    if req.task_ids.len() > 500 {
+        return Err(err(StatusCode::BAD_REQUEST, "Too many task IDs (max 500)"));
+    }
     // Batch ownership check
     if !auth::is_admin_or_root(&claims) {
-        let ph = req.task_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
-        let q = format!("SELECT COUNT(*) FROM tasks WHERE id IN ({}) AND user_id != ?", ph);
+        let ph = req
+            .task_ids
+            .iter()
+            .map(|_| "?")
+            .collect::<Vec<_>>()
+            .join(",");
+        let q = format!(
+            "SELECT COUNT(*) FROM tasks WHERE id IN ({}) AND user_id != ?",
+            ph
+        );
         let mut query = sqlx::query_as::<_, (i64,)>(&q);
-        for id in &req.task_ids { query = query.bind(id); }
+        for id in &req.task_ids {
+            query = query.bind(id);
+        }
         query = query.bind(claims.user_id);
         let (foreign,): (i64,) = query.fetch_one(&engine.pool).await.map_err(internal)?;
-        if foreign > 0 { return Err(err(StatusCode::FORBIDDEN, "Cannot update other users' tasks")); }
+        if foreign > 0 {
+            return Err(err(
+                StatusCode::FORBIDDEN,
+                "Cannot update other users' tasks",
+            ));
+        }
     }
     // Enforce workflow transition rules for each task
     for tid in &req.task_ids {
         if let Ok(t) = db::get_task(&engine.pool, *tid).await {
             if t.status != req.status {
-                db::validate_status_transition(&engine.pool, &t.status, &req.status, t.project_id).await
+                db::validate_status_transition(&engine.pool, &t.status, &req.status, t.project_id)
+                    .await
                     .map_err(|e| err(StatusCode::BAD_REQUEST, format!("Task #{}: {}", tid, e)))?;
             }
         }
     }
     // Batch update
-    let ph = req.task_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
-    let sql = format!("UPDATE tasks SET status = ?, updated_at = ? WHERE id IN ({}) AND deleted_at IS NULL", ph);
-    let mut q = sqlx::query(&sql).bind(&req.status).bind(crate::db::now_str());
-    for id in &req.task_ids { q = q.bind(id); }
+    let ph = req
+        .task_ids
+        .iter()
+        .map(|_| "?")
+        .collect::<Vec<_>>()
+        .join(",");
+    let sql = format!(
+        "UPDATE tasks SET status = ?, updated_at = ? WHERE id IN ({}) AND deleted_at IS NULL",
+        ph
+    );
+    let mut q = sqlx::query(&sql)
+        .bind(&req.status)
+        .bind(crate::db::now_str());
+    for id in &req.task_ids {
+        q = q.bind(id);
+    }
     q.execute(&engine.pool).await.map_err(internal)?;
     // B7: Auto-unblock dependents when bulk-completing/done tasks
     if req.status == "completed" || req.status == "done" {
@@ -565,7 +1116,11 @@ pub async fn bulk_update_status(State(engine): State<AppState>, claims: Claims, 
         }
     }
     // B4: Fire webhooks for bulk status updates
-    crate::webhook::dispatch(engine.pool.clone(), "task.updated", serde_json::json!({"ids": &req.task_ids, "status": &req.status, "bulk": true}));
+    crate::webhook::dispatch(
+        engine.pool.clone(),
+        "task.updated",
+        serde_json::json!({"ids": &req.task_ids, "status": &req.status, "bulk": true}),
+    );
     engine.notify(ChangeEvent::Tasks);
     Ok(StatusCode::NO_CONTENT)
 }
@@ -573,23 +1128,51 @@ pub async fn bulk_update_status(State(engine): State<AppState>, claims: Claims, 
 // ── Bulk assign ────────────────────────────────────────────────
 
 #[derive(Deserialize, utoipa::ToSchema)]
-pub struct BulkAssignRequest { pub task_ids: Vec<i64>, pub username: String }
+pub struct BulkAssignRequest {
+    pub task_ids: Vec<i64>,
+    pub username: String,
+}
 
 #[utoipa::path(post, path = "/api/tasks/bulk-assign", request_body = BulkAssignRequest, responses((status = 204)), security(("bearer" = [])))]
-pub async fn bulk_assign(State(engine): State<AppState>, claims: Claims, Json(req): Json<BulkAssignRequest>) -> Result<StatusCode, ApiError> {
-    if req.task_ids.is_empty() { return Ok(StatusCode::NO_CONTENT); }
-    if req.task_ids.len() > 500 { return Err(err(StatusCode::BAD_REQUEST, "Too many task IDs (max 500)")); }
-    let uid = db::get_user_id_by_username(&engine.pool, &req.username).await.map_err(internal)?
+pub async fn bulk_assign(
+    State(engine): State<AppState>,
+    claims: Claims,
+    Json(req): Json<BulkAssignRequest>,
+) -> Result<StatusCode, ApiError> {
+    if req.task_ids.is_empty() {
+        return Ok(StatusCode::NO_CONTENT);
+    }
+    if req.task_ids.len() > 500 {
+        return Err(err(StatusCode::BAD_REQUEST, "Too many task IDs (max 500)"));
+    }
+    let uid = db::get_user_id_by_username(&engine.pool, &req.username)
+        .await
+        .map_err(internal)?
         .ok_or_else(|| err(StatusCode::NOT_FOUND, "User not found"))?;
     // Ownership check: root can bulk-assign any, others only their own
     if !auth::is_admin_or_root(&claims) {
-        let ph = req.task_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
-        let sql = format!("SELECT COUNT(*) FROM tasks WHERE id IN ({}) AND user_id != ? AND deleted_at IS NULL", ph);
+        let ph = req
+            .task_ids
+            .iter()
+            .map(|_| "?")
+            .collect::<Vec<_>>()
+            .join(",");
+        let sql = format!(
+            "SELECT COUNT(*) FROM tasks WHERE id IN ({}) AND user_id != ? AND deleted_at IS NULL",
+            ph
+        );
         let mut q = sqlx::query_as::<_, (i64,)>(&sql);
-        for id in &req.task_ids { q = q.bind(id); }
+        for id in &req.task_ids {
+            q = q.bind(id);
+        }
         q = q.bind(claims.user_id);
         let (non_owned,) = q.fetch_one(&engine.pool).await.map_err(internal)?;
-        if non_owned > 0 { return Err(err(StatusCode::FORBIDDEN, "Cannot assign tasks you don't own")); }
+        if non_owned > 0 {
+            return Err(err(
+                StatusCode::FORBIDDEN,
+                "Cannot assign tasks you don't own",
+            ));
+        }
     }
     for tid in &req.task_ids {
         db::add_assignee(&engine.pool, *tid, uid).await.ok(); // ignore duplicates
@@ -601,14 +1184,29 @@ pub async fn bulk_assign(State(engine): State<AppState>, claims: Claims, Json(re
 // ── Bulk move to sprint ────────────────────────────────────────
 
 #[derive(Deserialize, utoipa::ToSchema)]
-pub struct BulkSprintMoveRequest { pub task_ids: Vec<i64>, pub sprint_id: i64 }
+pub struct BulkSprintMoveRequest {
+    pub task_ids: Vec<i64>,
+    pub sprint_id: i64,
+}
 
 #[utoipa::path(post, path = "/api/tasks/bulk-sprint", request_body = BulkSprintMoveRequest, responses((status = 204)), security(("bearer" = [])))]
-pub async fn bulk_sprint_move(State(engine): State<AppState>, claims: Claims, Json(req): Json<BulkSprintMoveRequest>) -> Result<StatusCode, ApiError> {
-    if req.task_ids.is_empty() { return Ok(StatusCode::NO_CONTENT); }
-    if req.task_ids.len() > 500 { return Err(err(StatusCode::BAD_REQUEST, "Too many task IDs (max 500)")); }
-    let sprint = db::get_sprint(&engine.pool, req.sprint_id).await.map_err(|_| err(StatusCode::NOT_FOUND, "Sprint not found"))?;
-    if !is_owner_or_root(sprint.created_by_id, &claims) { return Err(err(StatusCode::FORBIDDEN, "Not sprint owner")); }
+pub async fn bulk_sprint_move(
+    State(engine): State<AppState>,
+    claims: Claims,
+    Json(req): Json<BulkSprintMoveRequest>,
+) -> Result<StatusCode, ApiError> {
+    if req.task_ids.is_empty() {
+        return Ok(StatusCode::NO_CONTENT);
+    }
+    if req.task_ids.len() > 500 {
+        return Err(err(StatusCode::BAD_REQUEST, "Too many task IDs (max 500)"));
+    }
+    let sprint = db::get_sprint(&engine.pool, req.sprint_id)
+        .await
+        .map_err(|_| err(StatusCode::NOT_FOUND, "Sprint not found"))?;
+    if !is_owner_or_root(sprint.created_by_id, &claims) {
+        return Err(err(StatusCode::FORBIDDEN, "Not sprint owner"));
+    }
     for tid in &req.task_ids {
         sqlx::query("INSERT OR IGNORE INTO sprint_tasks (sprint_id, task_id, added_by_id, added_at) VALUES (?, ?, ?, ?)")
             .bind(req.sprint_id).bind(tid).bind(claims.user_id).bind(db::now_str())
@@ -618,25 +1216,44 @@ pub async fn bulk_sprint_move(State(engine): State<AppState>, claims: Claims, Js
     Ok(StatusCode::NO_CONTENT)
 }
 
-
 #[derive(Deserialize, utoipa::ToSchema)]
-pub struct ReorderRequest { pub orders: Vec<(i64, i64)> }
+pub struct ReorderRequest {
+    pub orders: Vec<(i64, i64)>,
+}
 
 #[utoipa::path(post, path = "/api/tasks/reorder", responses((status = 204)), security(("bearer" = [])))]
-pub async fn reorder_tasks(State(engine): State<AppState>, claims: Claims, Json(req): Json<ReorderRequest>) -> Result<StatusCode, ApiError> {
-    if req.orders.len() > 500 { return Err(err(StatusCode::BAD_REQUEST, "Too many items (max 500)")); }
+pub async fn reorder_tasks(
+    State(engine): State<AppState>,
+    claims: Claims,
+    Json(req): Json<ReorderRequest>,
+) -> Result<StatusCode, ApiError> {
+    if req.orders.len() > 500 {
+        return Err(err(StatusCode::BAD_REQUEST, "Too many items (max 500)"));
+    }
     // Verify user owns all tasks (root can reorder any)
     if !auth::is_admin_or_root(&claims) && !req.orders.is_empty() {
         let ids: Vec<i64> = req.orders.iter().map(|&(id, _)| id).collect();
         let ph = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
-        let q = format!("SELECT COUNT(*) as c FROM tasks WHERE id IN ({}) AND user_id != ?", ph);
+        let q = format!(
+            "SELECT COUNT(*) as c FROM tasks WHERE id IN ({}) AND user_id != ?",
+            ph
+        );
         let mut query = sqlx::query_as::<_, (i64,)>(&q);
-        for id in &ids { query = query.bind(id); }
+        for id in &ids {
+            query = query.bind(id);
+        }
         query = query.bind(claims.user_id);
         let (foreign,): (i64,) = query.fetch_one(&engine.pool).await.map_err(internal)?;
-        if foreign > 0 { return Err(err(StatusCode::FORBIDDEN, "Cannot reorder other users' tasks")); }
+        if foreign > 0 {
+            return Err(err(
+                StatusCode::FORBIDDEN,
+                "Cannot reorder other users' tasks",
+            ));
+        }
     }
-    db::reorder_tasks(&engine.pool, &req.orders).await.map_err(internal)?;
+    db::reorder_tasks(&engine.pool, &req.orders)
+        .await
+        .map_err(internal)?;
     engine.notify(ChangeEvent::Tasks);
     Ok(StatusCode::NO_CONTENT)
 }

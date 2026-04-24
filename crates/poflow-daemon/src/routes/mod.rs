@@ -1,6 +1,6 @@
 use crate::auth::{self, Claims};
 use crate::db;
-use crate::engine::{Engine, TimerPhase, ChangeEvent};
+use crate::engine::{ChangeEvent, Engine, TimerPhase};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
@@ -18,10 +18,17 @@ pub struct RateLimiter {
 }
 impl RateLimiter {
     fn new(max_requests: u32, window_secs: u64) -> Self {
-        Self { buckets: parking_lot::Mutex::new(std::collections::HashMap::new()), max_requests, window_secs }
+        Self {
+            buckets: parking_lot::Mutex::new(std::collections::HashMap::new()),
+            max_requests,
+            window_secs,
+        }
     }
     pub fn check_and_record(&self, key: &str) -> bool {
-        let now = std::time::SystemTime::now().duration_since(std::time::SystemTime::UNIX_EPOCH).unwrap_or_default().as_secs();
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::SystemTime::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
         let window = self.window_secs;
         let curr_window = now / window;
         let mut map = self.buckets.lock();
@@ -76,7 +83,8 @@ pub fn read_limiter() -> &'static RateLimiter {
 }
 
 pub(crate) fn extract_ip(headers: &axum::http::HeaderMap) -> String {
-    headers.get("x-real-ip")
+    headers
+        .get("x-real-ip")
         .or_else(|| headers.get("x-forwarded-for"))
         .and_then(|v| v.to_str().ok())
         .map(|s| s.split(',').next().unwrap_or(s).trim().to_string())
@@ -99,7 +107,10 @@ fn check_rate_limit(limiter: &RateLimiter, ip: &str) -> Result<(), ApiError> {
     if limiter.check_and_record(ip) {
         Ok(())
     } else {
-        Err(err(StatusCode::TOO_MANY_REQUESTS, "Too many attempts. Try again later."))
+        Err(err(
+            StatusCode::TOO_MANY_REQUESTS,
+            "Too many attempts. Try again later.",
+        ))
     }
 }
 
@@ -124,8 +135,10 @@ pub use burns_task::*;
 mod assignees;
 pub use assignees::*;
 pub mod watchers;
-pub use watchers::{watch_task, unwatch_task, get_task_watchers, get_watched_tasks,
-    __path_watch_task, __path_unwatch_task, __path_get_task_watchers, __path_get_watched_tasks};
+pub use watchers::{
+    __path_get_task_watchers, __path_get_watched_tasks, __path_unwatch_task, __path_watch_task,
+    get_task_watchers, get_watched_tasks, unwatch_task, watch_task,
+};
 mod history;
 pub use history::*;
 mod config;

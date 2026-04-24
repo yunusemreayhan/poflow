@@ -1,4 +1,4 @@
-use poflow_daemon::{auth, config, db, engine, notify, routes, build_router};
+use poflow_daemon::{auth, build_router, config, db, engine, notify, routes};
 
 use anyhow::Result;
 use chrono::Datelike;
@@ -153,19 +153,26 @@ struct SecurityAddon;
 impl utoipa::Modify for SecurityAddon {
     fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
         let components = openapi.components.get_or_insert_with(Default::default);
-        components.add_security_scheme("bearer", utoipa::openapi::security::SecurityScheme::Http(
-            utoipa::openapi::security::Http::new(utoipa::openapi::security::HttpAuthScheme::Bearer)
-        ));
+        components.add_security_scheme(
+            "bearer",
+            utoipa::openapi::security::SecurityScheme::Http(utoipa::openapi::security::Http::new(
+                utoipa::openapi::security::HttpAuthScheme::Bearer,
+            )),
+        );
     }
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let json_logs = std::env::var("POFLOW_LOG_JSON").is_ok_and(|v| v == "1" || v.to_lowercase() == "true");
+    let json_logs =
+        std::env::var("POFLOW_LOG_JSON").is_ok_and(|v| v == "1" || v.to_lowercase() == "true");
     let filter = tracing_subscriber::EnvFilter::from_default_env()
         .add_directive("poflow_daemon=info".parse()?);
     if json_logs {
-        tracing_subscriber::fmt().with_env_filter(filter).json().init();
+        tracing_subscriber::fmt()
+            .with_env_filter(filter)
+            .json()
+            .init();
     } else {
         tracing_subscriber::fmt().with_env_filter(filter).init();
     }
@@ -173,7 +180,9 @@ async fn main() -> Result<()> {
     tracing::info!("Poflow daemon starting...");
     // V29-8: Warn if GitHub webhook secret is not configured
     if std::env::var("GITHUB_WEBHOOK_SECRET").is_err() {
-        tracing::warn!("GITHUB_WEBHOOK_SECRET not set — GitHub webhook endpoint accepts unverified payloads");
+        tracing::warn!(
+            "GITHUB_WEBHOOK_SECRET not set — GitHub webhook endpoint accepts unverified payloads"
+        );
     }
 
     let config = config::Config::load()?;
@@ -197,14 +206,20 @@ async fn main() -> Result<()> {
     let mut shutdown_rx = shutdown_tx.subscribe();
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(std::time::Duration::from_secs(1));
-        let mut last_date = chrono::Utc::now().naive_utc().format("%Y-%m-%d").to_string();
+        let mut last_date = chrono::Utc::now()
+            .naive_utc()
+            .format("%Y-%m-%d")
+            .to_string();
         loop {
             tokio::select! {
                 _ = interval.tick() => {},
                 _ = shutdown_rx.changed() => break,
             }
             // Midnight reset: clear per-user daily counts
-            let today = chrono::Utc::now().naive_utc().format("%Y-%m-%d").to_string();
+            let today = chrono::Utc::now()
+                .naive_utc()
+                .format("%Y-%m-%d")
+                .to_string();
             if today != last_date {
                 last_date = today;
                 let mut states = engine_tick.states.lock().await;
@@ -218,12 +233,22 @@ async fn main() -> Result<()> {
                     engine_tick.heartbeat("tick").await;
                     for state in completed {
                         // Check user notification preferences
-                        let (should_notify, play_sound) = match db::get_user_config(&engine_tick.pool, state.current_user_id).await {
-                            Ok(Some(uc)) => (uc.notify_desktop.unwrap_or(1) != 0, uc.notify_sound.unwrap_or(1) != 0),
-                            _ => (true, true),
-                        };
+                        let (should_notify, play_sound) =
+                            match db::get_user_config(&engine_tick.pool, state.current_user_id)
+                                .await
+                            {
+                                Ok(Some(uc)) => (
+                                    uc.notify_desktop.unwrap_or(1) != 0,
+                                    uc.notify_sound.unwrap_or(1) != 0,
+                                ),
+                                _ => (true, true),
+                            };
                         if should_notify {
-                            notify::notify_session_complete(state.phase, state.session_count, play_sound);
+                            notify::notify_session_complete(
+                                state.phase,
+                                state.session_count,
+                                play_sound,
+                            );
                         }
                     }
                 }
@@ -254,7 +279,11 @@ async fn main() -> Result<()> {
                 tracing::error!("Notification cleanup error: {}", e);
             }
             // BL4: Cleanup expired token blocklist entries
-            sqlx::query("DELETE FROM token_blocklist WHERE expires_at < ?").bind(db::now_str()).execute(&engine_snap.pool).await.ok();
+            sqlx::query("DELETE FROM token_blocklist WHERE expires_at < ?")
+                .bind(db::now_str())
+                .execute(&engine_snap.pool)
+                .await
+                .ok();
             // A2: Prune in-memory token blocklist to match DB
             auth::prune_blocklist().await;
             engine_snap.heartbeat("snapshot").await;
@@ -271,49 +300,103 @@ async fn main() -> Result<()> {
                 _ = interval.tick() => {},
                 _ = shutdown_rx3.changed() => break,
             }
-            let today = chrono::Utc::now().naive_utc().format("%Y-%m-%d").to_string();
+            let today = chrono::Utc::now()
+                .naive_utc()
+                .format("%Y-%m-%d")
+                .to_string();
             let due = match db::get_due_recurrences(&engine_recur.pool, &today).await {
                 Ok(d) => d,
-                Err(e) => { tracing::error!("Recurrence check error: {}", e); continue; }
+                Err(e) => {
+                    tracing::error!("Recurrence check error: {}", e);
+                    continue;
+                }
             };
             for rec in due {
                 // Skip if already created today (idempotency)
-                if rec.last_created.as_deref() == Some(&today) { continue; }
+                if rec.last_created.as_deref() == Some(&today) {
+                    continue;
+                }
                 // Clone the template task
                 if let Ok(task) = db::get_task(&engine_recur.pool, rec.task_id).await {
                     let title = format!("{} ({})", task.title, today);
-                    if let Ok(_new) = db::create_task(&engine_recur.pool, db::CreateTaskOpts {
-                        user_id: task.user_id, parent_id: task.parent_id, title: &title,
-                        description: task.description.as_deref(), project: task.project.as_deref(), project_id: task.project_id, tags: task.tags.as_deref(),
-                        priority: task.priority, estimated: task.estimated, estimated_hours: task.estimated_hours,
-                        remaining_points: task.remaining_points, due_date: task.due_date.as_deref(),
-                    }).await {
+                    if let Ok(_new) = db::create_task(
+                        &engine_recur.pool,
+                        db::CreateTaskOpts {
+                            user_id: task.user_id,
+                            parent_id: task.parent_id,
+                            title: &title,
+                            description: task.description.as_deref(),
+                            project: task.project.as_deref(),
+                            project_id: task.project_id,
+                            tags: task.tags.as_deref(),
+                            priority: task.priority,
+                            estimated: task.estimated,
+                            estimated_hours: task.estimated_hours,
+                            remaining_points: task.remaining_points,
+                            due_date: task.due_date.as_deref(),
+                        },
+                    )
+                    .await
+                    {
                         // Advance next_due
                         let next = match rec.pattern.as_str() {
-                            "daily" => chrono::NaiveDate::parse_from_str(&rec.next_due, "%Y-%m-%d").ok().map(|d| d + chrono::Duration::days(1)),
-                            "weekly" => chrono::NaiveDate::parse_from_str(&rec.next_due, "%Y-%m-%d").ok().map(|d| d + chrono::Duration::weeks(1)),
-                            "biweekly" => chrono::NaiveDate::parse_from_str(&rec.next_due, "%Y-%m-%d").ok().map(|d| d + chrono::Duration::weeks(2)),
-                            "monthly" => chrono::NaiveDate::parse_from_str(&rec.next_due, "%Y-%m-%d").ok().map(|d| {
-                                let m = d.month() % 12 + 1;
-                                let y = if m == 1 { d.year() + 1 } else { d.year() };
-                                // Preserve original day, clamping to month's last day
-                                let original_day = task.due_date.as_ref()
-                                    .and_then(|dd| chrono::NaiveDate::parse_from_str(dd, "%Y-%m-%d").ok())
-                                    .map(|dd| dd.day()).unwrap_or(d.day());
-                                // B4: Get last day of target month correctly
-                                let next_month_first = if m < 12 {
-                                    chrono::NaiveDate::from_ymd_opt(y, m + 1, 1)
-                                } else {
-                                    chrono::NaiveDate::from_ymd_opt(y + 1, 1, 1)
-                                };
-                                let max_day = next_month_first
-                                    .and_then(|d| d.pred_opt()).map(|d| d.day()).unwrap_or(28);
-                                chrono::NaiveDate::from_ymd_opt(y, m, original_day.min(max_day)).unwrap_or(d + chrono::Duration::days(30))
-                            }),
+                            "daily" => chrono::NaiveDate::parse_from_str(&rec.next_due, "%Y-%m-%d")
+                                .ok()
+                                .map(|d| d + chrono::Duration::days(1)),
+                            "weekly" => {
+                                chrono::NaiveDate::parse_from_str(&rec.next_due, "%Y-%m-%d")
+                                    .ok()
+                                    .map(|d| d + chrono::Duration::weeks(1))
+                            }
+                            "biweekly" => {
+                                chrono::NaiveDate::parse_from_str(&rec.next_due, "%Y-%m-%d")
+                                    .ok()
+                                    .map(|d| d + chrono::Duration::weeks(2))
+                            }
+                            "monthly" => {
+                                chrono::NaiveDate::parse_from_str(&rec.next_due, "%Y-%m-%d")
+                                    .ok()
+                                    .map(|d| {
+                                        let m = d.month() % 12 + 1;
+                                        let y = if m == 1 { d.year() + 1 } else { d.year() };
+                                        // Preserve original day, clamping to month's last day
+                                        let original_day = task
+                                            .due_date
+                                            .as_ref()
+                                            .and_then(|dd| {
+                                                chrono::NaiveDate::parse_from_str(dd, "%Y-%m-%d")
+                                                    .ok()
+                                            })
+                                            .map(|dd| dd.day())
+                                            .unwrap_or(d.day());
+                                        // B4: Get last day of target month correctly
+                                        let next_month_first = if m < 12 {
+                                            chrono::NaiveDate::from_ymd_opt(y, m + 1, 1)
+                                        } else {
+                                            chrono::NaiveDate::from_ymd_opt(y + 1, 1, 1)
+                                        };
+                                        let max_day = next_month_first
+                                            .and_then(|d| d.pred_opt())
+                                            .map(|d| d.day())
+                                            .unwrap_or(28);
+                                        chrono::NaiveDate::from_ymd_opt(
+                                            y,
+                                            m,
+                                            original_day.min(max_day),
+                                        )
+                                        .unwrap_or(d + chrono::Duration::days(30))
+                                    })
+                            }
                             _ => None,
                         };
                         if let Some(next_date) = next {
-                            db::advance_recurrence(&engine_recur.pool, rec.task_id, &next_date.format("%Y-%m-%d").to_string()).await.ok();
+                            db::advance_recurrence(
+                                &engine_recur.pool,
+                                rec.task_id,
+                                &next_date.format("%Y-%m-%d").to_string(),
+                            )
+                            .await
+                            .ok();
                         }
                         engine_recur.notify(engine::ChangeEvent::Tasks);
                     }
@@ -334,9 +417,13 @@ async fn main() -> Result<()> {
                 _ = shutdown_rx_archive.changed() => break,
             }
             let days = engine_archive.get_config().await.auto_archive_days;
-            if days == 0 { continue; } // 0 = disabled
+            if days == 0 {
+                continue;
+            } // 0 = disabled
             let days = days.max(1) as i64;
-            let cutoff = (chrono::Utc::now() - chrono::Duration::days(days)).format("%Y-%m-%dT%H:%M:%S").to_string();
+            let cutoff = (chrono::Utc::now() - chrono::Duration::days(days))
+                .format("%Y-%m-%dT%H:%M:%S")
+                .to_string();
             if let Err(e) = sqlx::query("UPDATE tasks SET status = 'archived', updated_at = ? WHERE status = 'completed' AND updated_at < ? AND deleted_at IS NULL")
                 .bind(db::now_str()).bind(&cutoff).execute(&engine_archive.pool).await {
                 tracing::warn!("Auto-archive error: {}", e);
@@ -378,14 +465,30 @@ async fn main() -> Result<()> {
                 _ = interval.tick() => {},
                 _ = shutdown_rx4.changed() => break,
             }
-            let today = chrono::Utc::now().naive_utc().format("%Y-%m-%d").to_string();
+            let today = chrono::Utc::now()
+                .naive_utc()
+                .format("%Y-%m-%d")
+                .to_string();
             // Reset notified set on new day
-            if today != last_date { notified.clear(); last_date = today.clone(); }
-            let tomorrow = (chrono::Utc::now().naive_utc() + chrono::Duration::days(1)).format("%Y-%m-%d").to_string();
-            let due_tasks = db::get_due_tasks(&engine_due.pool, &tomorrow).await.unwrap_or_default();
+            if today != last_date {
+                notified.clear();
+                last_date = today.clone();
+            }
+            let tomorrow = (chrono::Utc::now().naive_utc() + chrono::Duration::days(1))
+                .format("%Y-%m-%d")
+                .to_string();
+            let due_tasks = db::get_due_tasks(&engine_due.pool, &tomorrow)
+                .await
+                .unwrap_or_default();
             for (id, title, due) in due_tasks {
-                if notified.contains(&id) { continue; }
-                let urgency = if due <= today { "overdue" } else { "due tomorrow" };
+                if notified.contains(&id) {
+                    continue;
+                }
+                let urgency = if due <= today {
+                    "overdue"
+                } else {
+                    "due tomorrow"
+                };
                 notify::notify_due_task(&title, urgency);
                 notified.insert(id);
             }
@@ -394,22 +497,32 @@ async fn main() -> Result<()> {
 
     let mut app = build_router(engine.clone()).await;
     #[cfg(feature = "swagger")]
-    let swagger_enabled = std::env::var("POFLOW_SWAGGER").is_ok_and(|v| v == "1" || v.to_lowercase() == "true");
+    let swagger_enabled =
+        std::env::var("POFLOW_SWAGGER").is_ok_and(|v| v == "1" || v.to_lowercase() == "true");
     #[cfg(feature = "swagger")]
     if swagger_enabled {
-        app = app.merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()));
+        app = app
+            .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()));
     }
     let app = app.layer(tower_http::trace::TraceLayer::new_for_http());
 
     let bind_addr = std::env::var("POFLOW_BIND_ADDRESS").unwrap_or(config.bind_address.clone());
-    let bind_port = std::env::var("POFLOW_BIND_PORT").ok().and_then(|p| p.parse().ok()).unwrap_or(config.bind_port);
+    let bind_port = std::env::var("POFLOW_BIND_PORT")
+        .ok()
+        .and_then(|p| p.parse().ok())
+        .unwrap_or(config.bind_port);
     let addr = format!("{}:{}", bind_addr, bind_port);
     tracing::info!("HTTP server listening on {}", addr);
     #[cfg(feature = "swagger")]
-    if swagger_enabled { tracing::info!("Swagger UI: http://{}/swagger-ui/", addr); }
+    if swagger_enabled {
+        tracing::info!("Swagger UI: http://{}/swagger-ui/", addr);
+    }
 
     let listener = tokio::net::TcpListener::bind(&addr).await?;
-    let server = axum::serve(listener, app.into_make_service_with_connect_info::<std::net::SocketAddr>());
+    let server = axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+    );
 
     // Graceful shutdown on SIGTERM/SIGINT
     let engine_shutdown = engine.clone();
@@ -417,7 +530,8 @@ async fn main() -> Result<()> {
         // INF1: Handle both SIGINT (ctrl_c) and SIGTERM (systemd)
         let ctrl_c = tokio::signal::ctrl_c();
         #[cfg(unix)]
-        let mut sigterm = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()).expect("SIGTERM handler");
+        let mut sigterm = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+            .expect("SIGTERM handler");
         #[cfg(unix)]
         tokio::select! {
             _ = ctrl_c => {},

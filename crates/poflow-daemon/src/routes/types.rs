@@ -6,11 +6,23 @@ use serde::{Deserialize, Serialize};
 // --- Request types ---
 
 #[derive(Deserialize, utoipa::ToSchema)]
-pub struct RegisterRequest { pub username: String, pub password: String }
+pub struct RegisterRequest {
+    pub username: String,
+    pub password: String,
+}
 #[derive(Deserialize, utoipa::ToSchema)]
-pub struct LoginRequest { pub username: String, pub password: String }
+pub struct LoginRequest {
+    pub username: String,
+    pub password: String,
+}
 #[derive(Serialize, utoipa::ToSchema)]
-pub struct AuthResponse { pub token: String, pub refresh_token: String, pub user_id: i64, pub username: String, pub role: String }
+pub struct AuthResponse {
+    pub token: String,
+    pub refresh_token: String,
+    pub user_id: i64,
+    pub username: String,
+    pub role: String,
+}
 #[derive(Deserialize, utoipa::ToSchema)]
 pub struct CreateTaskRequest {
     pub title: String,
@@ -54,33 +66,83 @@ pub struct UpdateTaskRequest {
     pub estimate_pessimistic: Option<Option<f64>>,
 }
 #[derive(Deserialize, utoipa::ToSchema)]
-pub struct StartRequest { pub task_id: Option<i64>, pub phase: Option<String> }
+pub struct StartRequest {
+    pub task_id: Option<i64>,
+    pub phase: Option<String>,
+}
 #[derive(Deserialize, utoipa::ToSchema)]
-pub struct AddCommentRequest { pub content: String, pub session_id: Option<i64>, pub parent_id: Option<i64> }
+pub struct AddCommentRequest {
+    pub content: String,
+    pub session_id: Option<i64>,
+    pub parent_id: Option<i64>,
+}
 #[derive(Deserialize, utoipa::ToSchema)]
-pub struct HistoryQuery { pub from: Option<String>, pub to: Option<String>, pub user_id: Option<i64> }
+pub struct HistoryQuery {
+    pub from: Option<String>,
+    pub to: Option<String>,
+    pub user_id: Option<i64>,
+}
 #[derive(Deserialize, utoipa::ToSchema)]
-pub struct StatsQuery { pub days: Option<i64> }
+pub struct StatsQuery {
+    pub days: Option<i64>,
+}
 #[derive(Deserialize, utoipa::ToSchema)]
-pub struct UpdateRoleRequest { pub role: String }
+pub struct UpdateRoleRequest {
+    pub role: String,
+}
 #[derive(Deserialize, utoipa::ToSchema)]
-pub struct UpdateProfileRequest { pub username: Option<String>, pub password: Option<String>, pub current_password: Option<String>, pub email: Option<String>, pub timezone: Option<String> }
+pub struct UpdateProfileRequest {
+    pub username: Option<String>,
+    pub password: Option<String>,
+    pub current_password: Option<String>,
+    pub email: Option<String>,
+    pub timezone: Option<String>,
+}
 #[derive(Deserialize, utoipa::ToSchema)]
-pub struct AddTimeReportRequest { pub hours: f64, pub points: Option<f64>, pub description: Option<String> }
+pub struct AddTimeReportRequest {
+    pub hours: f64,
+    pub points: Option<f64>,
+    pub description: Option<String>,
+}
 #[derive(Deserialize, utoipa::ToSchema)]
-pub struct AssignRequest { pub username: String }
+pub struct AssignRequest {
+    pub username: String,
+}
 #[derive(Deserialize, utoipa::ToSchema)]
-pub struct CreateRoomRequest { pub name: String, pub room_type: Option<String>, pub estimation_unit: Option<String>, pub project: Option<String>, pub project_id: Option<i64> }
+pub struct CreateRoomRequest {
+    pub name: String,
+    pub room_type: Option<String>,
+    pub estimation_unit: Option<String>,
+    pub project: Option<String>,
+    pub project_id: Option<i64>,
+}
 #[derive(Deserialize, utoipa::ToSchema)]
-pub struct RoomRoleRequest { pub username: String, pub role: String }
+pub struct RoomRoleRequest {
+    pub username: String,
+    pub role: String,
+}
 #[derive(Deserialize, utoipa::ToSchema)]
-pub struct StartVotingRequest { pub task_id: i64 }
+pub struct StartVotingRequest {
+    pub task_id: i64,
+}
 #[derive(Deserialize, utoipa::ToSchema)]
-pub struct CastVoteRequest { pub value: f64 }
+pub struct CastVoteRequest {
+    pub value: f64,
+}
 #[derive(Deserialize, utoipa::ToSchema)]
-pub struct AcceptEstimateRequest { pub value: f64 }
+pub struct AcceptEstimateRequest {
+    pub value: f64,
+}
 #[derive(Deserialize, utoipa::ToSchema)]
-pub struct CreateSprintRequest { pub name: String, pub project: Option<String>, pub project_id: Option<i64>, pub goal: Option<String>, pub start_date: Option<String>, pub end_date: Option<String>, pub capacity_hours: Option<f64> }
+pub struct CreateSprintRequest {
+    pub name: String,
+    pub project: Option<String>,
+    pub project_id: Option<i64>,
+    pub goal: Option<String>,
+    pub start_date: Option<String>,
+    pub end_date: Option<String>,
+    pub capacity_hours: Option<f64>,
+}
 #[derive(Deserialize, utoipa::ToSchema)]
 pub struct UpdateSprintRequest {
     pub name: Option<String>,
@@ -103,11 +165,21 @@ pub struct UpdateSprintRequest {
     pub expected_updated_at: Option<String>,
 }
 #[derive(Deserialize, utoipa::ToSchema)]
-pub struct AddSprintTasksRequest { pub task_ids: Vec<i64> }
+pub struct AddSprintTasksRequest {
+    pub task_ids: Vec<i64>,
+}
 #[derive(Deserialize)]
-pub struct SprintQuery { pub status: Option<String>, pub project: Option<String> }
+pub struct SprintQuery {
+    pub status: Option<String>,
+    pub project: Option<String>,
+}
 #[derive(Deserialize, utoipa::ToSchema)]
-pub struct LogBurnRequest { pub task_id: i64, pub points: Option<f64>, pub hours: Option<f64>, pub note: Option<String> }
+pub struct LogBurnRequest {
+    pub task_id: i64,
+    pub points: Option<f64>,
+    pub hours: Option<f64>,
+    pub note: Option<String>,
+}
 
 // --- Error types ---
 
@@ -127,13 +199,20 @@ pub struct ApiError {
 
 impl ApiError {
     pub fn new(status: StatusCode, code: &str, msg: impl ToString) -> Self {
-        Self { status, code: code.to_string(), message: msg.to_string() }
+        Self {
+            status,
+            code: code.to_string(),
+            message: msg.to_string(),
+        }
     }
 }
 
 impl IntoResponse for ApiError {
     fn into_response(self) -> axum::response::Response {
-        let body = ApiErrorBody { error: self.message, code: self.code };
+        let body = ApiErrorBody {
+            error: self.message,
+            code: self.code,
+        };
         (self.status, Json(body)).into_response()
     }
 }
@@ -157,27 +236,50 @@ pub fn internal(e: impl ToString) -> ApiError {
 
 // Q6: Allow `?` on sqlx::Error without explicit .map_err(internal)
 impl From<sqlx::Error> for ApiError {
-    fn from(e: sqlx::Error) -> Self { internal(e) }
+    fn from(e: sqlx::Error) -> Self {
+        internal(e)
+    }
 }
 
-pub fn deserialize_optional_nullable<'de, D>(deserializer: D) -> Result<Option<Option<String>>, D::Error>
-where D: serde::Deserializer<'de> {
+pub fn deserialize_optional_nullable<'de, D>(
+    deserializer: D,
+) -> Result<Option<Option<String>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
     Ok(Some(Option::deserialize(deserializer)?))
 }
 
-pub fn deserialize_optional_nullable_f64<'de, D>(deserializer: D) -> Result<Option<Option<f64>>, D::Error>
-where D: serde::Deserializer<'de> {
+pub fn deserialize_optional_nullable_f64<'de, D>(
+    deserializer: D,
+) -> Result<Option<Option<f64>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
     Ok(Some(Option::deserialize(deserializer)?))
 }
 
-pub fn deserialize_optional_nullable_i64<'de, D>(deserializer: D) -> Result<Option<Option<i64>>, D::Error>
-where D: serde::Deserializer<'de> {
+pub fn deserialize_optional_nullable_i64<'de, D>(
+    deserializer: D,
+) -> Result<Option<Option<i64>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
     Ok(Some(Option::deserialize(deserializer)?))
 }
 
 pub use crate::auth::is_owner_or_root;
 
-pub const VALID_TASK_STATUSES: &[&str] = &["backlog", "active", "in_progress", "blocked", "completed", "done", "estimated", "archived"];
+pub const VALID_TASK_STATUSES: &[&str] = &[
+    "backlog",
+    "active",
+    "in_progress",
+    "blocked",
+    "completed",
+    "done",
+    "estimated",
+    "archived",
+];
 pub const VALID_SPRINT_STATUSES: &[&str] = &["planning", "active", "completed"];
 pub const VALID_ROLES: &[&str] = &["user", "admin", "root"];
 pub const VALID_ROOM_ROLES: &[&str] = &["admin", "voter", "observer"];
@@ -185,25 +287,63 @@ pub const VALID_ROOM_ROLES: &[&str] = &["admin", "voter", "observer"];
 pub fn validate_task_status(s: &str) -> Result<(), ApiError> {
     // Built-in statuses always valid; custom statuses validated at the route level with DB access
     if !VALID_TASK_STATUSES.contains(&s) && !s.chars().all(|c| c.is_alphanumeric() || c == '_') {
-        Err(err(StatusCode::BAD_REQUEST, format!("Invalid status '{}'. Must be alphanumeric/underscore", s)))
+        Err(err(
+            StatusCode::BAD_REQUEST,
+            format!("Invalid status '{}'. Must be alphanumeric/underscore", s),
+        ))
     } else if s.len() > 50 {
-        Err(err(StatusCode::BAD_REQUEST, "Status name too long (max 50)"))
+        Err(err(
+            StatusCode::BAD_REQUEST,
+            "Status name too long (max 50)",
+        ))
     } else {
         Ok(())
     }
 }
 
 pub fn validate_sprint_status(s: &str) -> Result<(), ApiError> {
-    if !VALID_SPRINT_STATUSES.contains(&s) { Err(err(StatusCode::BAD_REQUEST, format!("Invalid sprint status '{}'. Must be one of: {}", s, VALID_SPRINT_STATUSES.join(", ")))) } else { Ok(()) }
+    if !VALID_SPRINT_STATUSES.contains(&s) {
+        Err(err(
+            StatusCode::BAD_REQUEST,
+            format!(
+                "Invalid sprint status '{}'. Must be one of: {}",
+                s,
+                VALID_SPRINT_STATUSES.join(", ")
+            ),
+        ))
+    } else {
+        Ok(())
+    }
 }
 
 pub fn validate_username(u: &str) -> Result<(), ApiError> {
-    if u.trim().is_empty() { return Err(err(StatusCode::BAD_REQUEST, "Username cannot be empty")); }
-    if u.len() > 32 { return Err(err(StatusCode::BAD_REQUEST, "Username too long (max 32 chars)")); }
-    if !u.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-') {
-        return Err(err(StatusCode::BAD_REQUEST, "Username must be alphanumeric (underscores and hyphens allowed)"));
+    if u.trim().is_empty() {
+        return Err(err(StatusCode::BAD_REQUEST, "Username cannot be empty"));
     }
-    const RESERVED: &[&str] = &["admin", "root", "system", "api", "null", "undefined", "anonymous"];
+    if u.len() > 32 {
+        return Err(err(
+            StatusCode::BAD_REQUEST,
+            "Username too long (max 32 chars)",
+        ));
+    }
+    if !u
+        .chars()
+        .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
+    {
+        return Err(err(
+            StatusCode::BAD_REQUEST,
+            "Username must be alphanumeric (underscores and hyphens allowed)",
+        ));
+    }
+    const RESERVED: &[&str] = &[
+        "admin",
+        "root",
+        "system",
+        "api",
+        "null",
+        "undefined",
+        "anonymous",
+    ];
     if RESERVED.contains(&u.to_lowercase().as_str()) {
         return Err(err(StatusCode::BAD_REQUEST, "This username is reserved"));
     }
@@ -211,12 +351,34 @@ pub fn validate_username(u: &str) -> Result<(), ApiError> {
 }
 
 pub fn validate_password(p: &str) -> Result<(), ApiError> {
-    if p.len() < 8 { return Err(err(StatusCode::BAD_REQUEST, "Password must be at least 8 characters")); }
-    if p.len() > 128 { return Err(err(StatusCode::BAD_REQUEST, "Password too long (max 128 chars)")); }
-    if !p.chars().any(|c| c.is_uppercase()) { return Err(err(StatusCode::BAD_REQUEST, "Password must contain an uppercase letter")); }
-    if !p.chars().any(|c| c.is_ascii_digit()) { return Err(err(StatusCode::BAD_REQUEST, "Password must contain a digit")); }
+    if p.len() < 8 {
+        return Err(err(
+            StatusCode::BAD_REQUEST,
+            "Password must be at least 8 characters",
+        ));
+    }
+    if p.len() > 128 {
+        return Err(err(
+            StatusCode::BAD_REQUEST,
+            "Password too long (max 128 chars)",
+        ));
+    }
+    if !p.chars().any(|c| c.is_uppercase()) {
+        return Err(err(
+            StatusCode::BAD_REQUEST,
+            "Password must contain an uppercase letter",
+        ));
+    }
+    if !p.chars().any(|c| c.is_ascii_digit()) {
+        return Err(err(
+            StatusCode::BAD_REQUEST,
+            "Password must contain a digit",
+        ));
+    }
     Ok(())
 }
 
 #[derive(Deserialize, utoipa::ToSchema)]
-pub struct UpdateSessionNoteRequest { pub note: String }
+pub struct UpdateSessionNoteRequest {
+    pub note: String,
+}

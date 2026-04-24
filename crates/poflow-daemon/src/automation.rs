@@ -11,16 +11,26 @@ pub async fn run_status_changed(pool: &Pool, task_id: i64, old_status: &str, new
     };
 
     for (rule_id, user_id, cond_json, action_json) in rules {
-        if !matches_status_condition(&cond_json, old_status, new_status) { continue; }
-        if !can_act_on_task(pool, task_id, user_id).await { continue; }
+        if !matches_status_condition(&cond_json, old_status, new_status) {
+            continue;
+        }
+        if !can_act_on_task(pool, task_id, user_id).await {
+            continue;
+        }
         execute_action(pool, task_id, &action_json, rule_id).await;
     }
 }
 
 /// Run automation rules for "all subtasks done" trigger.
 pub async fn run_all_subtasks_done(pool: &Pool, task_id: i64) {
-    let task = match db::get_task(pool, task_id).await { Ok(t) => t, Err(_) => return };
-    let parent_id = match task.parent_id { Some(p) => p, None => return };
+    let task = match db::get_task(pool, task_id).await {
+        Ok(t) => t,
+        Err(_) => return,
+    };
+    let parent_id = match task.parent_id {
+        Some(p) => p,
+        None => return,
+    };
 
     let (incomplete,): (i64,) = match sqlx::query_as(
         "SELECT COUNT(*) FROM tasks WHERE parent_id = ? AND deleted_at IS NULL AND status NOT IN ('completed','done')"
@@ -28,7 +38,9 @@ pub async fn run_all_subtasks_done(pool: &Pool, task_id: i64) {
         Ok(r) => r,
         Err(_) => return,
     };
-    if incomplete > 0 { return; }
+    if incomplete > 0 {
+        return;
+    }
 
     let rules: Vec<(i64, String)> = match sqlx::query_as(
         "SELECT id, action_json FROM automation_rules WHERE trigger_event = 'task.all_subtasks_done' AND enabled = 1"
@@ -51,11 +63,18 @@ pub async fn run_task_created(pool: &Pool, task_id: i64) {
         Err(_) => return,
     };
 
-    let task = match db::get_task(pool, task_id).await { Ok(t) => t, Err(_) => return };
+    let task = match db::get_task(pool, task_id).await {
+        Ok(t) => t,
+        Err(_) => return,
+    };
 
     for (rule_id, user_id, cond_json, action_json) in rules {
-        if !matches_task_condition(&cond_json, &task) { continue; }
-        if !can_act_on_task(pool, task_id, user_id).await { continue; }
+        if !matches_task_condition(&cond_json, &task) {
+            continue;
+        }
+        if !can_act_on_task(pool, task_id, user_id).await {
+            continue;
+        }
         execute_action(pool, task_id, &action_json, rule_id).await;
     }
 }
@@ -72,10 +91,14 @@ pub async fn run_task_assigned(pool: &Pool, task_id: i64, assignee: &str) {
     for (rule_id, user_id, cond_json, action_json) in rules {
         if let Ok(cond) = serde_json::from_str::<Value>(&cond_json) {
             if let Some(expected) = cond.get("assignee").and_then(|v| v.as_str()) {
-                if expected != assignee { continue; }
+                if expected != assignee {
+                    continue;
+                }
             }
         }
-        if !can_act_on_task(pool, task_id, user_id).await { continue; }
+        if !can_act_on_task(pool, task_id, user_id).await {
+            continue;
+        }
         execute_action(pool, task_id, &action_json, rule_id).await;
     }
 }
@@ -92,10 +115,14 @@ pub async fn run_priority_changed(pool: &Pool, task_id: i64, old_priority: i64, 
     for (rule_id, user_id, cond_json, action_json) in rules {
         if let Ok(cond) = serde_json::from_str::<Value>(&cond_json) {
             if let Some(p) = cond.get("priority").and_then(|v| v.as_i64()) {
-                if p != new_priority { continue; }
+                if p != new_priority {
+                    continue;
+                }
             }
         }
-        if !can_act_on_task(pool, task_id, user_id).await { continue; }
+        if !can_act_on_task(pool, task_id, user_id).await {
+            continue;
+        }
         execute_action(pool, task_id, &action_json, rule_id).await;
     }
     let _ = (old_priority,); // suppress unused warning
@@ -104,43 +131,89 @@ pub async fn run_priority_changed(pool: &Pool, task_id: i64, old_priority: i64, 
 // --- Helpers ---
 
 async fn can_act_on_task(pool: &Pool, task_id: i64, user_id: i64) -> bool {
-    let task = match db::get_task(pool, task_id).await { Ok(t) => t, Err(_) => return false };
-    if task.user_id == user_id { return true; }
+    let task = match db::get_task(pool, task_id).await {
+        Ok(t) => t,
+        Err(_) => return false,
+    };
+    if task.user_id == user_id {
+        return true;
+    }
     let (role,): (String,) = match sqlx::query_as("SELECT role FROM users WHERE id = ?")
-        .bind(user_id).fetch_one(pool).await { Ok(r) => r, Err(_) => return false };
+        .bind(user_id)
+        .fetch_one(pool)
+        .await
+    {
+        Ok(r) => r,
+        Err(_) => return false,
+    };
     role == "root" || role == "admin"
 }
 
 fn matches_status_condition(cond_json: &str, old_status: &str, new_status: &str) -> bool {
-    let cond: Value = match serde_json::from_str(cond_json) { Ok(v) => v, Err(_) => return true };
+    let cond: Value = match serde_json::from_str(cond_json) {
+        Ok(v) => v,
+        Err(_) => return true,
+    };
     if let Some(to) = cond.get("to_status").and_then(|v| v.as_str()) {
-        if to != new_status { return false; }
+        if to != new_status {
+            return false;
+        }
     }
     if let Some(from) = cond.get("from_status").and_then(|v| v.as_str()) {
-        if from != old_status { return false; }
+        if from != old_status {
+            return false;
+        }
     }
     true
 }
 
 fn matches_task_condition(cond_json: &str, task: &db::Task) -> bool {
-    let cond: Value = match serde_json::from_str(cond_json) { Ok(v) => v, Err(_) => return true };
+    let cond: Value = match serde_json::from_str(cond_json) {
+        Ok(v) => v,
+        Err(_) => return true,
+    };
     if let Some(project) = cond.get("project").and_then(|v| v.as_str()) {
-        if task.project.as_deref() != Some(project) { return false; }
+        if task.project.as_deref() != Some(project) {
+            return false;
+        }
     }
     if let Some(priority) = cond.get("priority").and_then(|v| v.as_i64()) {
-        if task.priority != priority { return false; }
+        if task.priority != priority {
+            return false;
+        }
     }
     true
 }
 
 async fn execute_action(pool: &Pool, task_id: i64, action_json: &str, _rule_id: i64) {
-    let action: Value = match serde_json::from_str(action_json) { Ok(v) => v, Err(_) => return };
+    let action: Value = match serde_json::from_str(action_json) {
+        Ok(v) => v,
+        Err(_) => return,
+    };
 
     if let Some(status) = action.get("set_status").and_then(|v| v.as_str()) {
-        db::update_task(pool, task_id, db::UpdateTaskOpts { status: Some(status), ..Default::default() }).await.ok();
+        db::update_task(
+            pool,
+            task_id,
+            db::UpdateTaskOpts {
+                status: Some(status),
+                ..Default::default()
+            },
+        )
+        .await
+        .ok();
     }
     if let Some(priority) = action.get("set_priority").and_then(|v| v.as_i64()) {
-        db::update_task(pool, task_id, db::UpdateTaskOpts { priority: Some(priority), ..Default::default() }).await.ok();
+        db::update_task(
+            pool,
+            task_id,
+            db::UpdateTaskOpts {
+                priority: Some(priority),
+                ..Default::default()
+            },
+        )
+        .await
+        .ok();
     }
     tracing::debug!("Automation rule executed on task {}", task_id);
 }

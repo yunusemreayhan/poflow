@@ -3,7 +3,7 @@ use crate::db::{self, Pool};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::{broadcast, Mutex, watch};
+use tokio::sync::{broadcast, watch, Mutex};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub enum TimerPhase {
@@ -122,16 +122,35 @@ impl Engine {
         }
         let mut config = self.config.lock().await.clone();
         if let Ok(Some(uc)) = db::get_user_config(&self.pool, user_id).await {
-            if let Some(v) = uc.work_duration_min { config.work_duration_min = v as u32; }
-            if let Some(v) = uc.short_break_min { config.short_break_min = v as u32; }
-            if let Some(v) = uc.long_break_min { config.long_break_min = v as u32; }
-            if let Some(v) = uc.long_break_interval { config.long_break_interval = v as u32; }
-            if let Some(v) = uc.auto_start_breaks { config.auto_start_breaks = v != 0; }
-            if let Some(v) = uc.auto_start_work { config.auto_start_work = v != 0; }
-            if let Some(v) = uc.daily_goal { config.daily_goal = v as u32; }
-            if let Some(v) = uc.theme { config.theme = v; }
+            if let Some(v) = uc.work_duration_min {
+                config.work_duration_min = v as u32;
+            }
+            if let Some(v) = uc.short_break_min {
+                config.short_break_min = v as u32;
+            }
+            if let Some(v) = uc.long_break_min {
+                config.long_break_min = v as u32;
+            }
+            if let Some(v) = uc.long_break_interval {
+                config.long_break_interval = v as u32;
+            }
+            if let Some(v) = uc.auto_start_breaks {
+                config.auto_start_breaks = v != 0;
+            }
+            if let Some(v) = uc.auto_start_work {
+                config.auto_start_work = v != 0;
+            }
+            if let Some(v) = uc.daily_goal {
+                config.daily_goal = v as u32;
+            }
+            if let Some(v) = uc.theme {
+                config.theme = v;
+            }
         }
-        self.user_config_cache.lock().await.insert(user_id, (config.clone(), std::time::Instant::now()));
+        self.user_config_cache
+            .lock()
+            .await
+            .insert(user_id, (config.clone(), std::time::Instant::now()));
         config
     }
 
@@ -143,10 +162,17 @@ impl Engine {
         }
     }
 
-    pub async fn start(&self, user_id: i64, task_id: Option<i64>, phase: Option<TimerPhase>) -> anyhow::Result<EngineState> {
+    pub async fn start(
+        &self,
+        user_id: i64,
+        task_id: Option<i64>,
+        phase: Option<TimerPhase>,
+    ) -> anyhow::Result<EngineState> {
         let config = self.get_user_config(user_id).await;
         let mut states = self.states.lock().await;
-        let state = states.entry(user_id).or_insert_with(|| Self::idle_state(user_id, &config));
+        let state = states
+            .entry(user_id)
+            .or_insert_with(|| Self::idle_state(user_id, &config));
 
         // Stop any existing session
         if state.status != TimerStatus::Idle {
@@ -158,8 +184,14 @@ impl Engine {
             TimerPhase::Work => {
                 // B1: Use per-task work duration override if set
                 let task_override = if let Some(tid) = task_id {
-                    db::get_task(&self.pool, tid).await.ok().and_then(|t| t.work_duration_minutes).map(|m| m as u32 * 60)
-                } else { None };
+                    db::get_task(&self.pool, tid)
+                        .await
+                        .ok()
+                        .and_then(|t| t.work_duration_minutes)
+                        .map(|m| m as u32 * 60)
+                } else {
+                    None
+                };
                 task_override.unwrap_or(config.work_duration_min * 60)
             }
             TimerPhase::ShortBreak => config.short_break_min * 60,
@@ -175,7 +207,9 @@ impl Engine {
         };
 
         let session = db::create_session(&self.pool, user_id, task_id, session_type).await?;
-        let daily = db::get_today_completed_for_user(&self.pool, Some(user_id)).await.unwrap_or(0);
+        let daily = db::get_today_completed_for_user(&self.pool, Some(user_id))
+            .await
+            .unwrap_or(0);
 
         state.phase = phase;
         state.status = TimerStatus::Running;
@@ -233,7 +267,12 @@ impl Engine {
             None => return Ok(Self::idle_state(user_id, &config)),
         };
         Self::stop_session(&self.pool, state, "interrupted").await;
-        let preserved = (state.session_count, state.daily_completed, state.daily_goal, state.duration_s);
+        let preserved = (
+            state.session_count,
+            state.daily_completed,
+            state.daily_goal,
+            state.duration_s,
+        );
         *state = EngineState {
             current_user_id: user_id,
             session_count: preserved.0,
@@ -251,7 +290,9 @@ impl Engine {
     pub async fn skip(&self, user_id: i64) -> anyhow::Result<EngineState> {
         let config = self.get_user_config(user_id).await;
         let mut states = self.states.lock().await;
-        let state = states.entry(user_id).or_insert_with(|| Self::idle_state(user_id, &config));
+        let state = states
+            .entry(user_id)
+            .or_insert_with(|| Self::idle_state(user_id, &config));
         // End current session
         if let Some(sid) = state.current_session_id.take() {
             if let Err(e) = db::end_session(&self.pool, sid, "skipped").await {
@@ -264,7 +305,13 @@ impl Engine {
             state.session_count += 1;
         }
         let next_phase = match state.phase {
-            TimerPhase::Work => if state.session_count % config.long_break_interval.max(1) == 0 { TimerPhase::LongBreak } else { TimerPhase::ShortBreak },
+            TimerPhase::Work => {
+                if state.session_count % config.long_break_interval.max(1) == 0 {
+                    TimerPhase::LongBreak
+                } else {
+                    TimerPhase::ShortBreak
+                }
+            }
             _ => TimerPhase::Work,
         };
         state.phase = next_phase;
@@ -305,7 +352,8 @@ impl Engine {
             // First pass: snapshot running user IDs without holding states lock long.
             let user_ids: Vec<i64> = {
                 let states = self.states.lock().await;
-                states.iter()
+                states
+                    .iter()
                     .filter(|(_, s)| s.status == TimerStatus::Running)
                     .map(|(uid, _)| *uid)
                     .collect()
@@ -341,11 +389,19 @@ impl Engine {
                 }
 
                 let next_phase = if was_work {
-                    if state.session_count % config.long_break_interval.max(1) == 0 { TimerPhase::LongBreak } else { TimerPhase::ShortBreak }
+                    if state.session_count % config.long_break_interval.max(1) == 0 {
+                        TimerPhase::LongBreak
+                    } else {
+                        TimerPhase::ShortBreak
+                    }
                 } else {
                     TimerPhase::Work
                 };
-                let auto_start = if was_work { config.auto_start_breaks } else { config.auto_start_work };
+                let auto_start = if was_work {
+                    config.auto_start_breaks
+                } else {
+                    config.auto_start_work
+                };
 
                 state.phase = next_phase;
                 state.elapsed_s = 0;
@@ -355,11 +411,17 @@ impl Engine {
                     TimerPhase::LongBreak => config.long_break_min * 60,
                     TimerPhase::Idle => 0,
                 };
-                state.status = if auto_start { TimerStatus::Running } else { TimerStatus::Idle };
+                state.status = if auto_start {
+                    TimerStatus::Running
+                } else {
+                    TimerStatus::Idle
+                };
 
                 let next_session_type = match next_phase {
-                    TimerPhase::Work => "work", TimerPhase::ShortBreak => "short_break",
-                    TimerPhase::LongBreak => "long_break", TimerPhase::Idle => "work",
+                    TimerPhase::Work => "work",
+                    TimerPhase::ShortBreak => "short_break",
+                    TimerPhase::LongBreak => "long_break",
+                    TimerPhase::Idle => "work",
                 };
 
                 comps.push(Completion {
@@ -374,7 +436,10 @@ impl Engine {
             }
 
             // Collect completed states while still holding lock
-            completed_states = comps.iter().filter_map(|c| states.get(&c.user_id).cloned()).collect();
+            completed_states = comps
+                .iter()
+                .filter_map(|c| states.get(&c.user_id).cloned())
+                .collect();
             completions = comps;
 
             // Broadcast running states
@@ -388,33 +453,69 @@ impl Engine {
         // Phase 2: DB work without holding the lock
         for (i, c) in completions.iter().enumerate() {
             if let Some(sid) = c.session_id {
-                if let Err(e) = db::end_session(&self.pool, sid, "completed").await { tracing::warn!("Failed to end session {}: {}", sid, e); };
+                if let Err(e) = db::end_session(&self.pool, sid, "completed").await {
+                    tracing::warn!("Failed to end session {}: {}", sid, e);
+                };
             }
             if c.was_work {
                 if let Some(tid) = c.task_id {
-                    db::increment_task_actual(&self.pool, tid).await
-                        .map_err(|e| tracing::warn!("Failed to increment actual: {}", e)).ok();
+                    db::increment_task_actual(&self.pool, tid)
+                        .await
+                        .map_err(|e| tracing::warn!("Failed to increment actual: {}", e))
+                        .ok();
                     let hours = c.duration_s as f64 / 3600.0;
-                    let sprint_id = db::find_task_active_sprint(&self.pool, tid).await.unwrap_or(None);
-                    db::log_burn(&self.pool, db::LogBurnOpts { sprint_id, task_id: tid, session_id: c.session_id, user_id: c.user_id, points: 0.0, hours, source: "timer", note: None }).await
-                        .map_err(|e| tracing::warn!("Failed to log burn: {}", e)).ok();
+                    let sprint_id = db::find_task_active_sprint(&self.pool, tid)
+                        .await
+                        .unwrap_or(None);
+                    db::log_burn(
+                        &self.pool,
+                        db::LogBurnOpts {
+                            sprint_id,
+                            task_id: tid,
+                            session_id: c.session_id,
+                            user_id: c.user_id,
+                            points: 0.0,
+                            hours,
+                            source: "timer",
+                            note: None,
+                        },
+                    )
+                    .await
+                    .map_err(|e| tracing::warn!("Failed to log burn: {}", e))
+                    .ok();
                 }
             }
             if c.auto_start {
                 // B1: Break sessions shouldn't be associated with a task
-                let next_task = if c.next_session_type == "work" { c.task_id } else { None };
-                if let Ok(session) = db::create_session(&self.pool, c.user_id, next_task, c.next_session_type).await {
+                let next_task = if c.next_session_type == "work" {
+                    c.task_id
+                } else {
+                    None
+                };
+                if let Ok(session) =
+                    db::create_session(&self.pool, c.user_id, next_task, c.next_session_type).await
+                {
                     // Re-acquire lock briefly to set session ID
                     let mut states = self.states.lock().await;
                     if let Some(state) = states.get_mut(&c.user_id) {
                         // B3: Only set session ID if state hasn't been modified by another request
                         // (e.g., user stopped/started a new timer while we were doing DB I/O)
-                        if state.current_session_id.is_none() && state.status == TimerStatus::Running {
+                        if state.current_session_id.is_none()
+                            && state.status == TimerStatus::Running
+                        {
                             state.current_session_id = Some(session.id);
                         } else {
                             // State was modified — end the orphaned session
-                            db::end_session(&self.pool, session.id, "superseded").await
-                                .map_err(|e| tracing::warn!("Failed to end orphaned session {}: {}", session.id, e)).ok();
+                            db::end_session(&self.pool, session.id, "superseded")
+                                .await
+                                .map_err(|e| {
+                                    tracing::warn!(
+                                        "Failed to end orphaned session {}: {}",
+                                        session.id,
+                                        e
+                                    )
+                                })
+                                .ok();
                         }
                     }
                 }
@@ -431,20 +532,27 @@ impl Engine {
     /// Persist a single user's timer state to DB. Called after every mutation.
     async fn persist_state(&self, state: &EngineState) {
         if state.status == TimerStatus::Idle && state.phase == TimerPhase::Idle {
-            db::delete_timer_state(&self.pool, state.current_user_id).await.ok();
+            db::delete_timer_state(&self.pool, state.current_user_id)
+                .await
+                .ok();
         } else {
-            db::save_timer_state(&self.pool, db::SaveTimerState {
-                user_id: state.current_user_id,
-                phase: &format!("{:?}", state.phase),
-                status: &format!("{:?}", state.status),
-                elapsed_s: state.elapsed_s,
-                duration_s: state.duration_s,
-                session_count: state.session_count,
-                task_id: state.current_task_id,
-                session_id: state.current_session_id,
-                daily_completed: state.daily_completed,
-                daily_goal: state.daily_goal,
-            }).await.ok();
+            db::save_timer_state(
+                &self.pool,
+                db::SaveTimerState {
+                    user_id: state.current_user_id,
+                    phase: &format!("{:?}", state.phase),
+                    status: &format!("{:?}", state.status),
+                    elapsed_s: state.elapsed_s,
+                    duration_s: state.duration_s,
+                    session_count: state.session_count,
+                    task_id: state.current_task_id,
+                    session_id: state.current_session_id,
+                    daily_completed: state.daily_completed,
+                    daily_goal: state.daily_goal,
+                },
+            )
+            .await
+            .ok();
         }
     }
 
@@ -452,7 +560,10 @@ impl Engine {
     pub async fn restore_states(&self) {
         let rows = match db::load_timer_states(&self.pool).await {
             Ok(r) => r,
-            Err(e) => { tracing::warn!("Failed to load timer states: {}", e); return; }
+            Err(e) => {
+                tracing::warn!("Failed to load timer states: {}", e);
+                return;
+            }
         };
         let mut states = self.states.lock().await;
         for row in rows {
@@ -471,19 +582,29 @@ impl Engine {
             if status == TimerStatus::Idle && phase == TimerPhase::Idle {
                 continue;
             }
-            states.insert(row.user_id, EngineState {
+            states.insert(
+                row.user_id,
+                EngineState {
+                    phase,
+                    status,
+                    elapsed_s: row.elapsed_s as u32,
+                    duration_s: row.duration_s as u32,
+                    session_count: row.session_count as u32,
+                    current_task_id: row.current_task_id,
+                    current_session_id: row.current_session_id,
+                    current_user_id: row.user_id,
+                    daily_completed: row.daily_completed,
+                    daily_goal: row.daily_goal as u32,
+                },
+            );
+            tracing::info!(
+                "Restored timer state for user {}: {:?}/{:?} at {}s/{}s",
+                row.user_id,
                 phase,
                 status,
-                elapsed_s: row.elapsed_s as u32,
-                duration_s: row.duration_s as u32,
-                session_count: row.session_count as u32,
-                current_task_id: row.current_task_id,
-                current_session_id: row.current_session_id,
-                current_user_id: row.user_id,
-                daily_completed: row.daily_completed,
-                daily_goal: row.daily_goal as u32,
-            });
-            tracing::info!("Restored timer state for user {}: {:?}/{:?} at {}s/{}s", row.user_id, phase, status, row.elapsed_s, row.duration_s);
+                row.elapsed_s,
+                row.duration_s
+            );
         }
     }
 
@@ -491,16 +612,23 @@ impl Engine {
         let config = self.config.lock().await.clone();
         let mut state = {
             let states = self.states.lock().await;
-            states.get(&user_id).cloned().unwrap_or_else(|| Self::idle_state(user_id, &config))
+            states
+                .get(&user_id)
+                .cloned()
+                .unwrap_or_else(|| Self::idle_state(user_id, &config))
         };
         // B2: Always refresh daily_completed from DB (get_state is called infrequently: SSE init + explicit poll)
-        state.daily_completed = db::get_today_completed_for_user(&self.pool, Some(user_id)).await.unwrap_or(state.daily_completed);
+        state.daily_completed = db::get_today_completed_for_user(&self.pool, Some(user_id))
+            .await
+            .unwrap_or(state.daily_completed);
         state
     }
 
     pub async fn is_task_active(&self, task_id: i64) -> bool {
         let states = self.states.lock().await;
-        states.values().any(|s| s.current_task_id == Some(task_id) && s.status != TimerStatus::Idle)
+        states
+            .values()
+            .any(|s| s.current_task_id == Some(task_id) && s.status != TimerStatus::Idle)
     }
 
     pub async fn update_config(&self, config: Config) -> anyhow::Result<()> {
@@ -523,7 +651,10 @@ impl Engine {
     }
 
     pub async fn heartbeat(&self, task_name: &str) {
-        self.heartbeats.lock().await.insert(task_name.to_string(), std::time::Instant::now());
+        self.heartbeats
+            .lock()
+            .await
+            .insert(task_name.to_string(), std::time::Instant::now());
     }
 }
 
@@ -548,7 +679,11 @@ mod tests {
 
     #[test]
     fn idle_state_uses_config() {
-        let cfg = Config { daily_goal: 12, work_duration_min: 50, ..Config::default() };
+        let cfg = Config {
+            daily_goal: 12,
+            work_duration_min: 50,
+            ..Config::default()
+        };
         let s = Engine::idle_state(42, &cfg);
         assert_eq!(s.current_user_id, 42);
         assert_eq!(s.daily_goal, 12);
@@ -624,7 +759,12 @@ mod tests {
             daily_completed: 2,
             daily_goal: 8,
         };
-        let preserved = (state.session_count, state.daily_completed, state.daily_goal, state.duration_s);
+        let preserved = (
+            state.session_count,
+            state.daily_completed,
+            state.daily_goal,
+            state.duration_s,
+        );
         let new_state = EngineState {
             current_user_id: 1,
             session_count: preserved.0,
@@ -679,7 +819,11 @@ mod tests {
     #[test]
     fn skip_duration_calculation() {
         let cfg = Config::default();
-        for phase in [TimerPhase::Work, TimerPhase::ShortBreak, TimerPhase::LongBreak] {
+        for phase in [
+            TimerPhase::Work,
+            TimerPhase::ShortBreak,
+            TimerPhase::LongBreak,
+        ] {
             let dur = match phase {
                 TimerPhase::Work => cfg.work_duration_min * 60,
                 TimerPhase::ShortBreak => cfg.short_break_min * 60,
@@ -698,7 +842,12 @@ mod tests {
 
     #[test]
     fn change_event_serde() {
-        let events = [ChangeEvent::Tasks, ChangeEvent::Sprints, ChangeEvent::Rooms, ChangeEvent::Config];
+        let events = [
+            ChangeEvent::Tasks,
+            ChangeEvent::Sprints,
+            ChangeEvent::Rooms,
+            ChangeEvent::Config,
+        ];
         for e in &events {
             let json = serde_json::to_string(e).unwrap();
             let _: ChangeEvent = serde_json::from_str(&json).unwrap();

@@ -44,10 +44,15 @@ pub async fn save_timer_state(pool: &Pool, s: SaveTimerState<'_>) -> Result<()> 
 }
 
 pub async fn load_timer_states(pool: &Pool) -> Result<Vec<TimerStateRow>> {
-    Ok(sqlx::query_as("SELECT * FROM timer_states").fetch_all(pool).await?)
+    Ok(sqlx::query_as("SELECT * FROM timer_states")
+        .fetch_all(pool)
+        .await?)
 }
 
 pub async fn delete_timer_state(pool: &Pool, user_id: i64) -> Result<()> {
-    sqlx::query("DELETE FROM timer_states WHERE user_id = ?").bind(user_id).execute(pool).await?;
+    sqlx::query("DELETE FROM timer_states WHERE user_id = ?")
+        .bind(user_id)
+        .execute(pool)
+        .await?;
     Ok(())
 }

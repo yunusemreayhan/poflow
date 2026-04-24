@@ -1,6 +1,5 @@
 use super::*;
 
-
 const SPRINT_SELECT: &str = "SELECT sp.id, sp.name, sp.project, sp.project_id, p.name as project_name, sp.goal, sp.status, sp.start_date, sp.end_date, sp.retro_notes, sp.capacity_hours, sp.created_by_id, u.username as created_by, sp.created_at, sp.updated_at FROM sprints sp JOIN users u ON sp.created_by_id = u.id LEFT JOIN projects p ON sp.project_id = p.id";
 
 pub struct CreateSprintOpts<'a> {
@@ -23,17 +22,34 @@ pub async fn create_sprint(pool: &Pool, opts: CreateSprintOpts<'_>) -> Result<Sp
 }
 
 pub async fn get_sprint(pool: &Pool, id: i64) -> Result<Sprint> {
-    Ok(sqlx::query_as::<_, Sprint>(&format!("{} WHERE sp.id = ?", SPRINT_SELECT)).bind(id).fetch_one(pool).await?)
+    Ok(
+        sqlx::query_as::<_, Sprint>(&format!("{} WHERE sp.id = ?", SPRINT_SELECT))
+            .bind(id)
+            .fetch_one(pool)
+            .await?,
+    )
 }
 
-pub async fn list_sprints(pool: &Pool, status: Option<&str>, project: Option<&str>) -> Result<Vec<Sprint>> {
+pub async fn list_sprints(
+    pool: &Pool,
+    status: Option<&str>,
+    project: Option<&str>,
+) -> Result<Vec<Sprint>> {
     let mut q = format!("{} WHERE 1=1", SPRINT_SELECT);
-    if status.is_some() { q.push_str(" AND sp.status = ?"); }
-    if project.is_some() { q.push_str(" AND sp.project = ?"); }
+    if status.is_some() {
+        q.push_str(" AND sp.status = ?");
+    }
+    if project.is_some() {
+        q.push_str(" AND sp.project = ?");
+    }
     q.push_str(" ORDER BY sp.created_at DESC LIMIT 200");
     let mut query = sqlx::query_as::<_, Sprint>(&q);
-    if let Some(s) = status { query = query.bind(s); }
-    if let Some(p) = project { query = query.bind(p); }
+    if let Some(s) = status {
+        query = query.bind(s);
+    }
+    if let Some(p) = project {
+        query = query.bind(p);
+    }
     Ok(query.fetch_all(pool).await?)
 }
 
@@ -53,13 +69,34 @@ pub struct UpdateSprintOpts<'a> {
 pub async fn update_sprint(pool: &Pool, id: i64, opts: UpdateSprintOpts<'_>) -> Result<Sprint> {
     let now = now_str();
     let current = get_sprint(pool, id).await?;
-    let new_project = match opts.project { Some(v) => v.map(|s| s.to_string()), None => current.project };
-    let new_project_id = match opts.project_id { Some(v) => v, None => current.project_id };
-    let new_goal = match opts.goal { Some(v) => v.map(|s| s.to_string()), None => current.goal };
-    let new_start = match opts.start_date { Some(v) => v.map(|s| s.to_string()), None => current.start_date };
-    let new_end = match opts.end_date { Some(v) => v.map(|s| s.to_string()), None => current.end_date };
-    let new_retro = match opts.retro_notes { Some(v) => v.map(|s| s.to_string()), None => current.retro_notes };
-    let new_cap = match opts.capacity_hours { Some(v) => v, None => current.capacity_hours };
+    let new_project = match opts.project {
+        Some(v) => v.map(|s| s.to_string()),
+        None => current.project,
+    };
+    let new_project_id = match opts.project_id {
+        Some(v) => v,
+        None => current.project_id,
+    };
+    let new_goal = match opts.goal {
+        Some(v) => v.map(|s| s.to_string()),
+        None => current.goal,
+    };
+    let new_start = match opts.start_date {
+        Some(v) => v.map(|s| s.to_string()),
+        None => current.start_date,
+    };
+    let new_end = match opts.end_date {
+        Some(v) => v.map(|s| s.to_string()),
+        None => current.end_date,
+    };
+    let new_retro = match opts.retro_notes {
+        Some(v) => v.map(|s| s.to_string()),
+        None => current.retro_notes,
+    };
+    let new_cap = match opts.capacity_hours {
+        Some(v) => v,
+        None => current.capacity_hours,
+    };
     sqlx::query("UPDATE sprints SET name=?, project=?, project_id=?, goal=?, status=?, start_date=?, end_date=?, retro_notes=?, capacity_hours=?, updated_at=? WHERE id=?")
         .bind(opts.name.unwrap_or(&current.name)).bind(&new_project).bind(new_project_id)
         .bind(&new_goal).bind(opts.status.unwrap_or(&current.status))
@@ -69,13 +106,21 @@ pub async fn update_sprint(pool: &Pool, id: i64, opts: UpdateSprintOpts<'_>) -> 
 }
 
 pub async fn delete_sprint(pool: &Pool, id: i64) -> Result<()> {
-    sqlx::query("DELETE FROM sprints WHERE id = ?").bind(id).execute(pool).await?;
+    sqlx::query("DELETE FROM sprints WHERE id = ?")
+        .bind(id)
+        .execute(pool)
+        .await?;
     Ok(())
 }
 
 const SPRINT_TASK_SELECT: &str = "SELECT st.sprint_id, st.task_id, st.added_by_id, u.username as added_by, st.added_at FROM sprint_tasks st JOIN users u ON st.added_by_id = u.id";
 
-pub async fn add_sprint_tasks(pool: &Pool, sprint_id: i64, task_ids: &[i64], user_id: i64) -> Result<Vec<SprintTask>> {
+pub async fn add_sprint_tasks(
+    pool: &Pool,
+    sprint_id: i64,
+    task_ids: &[i64],
+    user_id: i64,
+) -> Result<Vec<SprintTask>> {
     let now = now_str();
     // B9: Wrap in transaction to prevent partial inserts
     let mut tx = pool.begin().await?;
@@ -88,13 +133,24 @@ pub async fn add_sprint_tasks(pool: &Pool, sprint_id: i64, task_ids: &[i64], use
 }
 
 pub async fn remove_sprint_task(pool: &Pool, sprint_id: i64, task_id: i64) -> Result<()> {
-    let r = sqlx::query("DELETE FROM sprint_tasks WHERE sprint_id = ? AND task_id = ?").bind(sprint_id).bind(task_id).execute(pool).await?;
-    if r.rows_affected() == 0 { return Err(anyhow::anyhow!("Task not in sprint")); }
+    let r = sqlx::query("DELETE FROM sprint_tasks WHERE sprint_id = ? AND task_id = ?")
+        .bind(sprint_id)
+        .bind(task_id)
+        .execute(pool)
+        .await?;
+    if r.rows_affected() == 0 {
+        return Err(anyhow::anyhow!("Task not in sprint"));
+    }
     Ok(())
 }
 
 pub async fn get_sprint_task_entries(pool: &Pool, sprint_id: i64) -> Result<Vec<SprintTask>> {
-    Ok(sqlx::query_as::<_, SprintTask>(&format!("{} WHERE st.sprint_id = ?", SPRINT_TASK_SELECT)).bind(sprint_id).fetch_all(pool).await?)
+    Ok(
+        sqlx::query_as::<_, SprintTask>(&format!("{} WHERE st.sprint_id = ?", SPRINT_TASK_SELECT))
+            .bind(sprint_id)
+            .fetch_all(pool)
+            .await?,
+    )
 }
 
 pub async fn get_sprint_tasks(pool: &Pool, sprint_id: i64) -> Result<Vec<Task>> {
@@ -105,10 +161,17 @@ pub async fn get_sprint_tasks(pool: &Pool, sprint_id: i64) -> Result<Vec<Task>> 
 pub async fn get_sprint_board(pool: &Pool, sprint_id: i64) -> Result<SprintBoard> {
     let tasks = get_sprint_tasks(pool, sprint_id).await?;
     // Load custom status categories for board column mapping
-    let custom: Vec<(String, String)> = sqlx::query_as("SELECT name, category FROM custom_statuses")
-        .fetch_all(pool).await.unwrap_or_default();
-    let category_map: std::collections::HashMap<&str, &str> = custom.iter().map(|(n, c)| (n.as_str(), c.as_str())).collect();
-    let (mut todo, mut in_progress, mut blocked, mut done) = (Vec::new(), Vec::new(), Vec::new(), Vec::new());
+    let custom: Vec<(String, String)> =
+        sqlx::query_as("SELECT name, category FROM custom_statuses")
+            .fetch_all(pool)
+            .await
+            .unwrap_or_default();
+    let category_map: std::collections::HashMap<&str, &str> = custom
+        .iter()
+        .map(|(n, c)| (n.as_str(), c.as_str()))
+        .collect();
+    let (mut todo, mut in_progress, mut blocked, mut done) =
+        (Vec::new(), Vec::new(), Vec::new(), Vec::new());
     for t in tasks {
         let cat = category_map.get(t.status.as_str()).copied();
         match cat.unwrap_or(t.status.as_str()) {
@@ -118,19 +181,32 @@ pub async fn get_sprint_board(pool: &Pool, sprint_id: i64) -> Result<SprintBoard
             _ => todo.push(t),
         }
     }
-    Ok(SprintBoard { todo, in_progress, blocked, done })
+    Ok(SprintBoard {
+        todo,
+        in_progress,
+        blocked,
+        done,
+    })
 }
 
 pub async fn get_sprint_detail(pool: &Pool, id: i64) -> Result<SprintDetail> {
     let sprint = get_sprint(pool, id).await?;
     let tasks = get_sprint_tasks(pool, id).await?;
     let stats = get_sprint_burndown(pool, id).await?;
-    Ok(SprintDetail { sprint, tasks, stats })
+    Ok(SprintDetail {
+        sprint,
+        tasks,
+        stats,
+    })
 }
 
 pub async fn get_sprint_burndown(pool: &Pool, sprint_id: i64) -> Result<Vec<SprintDailyStat>> {
-    Ok(sqlx::query_as::<_, SprintDailyStat>("SELECT * FROM sprint_daily_stats WHERE sprint_id = ? ORDER BY date")
-        .bind(sprint_id).fetch_all(pool).await?)
+    Ok(sqlx::query_as::<_, SprintDailyStat>(
+        "SELECT * FROM sprint_daily_stats WHERE sprint_id = ? ORDER BY date",
+    )
+    .bind(sprint_id)
+    .fetch_all(pool)
+    .await?)
 }
 
 pub async fn get_global_burndown(pool: &Pool) -> Result<Vec<SprintDailyStat>> {
@@ -158,13 +234,20 @@ pub async fn snapshot_sprint(pool: &Pool, sprint_id: i64) -> Result<SprintDailyS
     sqlx::query("INSERT INTO sprint_daily_stats (sprint_id, date, total_points, done_points, total_hours, done_hours, total_tasks, done_tasks) VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(sprint_id, date) DO UPDATE SET total_points=excluded.total_points, done_points=excluded.done_points, total_hours=excluded.total_hours, done_hours=excluded.done_hours, total_tasks=excluded.total_tasks, done_tasks=excluded.done_tasks")
         .bind(sprint_id).bind(&date).bind(total_points).bind(done_points).bind(total_hours).bind(done_hours).bind(total_tasks).bind(done_tasks)
         .execute(pool).await?;
-    Ok(sqlx::query_as::<_, SprintDailyStat>("SELECT * FROM sprint_daily_stats WHERE sprint_id = ? AND date = ?")
-        .bind(sprint_id).bind(&date).fetch_one(pool).await?)
+    Ok(sqlx::query_as::<_, SprintDailyStat>(
+        "SELECT * FROM sprint_daily_stats WHERE sprint_id = ? AND date = ?",
+    )
+    .bind(sprint_id)
+    .bind(&date)
+    .fetch_one(pool)
+    .await?)
 }
 
 pub async fn snapshot_active_sprints(pool: &Pool) -> Result<()> {
     let sprints = list_sprints(pool, Some("active"), None).await?;
-    for s in sprints { let _ = snapshot_sprint(pool, s.id).await; }
+    for s in sprints {
+        let _ = snapshot_sprint(pool, s.id).await;
+    }
     Ok(())
 }
 

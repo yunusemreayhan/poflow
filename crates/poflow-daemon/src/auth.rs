@@ -1,9 +1,9 @@
 use axum::{extract::FromRequestParts, http::request::Parts};
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::sync::OnceLock;
 use tokio::sync::RwLock;
-use std::collections::HashSet;
 
 static SECRET: OnceLock<Vec<u8>> = OnceLock::new();
 static BLOCKLIST: OnceLock<RwLock<HashSet<String>>> = OnceLock::new();
@@ -19,10 +19,16 @@ fn blocklist() -> &'static RwLock<HashSet<String>> {
 /// Initialize auth with a DB pool for persistent token blocklist
 pub async fn init_pool(pool: crate::db::Pool) {
     AUTH_POOL.set(pool.clone()).ok();
-    let rows: Vec<(String,)> = sqlx::query_as("SELECT token_hash FROM token_blocklist WHERE expires_at > ?")
-        .bind(crate::db::now_str()).fetch_all(&pool).await.unwrap_or_default();
+    let rows: Vec<(String,)> =
+        sqlx::query_as("SELECT token_hash FROM token_blocklist WHERE expires_at > ?")
+            .bind(crate::db::now_str())
+            .fetch_all(&pool)
+            .await
+            .unwrap_or_default();
     let mut bl = blocklist().write().await;
-    for (hash,) in rows { bl.insert(hash); }
+    for (hash,) in rows {
+        bl.insert(hash);
+    }
 }
 
 fn secret() -> &'static [u8] {
@@ -55,19 +61,21 @@ fn secret() -> &'static [u8] {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Claims {
-    pub sub: String,      // user_id as string
+    pub sub: String, // user_id as string
     pub user_id: i64,
     pub username: String,
     pub role: String,
     pub exp: usize,
     pub iat: usize,
     #[serde(default = "default_token_type")]
-    pub typ: String,      // "access" or "refresh"
+    pub typ: String, // "access" or "refresh"
     #[serde(default)]
-    pub jti: String,      // unique token ID
+    pub jti: String, // unique token ID
 }
 
-fn default_token_type() -> String { "access".to_string() }
+fn default_token_type() -> String {
+    "access".to_string()
+}
 
 fn gen_jti() -> String {
     let mut buf = [0u8; 16];
@@ -75,23 +83,68 @@ fn gen_jti() -> String {
     hex::encode(buf)
 }
 
-pub fn create_token(user_id: i64, username: &str, role: &str) -> Result<String, jsonwebtoken::errors::Error> {
+pub fn create_token(
+    user_id: i64,
+    username: &str,
+    role: &str,
+) -> Result<String, jsonwebtoken::errors::Error> {
     let now = chrono::Utc::now().timestamp() as usize;
-    let access_exp: usize = std::env::var("ACCESS_TOKEN_EXPIRY_SECS").ok().and_then(|v| v.parse().ok()).unwrap_or(2 * 3600);
-    let claims = Claims { sub: user_id.to_string(), user_id, username: username.to_string(), role: role.to_string(), exp: now + access_exp, iat: now, typ: "access".to_string(), jti: gen_jti() };
-    encode(&Header::default(), &claims, &EncodingKey::from_secret(secret()))
+    let access_exp: usize = std::env::var("ACCESS_TOKEN_EXPIRY_SECS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(2 * 3600);
+    let claims = Claims {
+        sub: user_id.to_string(),
+        user_id,
+        username: username.to_string(),
+        role: role.to_string(),
+        exp: now + access_exp,
+        iat: now,
+        typ: "access".to_string(),
+        jti: gen_jti(),
+    };
+    encode(
+        &Header::default(),
+        &claims,
+        &EncodingKey::from_secret(secret()),
+    )
 }
 
 /// Create a long-lived refresh token (30 days)
-pub fn create_refresh_token(user_id: i64, username: &str, role: &str) -> Result<String, jsonwebtoken::errors::Error> {
+pub fn create_refresh_token(
+    user_id: i64,
+    username: &str,
+    role: &str,
+) -> Result<String, jsonwebtoken::errors::Error> {
     let now = chrono::Utc::now().timestamp() as usize;
-    let refresh_exp: usize = std::env::var("REFRESH_TOKEN_EXPIRY_SECS").ok().and_then(|v| v.parse().ok()).unwrap_or(30 * 24 * 3600);
-    let claims = Claims { sub: user_id.to_string(), user_id, username: username.to_string(), role: role.to_string(), exp: now + refresh_exp, iat: now, typ: "refresh".to_string(), jti: gen_jti() };
-    encode(&Header::default(), &claims, &EncodingKey::from_secret(secret()))
+    let refresh_exp: usize = std::env::var("REFRESH_TOKEN_EXPIRY_SECS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(30 * 24 * 3600);
+    let claims = Claims {
+        sub: user_id.to_string(),
+        user_id,
+        username: username.to_string(),
+        role: role.to_string(),
+        exp: now + refresh_exp,
+        iat: now,
+        typ: "refresh".to_string(),
+        jti: gen_jti(),
+    };
+    encode(
+        &Header::default(),
+        &claims,
+        &EncodingKey::from_secret(secret()),
+    )
 }
 
 pub fn verify_token(token: &str) -> Result<Claims, jsonwebtoken::errors::Error> {
-    decode::<Claims>(token, &DecodingKey::from_secret(secret()), &Validation::default()).map(|d| d.claims)
+    decode::<Claims>(
+        token,
+        &DecodingKey::from_secret(secret()),
+        &Validation::default(),
+    )
+    .map(|d| d.claims)
 }
 
 /// Revoke a token (add to blocklist). Persists to DB.
@@ -101,21 +154,37 @@ pub async fn revoke_token(token: &str) {
     // Persist to DB
     if let Some(pool) = AUTH_POOL.get() {
         let exp = decode::<Claims>(token, &DecodingKey::from_secret(secret()), &{
-            let mut v = Validation::default(); v.validate_exp = false; v
-        }).map(|d| d.claims.exp).unwrap_or(0);
+            let mut v = Validation::default();
+            v.validate_exp = false;
+            v
+        })
+        .map(|d| d.claims.exp)
+        .unwrap_or(0);
         let expires = chrono::DateTime::from_timestamp(exp as i64, 0)
             .map(|d| d.format("%Y-%m-%dT%H:%M:%S").to_string())
             .unwrap_or_default();
         sqlx::query("INSERT OR IGNORE INTO token_blocklist (token_hash, expires_at) VALUES (?, ?)")
-            .bind(&hash).bind(&expires).execute(pool).await.ok();
+            .bind(&hash)
+            .bind(&expires)
+            .execute(pool)
+            .await
+            .ok();
         // Prune expired from DB and sync in-memory blocklist
         let now = crate::db::now_str();
-        sqlx::query("DELETE FROM token_blocklist WHERE expires_at < ?").bind(&now).execute(pool).await.ok();
+        sqlx::query("DELETE FROM token_blocklist WHERE expires_at < ?")
+            .bind(&now)
+            .execute(pool)
+            .await
+            .ok();
         // S3: Trim in-memory set to match DB (prevents unbounded growth)
         let mut bl = blocklist().write().await;
         if bl.len() > 1000 {
-            let valid: Vec<(String,)> = sqlx::query_as("SELECT token_hash FROM token_blocklist WHERE expires_at > ?")
-                .bind(&now).fetch_all(pool).await.unwrap_or_default();
+            let valid: Vec<(String,)> =
+                sqlx::query_as("SELECT token_hash FROM token_blocklist WHERE expires_at > ?")
+                    .bind(&now)
+                    .fetch_all(pool)
+                    .await
+                    .unwrap_or_default();
             let valid_set: HashSet<String> = valid.into_iter().map(|(h,)| h).collect();
             *bl = valid_set;
         }
@@ -132,8 +201,12 @@ pub async fn is_revoked(token: &str) -> bool {
 pub async fn prune_blocklist() {
     if let Some(pool) = AUTH_POOL.get() {
         let now = crate::db::now_str();
-        let valid: Vec<(String,)> = sqlx::query_as("SELECT token_hash FROM token_blocklist WHERE expires_at > ?")
-            .bind(&now).fetch_all(pool).await.unwrap_or_default();
+        let valid: Vec<(String,)> =
+            sqlx::query_as("SELECT token_hash FROM token_blocklist WHERE expires_at > ?")
+                .bind(&now)
+                .fetch_all(pool)
+                .await
+                .unwrap_or_default();
         let valid_set: HashSet<String> = valid.into_iter().map(|(h,)| h).collect();
         let mut bl = blocklist().write().await;
         let before = bl.len();
@@ -146,7 +219,7 @@ pub async fn prune_blocklist() {
 }
 
 fn token_hash(data: &[u8]) -> String {
-    use sha2::{Sha256, Digest};
+    use sha2::{Digest, Sha256};
     hex::encode(Sha256::digest(data))
 }
 
@@ -162,35 +235,63 @@ impl FromRequestParts<std::sync::Arc<crate::engine::Engine>> for Claims {
         async move {
             // CSRF: require x-requested-with header on state-changing requests
             let method = &parts.method;
-            if method != axum::http::Method::GET && method != axum::http::Method::HEAD && method != axum::http::Method::OPTIONS
-                && parts.headers.get("x-requested-with").is_none() {
-                    return Err(axum::http::StatusCode::FORBIDDEN);
-                }
-            let header = parts.headers.get("authorization")
+            if method != axum::http::Method::GET
+                && method != axum::http::Method::HEAD
+                && method != axum::http::Method::OPTIONS
+                && parts.headers.get("x-requested-with").is_none()
+            {
+                return Err(axum::http::StatusCode::FORBIDDEN);
+            }
+            let header = parts
+                .headers
+                .get("authorization")
                 .and_then(|v| v.to_str().ok())
                 .ok_or(axum::http::StatusCode::UNAUTHORIZED)?;
-            let token = header.strip_prefix("Bearer ").ok_or(axum::http::StatusCode::UNAUTHORIZED)?;
-            if is_revoked(token).await { return Err(axum::http::StatusCode::UNAUTHORIZED); }
+            let token = header
+                .strip_prefix("Bearer ")
+                .ok_or(axum::http::StatusCode::UNAUTHORIZED)?;
+            if is_revoked(token).await {
+                return Err(axum::http::StatusCode::UNAUTHORIZED);
+            }
             let claims = verify_token(token).map_err(|_| axum::http::StatusCode::UNAUTHORIZED)?;
             // Reject refresh tokens used as access tokens
-            if claims.typ == "refresh" { return Err(axum::http::StatusCode::UNAUTHORIZED); }
+            if claims.typ == "refresh" {
+                return Err(axum::http::StatusCode::UNAUTHORIZED);
+            }
             // Reject tokens from deleted users (cached for 60s)
             {
                 let cached = {
                     let cache = user_cache.read().await;
-                    cache.get(&claims.user_id).map(|t| t.elapsed().as_secs() < 60).unwrap_or(false)
+                    cache
+                        .get(&claims.user_id)
+                        .map(|t| t.elapsed().as_secs() < 60)
+                        .unwrap_or(false)
                 };
                 if !cached {
-                    let row: Option<(i64, Option<String>)> = sqlx::query_as("SELECT id, password_changed_at FROM users WHERE id = ?")
-                        .bind(claims.user_id).fetch_optional(&pool).await.unwrap_or(None);
+                    let row: Option<(i64, Option<String>)> =
+                        sqlx::query_as("SELECT id, password_changed_at FROM users WHERE id = ?")
+                            .bind(claims.user_id)
+                            .fetch_optional(&pool)
+                            .await
+                            .unwrap_or(None);
                     match row {
                         None => return Err(axum::http::StatusCode::UNAUTHORIZED),
                         Some((_, Some(changed_at))) => {
                             // S2: Reject tokens issued before password was changed
-                            if let Ok(changed) = chrono::NaiveDateTime::parse_from_str(&changed_at, "%Y-%m-%dT%H:%M:%S%.f")
-                                .or_else(|_| chrono::NaiveDateTime::parse_from_str(&changed_at, "%Y-%m-%dT%H:%M:%S")) {
+                            if let Ok(changed) = chrono::NaiveDateTime::parse_from_str(
+                                &changed_at,
+                                "%Y-%m-%dT%H:%M:%S%.f",
+                            )
+                            .or_else(|_| {
+                                chrono::NaiveDateTime::parse_from_str(
+                                    &changed_at,
+                                    "%Y-%m-%dT%H:%M:%S",
+                                )
+                            }) {
                                 let changed_ts = changed.and_utc().timestamp() as usize;
-                                if claims.iat < changed_ts { return Err(axum::http::StatusCode::UNAUTHORIZED); }
+                                if claims.iat < changed_ts {
+                                    return Err(axum::http::StatusCode::UNAUTHORIZED);
+                                }
                             }
                         }
                         _ => {}
@@ -224,7 +325,10 @@ pub fn is_owner_or_privileged(resource_user_id: i64, claims: &Claims) -> bool {
 }
 
 /// Remove a user from the verified-user cache (call on user deletion)
-pub async fn invalidate_user_cache(cache: &tokio::sync::RwLock<std::collections::HashMap<i64, std::time::Instant>>, user_id: i64) {
+pub async fn invalidate_user_cache(
+    cache: &tokio::sync::RwLock<std::collections::HashMap<i64, std::time::Instant>>,
+    user_id: i64,
+) {
     cache.write().await.remove(&user_id);
 }
 
@@ -256,7 +360,10 @@ mod tests {
     fn token_hash_known_value() {
         // SHA-256 of empty string
         let h = token_hash(b"");
-        assert_eq!(h, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+        assert_eq!(
+            h,
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        );
     }
 
     #[test]
@@ -310,7 +417,8 @@ mod tests {
 
     #[test]
     fn claims_default_token_type() {
-        let json = r#"{"sub":"1","user_id":1,"username":"u","role":"user","exp":0,"iat":0,"jti":"x"}"#;
+        let json =
+            r#"{"sub":"1","user_id":1,"username":"u","role":"user","exp":0,"iat":0,"jti":"x"}"#;
         let c: Claims = serde_json::from_str(json).unwrap();
         assert_eq!(c.typ, "access"); // default_token_type
     }
@@ -379,7 +487,10 @@ mod tests {
         let token = create_token(1, "alice", "user").unwrap();
         assert!(!is_revoked(&token).await);
         // Revoke without DB (AUTH_POOL not set in unit tests — only in-memory blocklist)
-        blocklist().write().await.insert(token_hash(token.as_bytes()));
+        blocklist()
+            .write()
+            .await
+            .insert(token_hash(token.as_bytes()));
         assert!(is_revoked(&token).await);
     }
 }
