@@ -287,17 +287,13 @@ pub async fn advanced_search(
                 }
                 _ => {}
             },
-            "assignee" => {
-                if f.op == "eq" {
-                    conditions.push("EXISTS (SELECT 1 FROM task_assignees _ta JOIN users _au ON _au.id = _ta.user_id WHERE _ta.task_id = t.id AND _au.username = ?)".into());
-                    binds.push(f.value.as_str().unwrap_or("").to_string());
-                }
+            "assignee" if f.op == "eq" => {
+                conditions.push("EXISTS (SELECT 1 FROM task_assignees _ta JOIN users _au ON _au.id = _ta.user_id WHERE _ta.task_id = t.id AND _au.username = ?)".into());
+                binds.push(f.value.as_str().unwrap_or("").to_string());
             }
-            "label" => {
-                if f.op == "eq" {
-                    conditions.push("EXISTS (SELECT 1 FROM task_labels _tl JOIN labels _l ON _l.id = _tl.label_id WHERE _tl.task_id = t.id AND _l.name = ?)".into());
-                    binds.push(f.value.as_str().unwrap_or("").to_string());
-                }
+            "label" if f.op == "eq" => {
+                conditions.push("EXISTS (SELECT 1 FROM task_labels _tl JOIN labels _l ON _l.id = _tl.label_id WHERE _tl.task_id = t.id AND _l.name = ?)".into());
+                binds.push(f.value.as_str().unwrap_or("").to_string());
             }
             "priority" => {
                 let val = f.value.as_i64().unwrap_or(0).to_string();
@@ -347,11 +343,9 @@ pub async fn advanced_search(
                     _ => {}
                 }
             }
-            "title" => {
-                if f.op == "contains" {
-                    conditions.push("t.title LIKE ? ESCAPE '\\'".into());
-                    binds.push(db::escape_like_pub(f.value.as_str().unwrap_or("")));
-                }
+            "title" if f.op == "contains" => {
+                conditions.push("t.title LIKE ? ESCAPE '\\'".into());
+                binds.push(db::escape_like_pub(f.value.as_str().unwrap_or("")));
             }
             s if s.starts_with("custom:") => {
                 let field_name = &s[7..];
